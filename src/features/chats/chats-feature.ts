@@ -30,7 +30,7 @@ export function createChatsFeature(ctx: vscode.ExtensionContext): Feature {
       const exporter = new MarkdownExporter(repo);
 
       provider = new ChatTreeProvider(repo);
-      viewer = new ChatViewerService(ctx, repo, exporter);
+      viewer = new ChatViewerService(ctx, repo);
       statusBar = new ChatStatusBar();
       statusBar.setVisible(readConfig().chats.showStatusBarRename);
 

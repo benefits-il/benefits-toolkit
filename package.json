@@ -2,7 +2,7 @@
   "name": "benefits-toolkit",
   "displayName": "Benefit's Toolkit",
   "description": "Quality-of-life tools for Claude Code: RTL chat support, audio notifications, and conversation manager — all in one place.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "benakiva",
   "author": {
     "name": "Ben Akiva"
