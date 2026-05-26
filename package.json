@@ -1,0 +1,215 @@
+{
+  "name": "benefits-toolkit",
+  "displayName": "Benefit's Toolkit",
+  "description": "Quality-of-life tools for Claude Code: RTL chat support, audio notifications, and conversation manager — all in one place.",
+  "version": "0.0.1",
+  "publisher": "benakiva",
+  "author": {
+    "name": "Ben Akiva"
+  },
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "claude",
+    "claude code",
+    "rtl",
+    "hebrew",
+    "chat history",
+    "notifications",
+    "sounds"
+  ],
+  "icon": "media/icon.png",
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "benefit-sidebar",
+          "title": "Benefit's Toolkit",
+          "icon": "media/activity-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "benefit-sidebar": [
+        {
+          "id": "benefit.chatsView",
+          "name": "Claude Chats",
+          "icon": "media/activity-icon.svg",
+          "contextualTitle": "Claude Chats"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "benefit.chatsView",
+        "contents": "No Claude Code conversations found yet.\nOnce you start chatting in Claude Code, your conversations will appear here.\n[Refresh](command:benefit.chats.refresh)"
+      }
+    ],
+    "commands": [
+      { "command": "benefit.rtl.toggle", "title": "RTL: Toggle", "category": "Benefit" },
+      { "command": "benefit.rtl.enableActive", "title": "RTL: Enable (Active mode)", "category": "Benefit" },
+      { "command": "benefit.rtl.enableAlways", "title": "RTL: Enable (Always)", "category": "Benefit" },
+      { "command": "benefit.rtl.enableAuto", "title": "RTL: Enable (Auto-detect)", "category": "Benefit" },
+      { "command": "benefit.rtl.disable", "title": "RTL: Disable", "category": "Benefit" },
+      { "command": "benefit.rtl.status", "title": "RTL: Show Status", "category": "Benefit" },
+
+      { "command": "benefit.sounds.install", "title": "Sounds: Install Hooks", "category": "Benefit" },
+      { "command": "benefit.sounds.uninstall", "title": "Sounds: Uninstall Hooks", "category": "Benefit" },
+      { "command": "benefit.sounds.chooseSounds", "title": "Sounds: Choose Sound Variants", "category": "Benefit" },
+      { "command": "benefit.sounds.test", "title": "Sounds: Test Playback", "category": "Benefit" },
+      { "command": "benefit.sounds.status", "title": "Sounds: Show Status", "category": "Benefit" },
+
+      { "command": "benefit.chats.refresh", "title": "Refresh", "category": "Benefit Chats", "icon": "$(refresh)" },
+      { "command": "benefit.chats.rename", "title": "Rename", "category": "Benefit Chats", "icon": "$(edit)" },
+      { "command": "benefit.chats.archive", "title": "Archive", "category": "Benefit Chats", "icon": "$(archive)" },
+      { "command": "benefit.chats.restore", "title": "Restore from Archive", "category": "Benefit Chats" },
+      { "command": "benefit.chats.delete", "title": "Delete", "category": "Benefit Chats", "icon": "$(trash)" },
+      { "command": "benefit.chats.search", "title": "Search Conversations", "category": "Benefit Chats", "icon": "$(search)" },
+      { "command": "benefit.chats.export", "title": "Export to Markdown", "category": "Benefit Chats" },
+      { "command": "benefit.chats.view", "title": "View Conversation", "category": "Benefit Chats" },
+      { "command": "benefit.chats.toggleSort", "title": "Toggle Sort Order", "category": "Benefit Chats", "icon": "$(sort-precedence)" },
+      { "command": "benefit.chats.toggleGroupBy", "title": "Toggle Group By (Date / Project)", "category": "Benefit Chats" },
+      { "command": "benefit.chats.toggleArchived", "title": "Show/Hide Archived", "category": "Benefit Chats", "icon": "$(eye)" },
+      { "command": "benefit.chats.statusBarRename", "title": "Rename Active Conversation", "category": "Benefit Chats" }
+    ],
+    "menus": {
+      "view/title": [
+        { "command": "benefit.chats.refresh", "when": "view == benefit.chatsView", "group": "navigation@1" },
+        { "command": "benefit.chats.search", "when": "view == benefit.chatsView", "group": "navigation@2" },
+        { "command": "benefit.chats.toggleSort", "when": "view == benefit.chatsView", "group": "navigation@3" },
+        { "command": "benefit.chats.toggleArchived", "when": "view == benefit.chatsView", "group": "navigation@4" },
+        { "command": "benefit.chats.toggleGroupBy", "when": "view == benefit.chatsView", "group": "1_view" }
+      ],
+      "view/item/context": [
+        { "command": "benefit.chats.view", "when": "view == benefit.chatsView && viewItem == conversation", "group": "1_open@1" },
+        { "command": "benefit.chats.rename", "when": "view == benefit.chatsView && viewItem == conversation", "group": "2_edit@1" },
+        { "command": "benefit.chats.archive", "when": "view == benefit.chatsView && viewItem == conversation", "group": "2_edit@2" },
+        { "command": "benefit.chats.restore", "when": "view == benefit.chatsView && viewItem == archived-conversation", "group": "2_edit@1" },
+        { "command": "benefit.chats.export", "when": "view == benefit.chatsView && viewItem =~ /conversation/", "group": "3_actions@1" },
+        { "command": "benefit.chats.delete", "when": "view == benefit.chatsView && viewItem =~ /conversation/", "group": "9_destroy@1" }
+      ]
+    },
+    "configuration": {
+      "title": "Benefit's Toolkit",
+      "properties": {
+        "benefit.rtl.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable the RTL feature."
+        },
+        "benefit.rtl.mode": {
+          "type": "string",
+          "enum": ["off", "active", "always", "auto"],
+          "default": "off",
+          "enumDescriptions": [
+            "RTL is off.",
+            "Show a toggle button in the chat header; user toggles per session.",
+            "Force RTL always on.",
+            "Auto-detect RTL per message bubble."
+          ],
+          "description": "RTL mode."
+        },
+        "benefit.rtl.textFont": {
+          "type": "string",
+          "default": "",
+          "description": "Optional custom font for chat text (leave empty to use default)."
+        },
+        "benefit.rtl.codeFont": {
+          "type": "string",
+          "default": "",
+          "description": "Optional custom font for code blocks (leave empty to use default)."
+        },
+        "benefit.rtl.claudeCodePathOverride": {
+          "type": "string",
+          "default": "",
+          "description": "Override path to the Claude Code extension folder. Leave empty for auto-detection."
+        },
+        "benefit.sounds.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable the Sounds feature."
+        },
+        "benefit.sounds.stopVariant": {
+          "type": "string",
+          "enum": ["default", "alt"],
+          "default": "default",
+          "description": "Sound variant for the Stop event (Claude finished a message)."
+        },
+        "benefit.sounds.notificationVariant": {
+          "type": "string",
+          "enum": ["default", "alt"],
+          "default": "default",
+          "description": "Sound variant for the Notification event (Claude waits for input)."
+        },
+        "benefit.sounds.cleanupOnDeactivate": {
+          "type": "boolean",
+          "default": false,
+          "description": "Remove sound hooks from ~/.claude/settings.json when the extension is deactivated."
+        },
+        "benefit.chats.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable the Chats feature."
+        },
+        "benefit.chats.groupBy": {
+          "type": "string",
+          "enum": ["date", "project", "flat"],
+          "default": "date",
+          "description": "How to group conversations in the sidebar."
+        },
+        "benefit.chats.sortOrder": {
+          "type": "string",
+          "enum": ["newest", "oldest"],
+          "default": "newest",
+          "description": "Conversation sort order."
+        },
+        "benefit.chats.showArchived": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include archived conversations in the sidebar."
+        },
+        "benefit.chats.hideEmpty": {
+          "type": "boolean",
+          "default": true,
+          "description": "Hide conversations that contain no real user/assistant messages."
+        },
+        "benefit.chats.confirmDelete": {
+          "type": "boolean",
+          "default": true,
+          "description": "Ask for confirmation before deleting a conversation."
+        },
+        "benefit.chats.showStatusBarRename": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a status bar shortcut to rename the active conversation."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "node esbuild.config.mjs --production",
+    "watch": "node esbuild.config.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "package": "vsce package",
+    "test": "node --test --import tsx test/**/*.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.0",
+    "@types/vscode": "^1.95.0",
+    "@vscode/vsce": "^3.2.0",
+    "esbuild": "^0.24.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

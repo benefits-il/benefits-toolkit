@@ -1,0 +1,109 @@
+/*
+ * Benefit's Toolkit — RTL overrides.
+ * Scoped under the body class .benefit-rtl-on so we can toggle without re-patching.
+ * In "always" mode the scope is applied unconditionally via the JS shim.
+ */
+
+.benefit-rtl-on [class*="messagesContainer_"],
+.benefit-rtl-on [class*="userMessage_"],
+.benefit-rtl-on [class*="userMessageContainer_"],
+.benefit-rtl-on [class*="root_"]:not([class*="thinkingContent_"] [class*="root_"]),
+.benefit-rtl-on [class*="questionBlock_"],
+.benefit-rtl-on [class*="questionHeader_"],
+.benefit-rtl-on [class*="answerText_"],
+.benefit-rtl-on [class*="optionText_"],
+.benefit-rtl-on [class*="optionContent_"] {
+  direction: rtl;
+  unicode-bidi: plaintext;
+}
+
+.benefit-rtl-on [class*="userMessage_"],
+.benefit-rtl-on [class*="userMessageContainer_"] {
+  text-align: right !important;
+  align-items: flex-end !important;
+  margin-left: auto !important;
+  margin-right: 0 !important;
+}
+
+.benefit-rtl-on [class*="root_"]:not([class*="thinkingContent_"] [class*="root_"]) > :is(p, ul, ol, h1, h2, h3, h4, blockquote),
+.benefit-rtl-on [class*="root_"]:not([class*="thinkingContent_"] [class*="root_"]) > :is(ul, ol) li {
+  text-align: right;
+}
+
+/* Prompt input auto-detect; force RTL when scope is on. */
+[class*="messageInputContainer_"] > * {
+  unicode-bidi: plaintext;
+  text-align: start;
+}
+.benefit-rtl-on [class*="messageInputContainer_"] > * {
+  direction: rtl;
+  unicode-bidi: normal;
+}
+
+/* Per-message auto-detection: when the JS shim sets dir="rtl" on a bubble. */
+[data-benefit-dir="rtl"] {
+  direction: rtl;
+  unicode-bidi: plaintext;
+  text-align: right;
+}
+[data-benefit-dir="ltr"] {
+  direction: ltr;
+  unicode-bidi: plaintext;
+  text-align: left;
+}
+
+/* Keep code, tools, and meta UI strictly LTR. */
+.benefit-rtl-on pre,
+.benefit-rtl-on code,
+.benefit-rtl-on [class*="codeBlockWrapper_"],
+.benefit-rtl-on [class*="toolUse_"],
+.benefit-rtl-on [class*="toolSummary_"],
+.benefit-rtl-on [class*="toolBody_"],
+.benefit-rtl-on [class*="toolBodyGrid_"],
+.benefit-rtl-on [class*="toolBodyRow_"],
+.benefit-rtl-on [class*="toolBodyRowContent_"],
+.benefit-rtl-on [class*="toolBodyRowLabel_"],
+.benefit-rtl-on [class*="toolResult_"],
+.benefit-rtl-on [class*="toolNameText_"],
+.benefit-rtl-on [class*="toolReference_"],
+.benefit-rtl-on [class*="slashCommandMessage_"],
+.benefit-rtl-on [class*="slashCommandResultMessage_"],
+.benefit-rtl-on [class*="progressContent_"],
+.benefit-rtl-on [class*="todoListContainer_"],
+.benefit-rtl-on [class*="todoList_"],
+.benefit-rtl-on [class*="todoItem_"],
+.benefit-rtl-on [class*="copyButton_"],
+.benefit-rtl-on [class*="iconButton_"],
+.benefit-rtl-on [class*="actionButton_"],
+.benefit-rtl-on [class*="errorMessage_"],
+.benefit-rtl-on [class*="auth_"] {
+  direction: ltr !important;
+  unicode-bidi: isolate !important;
+  text-align: left !important;
+}
+
+/* The toggle button that the JS shim adds to the chat header. */
+.benefit-rtl-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin: 0 6px;
+  padding: 0;
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--vscode-foreground, currentColor);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.7;
+}
+.benefit-rtl-toggle:hover { opacity: 1; }
+.benefit-rtl-toggle.is-on {
+  background: var(--vscode-button-background, rgba(127,127,127,0.18));
+  color: var(--vscode-button-foreground, currentColor);
+  opacity: 1;
+}

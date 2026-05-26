@@ -1,0 +1,64 @@
+import * as vscode from "vscode";
+import { affects, readConfig } from "../../core/config-manager";
+import type { Feature } from "../../core/feature-registry";
+import { logger } from "../../core/logger";
+import { HookInstaller } from "./services/hook-installer";
+import { SoundAssetManager } from "./services/sound-asset-manager";
+import { VariantPicker } from "./services/variant-picker";
+import { registerSoundsCommands } from "./ui/sounds-commands";
+
+export function createSoundsFeature(ctx: vscode.ExtensionContext): Feature {
+  let disposables: vscode.Disposable[] = [];
+  let installer: HookInstaller | undefined;
+
+  return {
+    id: "sounds",
+    isEnabled(): boolean {
+      return readConfig().sounds.enabled;
+    },
+    async activate(): Promise<void> {
+      const assets = new SoundAssetManager(ctx);
+      installer = new HookInstaller(assets);
+      const picker = new VariantPicker(assets);
+
+      disposables = registerSoundsCommands(ctx, installer, assets, picker);
+
+      disposables.push(
+        vscode.workspace.onDidChangeConfiguration(async (e) => {
+          if (!installer) return;
+          const variantChanged =
+            affects(e, "sounds.stopVariant") || affects(e, "sounds.notificationVariant");
+          if (!variantChanged) return;
+          if (!(await installer.isInstalled())) return;
+          const cfg = readConfig().sounds;
+          try {
+            await installer.install(cfg.stopVariant, cfg.notificationVariant);
+            logger.info("sounds", "Re-installed hooks after variant config change.");
+          } catch (err) {
+            logger.error("sounds", "Auto re-install failed", err);
+          }
+        }),
+      );
+    },
+    async deactivate(): Promise<void> {
+      for (const d of disposables) {
+        try {
+          d.dispose();
+        } catch {
+          // ignore
+        }
+      }
+      disposables = [];
+
+      const cfg = readConfig().sounds;
+      if (cfg.cleanupOnDeactivate && installer) {
+        try {
+          await installer.uninstall();
+        } catch (err) {
+          logger.warn("sounds", "Cleanup-on-deactivate failed", err);
+        }
+      }
+      installer = undefined;
+    },
+  };
+}
