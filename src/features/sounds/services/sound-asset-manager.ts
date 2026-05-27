@@ -49,6 +49,20 @@ export class SoundAssetManager {
     };
   }
 
+  async cleanupLegacyArtifacts(): Promise<void> {
+    const dir = claudeSoundsDir();
+    const legacy = ["play-stop.ps1", "play-notify.ps1", "benefit-hook.log"];
+    for (const name of legacy) {
+      try {
+        await fs.unlink(path.join(dir, name));
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+          // best-effort cleanup — never block install on a leftover file
+        }
+      }
+    }
+  }
+
   async removeInstalled(): Promise<void> {
     const dir = claudeSoundsDir();
     if (!(await pathExists(dir))) return;

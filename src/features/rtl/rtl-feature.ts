@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { affects, readConfig } from "../../core/config-manager";
-import type { Feature } from "../../core/feature-registry";
+import type { DeactivateReason, Feature } from "../../core/feature-registry";
 import { logger } from "../../core/logger";
 import { ClaudeAssetLocator } from "./services/claude-asset-locator";
 import { RtlAssetPatcher } from "./services/css-injector";
@@ -12,6 +12,24 @@ export function createRtlFeature(ctx: vscode.ExtensionContext): Feature {
   let statusBar: RtlStatusBar | undefined;
   let locator: ClaudeAssetLocator | undefined;
   let patcher: RtlAssetPatcher | undefined;
+  let reloadPromptShowing = false;
+
+  // Claude Code's webview reads index.css/js at webview-creation time. When we
+  // change those files at runtime, the already-open chat keeps the old assets
+  // until its webview reloads — which is why "I enabled RTL but nothing happened".
+  // Prompt once when (and only when) a patch was actually newly written.
+  function promptReload(): void {
+    if (reloadPromptShowing) return;
+    reloadPromptShowing = true;
+    void vscode.window
+      .showInformationMessage("Benefit: RTL settings applied. Reload to see the change.", "Reload Window")
+      .then((choice) => {
+        reloadPromptShowing = false;
+        if (choice === "Reload Window") {
+          void vscode.commands.executeCommand("workbench.action.reloadWindow");
+        }
+      });
+  }
 
   async function reconcile(): Promise<void> {
     if (!locator || !patcher) return;
@@ -25,17 +43,19 @@ export function createRtlFeature(ctx: vscode.ExtensionContext): Feature {
     }
 
     if (cfg.mode === "off") {
-      await patcher.remove(assets);
+      const changed = await patcher.remove(assets);
       statusBar?.render(cfg.mode, false);
+      if (changed) promptReload();
       return;
     }
 
-    await patcher.apply(assets, {
+    const changed = await patcher.apply(assets, {
       mode: cfg.mode,
       textFont: cfg.textFont,
       codeFont: cfg.codeFont,
     });
     statusBar?.render(cfg.mode, true);
+    if (changed) promptReload();
   }
 
   return {
@@ -82,8 +102,11 @@ export function createRtlFeature(ctx: vscode.ExtensionContext): Feature {
         logger.error("rtl", "Initial reconcile failed", err);
       }
     },
-    async deactivate(): Promise<void> {
-      if (locator && patcher) {
+    async deactivate(reason: DeactivateReason): Promise<void> {
+      // Only strip the patch when the user actually turns the feature off.
+      // On a routine window reload/shutdown we LEAVE it in place so the next
+      // webview load already renders RTL — no reload needed, no startup race.
+      if (reason === "disable" && locator && patcher) {
         const assets = await locator.locate();
         if (assets) {
           try {

@@ -23,6 +23,17 @@ export function createSoundsFeature(ctx: vscode.ExtensionContext): Feature {
 
       disposables = registerSoundsCommands(ctx, installer, assets, picker);
 
+      // Self-heal: (re)install hooks if they're missing or stale. This is what
+      // fixes "sounds stopped working again" after a Claude Code update or a
+      // settings.json reset wipes the hooks.
+      const initial = readConfig().sounds;
+      try {
+        const changed = await installer.ensureInstalled(initial.stopVariant, initial.notificationVariant);
+        if (changed) logger.info("sounds", "Hooks (re)installed on activation.");
+      } catch (err) {
+        logger.error("sounds", "ensureInstalled on activation failed", err);
+      }
+
       disposables.push(
         vscode.workspace.onDidChangeConfiguration(async (e) => {
           if (!installer) return;

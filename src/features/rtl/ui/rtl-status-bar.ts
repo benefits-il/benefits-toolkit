@@ -8,12 +8,17 @@ export class RtlStatusBar implements vscode.Disposable {
   constructor() {
     this.item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 1000);
     this.item.command = "benefit.rtl.toggle";
-    this.item.tooltip = "Benefit: toggle RTL mode for Claude Code";
   }
 
   render(mode: RtlMode, applied: boolean): void {
-    const indicator = applied ? "$(arrow-left)" : "$(arrow-right)";
-    this.item.text = `${indicator} RTL: ${describeMode(mode)}`;
+    const icon = applied ? "$(arrow-swap)" : "$(arrow-right)";
+    this.item.text = `${icon} RTL`;
+    this.item.tooltip = applied
+      ? `Benefit RTL: ${describeMode(mode)} (click to disable). Close & reopen Claude Code chat to refresh.`
+      : `Benefit RTL: off (click to enable). Close & reopen Claude Code chat to apply.`;
+    this.item.backgroundColor = applied
+      ? new vscode.ThemeColor("statusBarItem.warningBackground")
+      : undefined;
     this.item.show();
   }
 

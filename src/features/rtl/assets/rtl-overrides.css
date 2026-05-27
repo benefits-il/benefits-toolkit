@@ -4,10 +4,43 @@
  * In "always" mode the scope is applied unconditionally via the JS shim.
  */
 
-.benefit-rtl-on [class*="messagesContainer_"],
+/* ==========================================
+   RTL content (text bubbles + markdown)
+   ========================================== */
+
+.benefit-rtl-on [class*="messagesContainer_"] {
+  direction: rtl;
+}
+
 .benefit-rtl-on [class*="userMessage_"],
-.benefit-rtl-on [class*="userMessageContainer_"],
-.benefit-rtl-on [class*="root_"]:not([class*="thinkingContent_"] [class*="root_"]),
+.benefit-rtl-on [class*="userMessageContainer_"] {
+  direction: rtl;
+  unicode-bidi: plaintext;
+  text-align: right !important;
+  align-items: flex-end !important;
+  margin-left: auto !important;
+  margin-right: 0 !important;
+}
+
+.benefit-rtl-on [class*="content_"][class*="xGDvVg"],
+.benefit-rtl-on [class*="content_"] > span {
+  unicode-bidi: plaintext;
+}
+
+.benefit-rtl-on [class*="root_"]:not([class*="thinkingContent_"] [class*="root_"]) {
+  direction: rtl;
+  unicode-bidi: plaintext;
+}
+
+.benefit-rtl-on [class*="root_"]:not([class*="thinkingContent_"] [class*="root_"]) > :is(p, ul, ol, h1, h2, h3, h4, blockquote),
+.benefit-rtl-on [class*="root_"]:not([class*="thinkingContent_"] [class*="root_"]) > :is(ul, ol) li {
+  text-align: right;
+}
+
+.benefit-rtl-on [class*="root_"]:not([class*="thinkingContent_"] [class*="root_"]) a {
+  unicode-bidi: plaintext;
+}
+
 .benefit-rtl-on [class*="questionBlock_"],
 .benefit-rtl-on [class*="questionHeader_"],
 .benefit-rtl-on [class*="answerText_"],
@@ -17,20 +50,7 @@
   unicode-bidi: plaintext;
 }
 
-.benefit-rtl-on [class*="userMessage_"],
-.benefit-rtl-on [class*="userMessageContainer_"] {
-  text-align: right !important;
-  align-items: flex-end !important;
-  margin-left: auto !important;
-  margin-right: 0 !important;
-}
-
-.benefit-rtl-on [class*="root_"]:not([class*="thinkingContent_"] [class*="root_"]) > :is(p, ul, ol, h1, h2, h3, h4, blockquote),
-.benefit-rtl-on [class*="root_"]:not([class*="thinkingContent_"] [class*="root_"]) > :is(ul, ol) li {
-  text-align: right;
-}
-
-/* Prompt input auto-detect; force RTL when scope is on. */
+/* Prompt input — always auto-detect direction; force RTL when scope is on. */
 [class*="messageInputContainer_"] > * {
   unicode-bidi: plaintext;
   text-align: start;
@@ -40,7 +60,7 @@
   unicode-bidi: normal;
 }
 
-/* Per-message auto-detection: when the JS shim sets dir="rtl" on a bubble. */
+/* Per-message auto-detection (auto mode): the JS shim sets dir on each bubble. */
 [data-benefit-dir="rtl"] {
   direction: rtl;
   unicode-bidi: plaintext;
@@ -52,10 +72,47 @@
   text-align: left;
 }
 
-/* Keep code, tools, and meta UI strictly LTR. */
+/* ==========================================
+   LTR overrides — UI chrome, tools, code, thinking
+   ========================================== */
+
+.benefit-rtl-on [class*="slashCommandMessage_"],
+.benefit-rtl-on [class*="slashCommandResultMessage_"],
+.benefit-rtl-on [class*="header_"][class*="aqhumA"],
+.benefit-rtl-on [class*="sessionsButtonText_"],
+.benefit-rtl-on [class*="dotSuccess_"],
+.benefit-rtl-on [class*="dotFailure_"],
+.benefit-rtl-on [class*="dotProgress_"],
+.benefit-rtl-on [class*="dotWarning_"],
+.benefit-rtl-on [class*="progressContent_"],
+.benefit-rtl-on [class*="inputContainer_"][class*="cKsPxg"],
+.benefit-rtl-on [class*="inputWrapper_"],
+.benefit-rtl-on [class*="iconButton_"],
+.benefit-rtl-on [class*="copyButton_"],
+.benefit-rtl-on [class*="actionButton_"],
+.benefit-rtl-on [class*="selectionAttachment_"],
+.benefit-rtl-on [class*="attachmentInfo_"],
+.benefit-rtl-on [class*="attachmentText_"],
+.benefit-rtl-on [class*="errorMessage_"],
+.benefit-rtl-on [class*="secondaryLine_"],
+.benefit-rtl-on [class*="todoListContainer_"],
+.benefit-rtl-on [class*="todoList_"],
+.benefit-rtl-on [class*="todoItem_"],
+.benefit-rtl-on [class*="auth_"],
+.benefit-rtl-on [class*="authUrl"] {
+  direction: ltr !important;
+}
+
+/* Code blocks — LTR + alignment */
 .benefit-rtl-on pre,
 .benefit-rtl-on code,
-.benefit-rtl-on [class*="codeBlockWrapper_"],
+.benefit-rtl-on [class*="codeBlockWrapper_"] {
+  direction: ltr !important;
+  unicode-bidi: isolate !important;
+  text-align: left !important;
+}
+
+/* Tool containers — LTR + alignment */
 .benefit-rtl-on [class*="toolUse_"],
 .benefit-rtl-on [class*="toolSummary_"],
 .benefit-rtl-on [class*="toolBody_"],
@@ -65,45 +122,72 @@
 .benefit-rtl-on [class*="toolBodyRowLabel_"],
 .benefit-rtl-on [class*="toolResult_"],
 .benefit-rtl-on [class*="toolNameText_"],
-.benefit-rtl-on [class*="toolReference_"],
-.benefit-rtl-on [class*="slashCommandMessage_"],
-.benefit-rtl-on [class*="slashCommandResultMessage_"],
-.benefit-rtl-on [class*="progressContent_"],
-.benefit-rtl-on [class*="todoListContainer_"],
-.benefit-rtl-on [class*="todoList_"],
-.benefit-rtl-on [class*="todoItem_"],
-.benefit-rtl-on [class*="copyButton_"],
-.benefit-rtl-on [class*="iconButton_"],
-.benefit-rtl-on [class*="actionButton_"],
-.benefit-rtl-on [class*="errorMessage_"],
-.benefit-rtl-on [class*="auth_"] {
+.benefit-rtl-on [class*="toolReference_"] {
   direction: ltr !important;
   unicode-bidi: isolate !important;
   text-align: left !important;
 }
 
-/* The toggle button that the JS shim adds to the chat header. */
-.benefit-rtl-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+/* Thinking blocks — LTR + alignment */
+.benefit-rtl-on [class*="thinking_"],
+.benefit-rtl-on [class*="thinkingContent_"],
+.benefit-rtl-on [class*="thinkingContainer_"],
+.benefit-rtl-on [class*="thinkingHeader_"],
+.benefit-rtl-on [class*="spinnerRow_"],
+.benefit-rtl-on [class*="timelineMessage_"]:has([class*="thinking_"]) {
+  direction: ltr !important;
+  unicode-bidi: isolate !important;
+  text-align: left !important;
+}
+
+.benefit-rtl-on [class*="thinkingContent_"] [class*="root_"] :is(ul, ol, li) {
+  direction: ltr !important;
+  text-align: left !important;
+}
+
+/* ==========================================
+   Toggle button — inlined into header when present, else above the input.
+   ========================================== */
+
+#benefit-rtl-btn {
+  font-size: 14px;
+  font-weight: bold;
   width: 28px;
   height: 28px;
-  margin: 0 6px;
-  padding: 0;
-  border: 1px solid var(--vscode-input-border, transparent);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--vscode-foreground, currentColor);
+  border: none;
+  border-radius: 4px;
   cursor: pointer;
-  font-family: inherit;
-  font-size: 14px;
-  line-height: 1;
-  opacity: 0.7;
+  background: transparent;
+  color: var(--vscode-foreground);
+  opacity: 0.5;
+  transition: opacity 0.2s, background 0.2s;
+  flex-shrink: 0;
 }
-.benefit-rtl-toggle:hover { opacity: 1; }
-.benefit-rtl-toggle.is-on {
-  background: var(--vscode-button-background, rgba(127,127,127,0.18));
-  color: var(--vscode-button-foreground, currentColor);
+#benefit-rtl-btn:hover {
+  opacity: 1;
+}
+#benefit-rtl-btn.is-on {
+  opacity: 1;
+  background: var(--vscode-button-background, rgba(128, 128, 128, 0.3));
+}
+
+#benefit-rtl-btn-wrap {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 8px;
+}
+
+/* Last-resort floating placement — bottom-left, a corner Claude Code does not occupy. */
+#benefit-rtl-btn.is-floating {
+  position: fixed;
+  bottom: 12px;
+  left: 12px;
+  z-index: 2147483000;
+  background: var(--vscode-editorWidget-background, rgba(40,40,46,0.92));
+  opacity: 0.85;
+  border: 1px solid var(--vscode-input-border, rgba(127,127,127,0.4));
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+#benefit-rtl-btn.is-floating:hover {
   opacity: 1;
 }

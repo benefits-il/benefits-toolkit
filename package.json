@@ -2,7 +2,7 @@
   "name": "benefits-toolkit",
   "displayName": "Benefit's Toolkit",
   "description": "Quality-of-life tools for Claude Code: RTL chat support, audio notifications, and conversation manager — all in one place.",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "publisher": "benakiva",
   "author": {
     "name": "Ben Akiva"
@@ -51,7 +51,7 @@
     "viewsWelcome": [
       {
         "view": "benefit.chatsView",
-        "contents": "No Claude Code conversations found yet.\nOnce you start chatting in Claude Code, your conversations will appear here.\n[Refresh](command:benefit.chats.refresh)"
+        "contents": "No conversations for this project yet.\nThe list is scoped to the folder open in this window.\n[Show All Projects](command:benefit.chats.toggleScope)\n[Refresh](command:benefit.chats.refresh)"
       }
     ],
     "commands": [
@@ -79,14 +79,16 @@
       { "command": "benefit.chats.toggleSort", "title": "Toggle Sort Order", "category": "Benefit Chats", "icon": "$(sort-precedence)" },
       { "command": "benefit.chats.toggleGroupBy", "title": "Toggle Group By (Date / Project)", "category": "Benefit Chats" },
       { "command": "benefit.chats.toggleArchived", "title": "Show/Hide Archived", "category": "Benefit Chats", "icon": "$(eye)" },
+      { "command": "benefit.chats.toggleScope", "title": "Toggle Scope (Current Project / All)", "category": "Benefit Chats", "icon": "$(filter)" },
       { "command": "benefit.chats.statusBarRename", "title": "Rename Active Conversation", "category": "Benefit Chats" }
     ],
     "menus": {
       "view/title": [
         { "command": "benefit.chats.refresh", "when": "view == benefit.chatsView", "group": "navigation@1" },
         { "command": "benefit.chats.search", "when": "view == benefit.chatsView", "group": "navigation@2" },
-        { "command": "benefit.chats.toggleSort", "when": "view == benefit.chatsView", "group": "navigation@3" },
-        { "command": "benefit.chats.toggleArchived", "when": "view == benefit.chatsView", "group": "navigation@4" },
+        { "command": "benefit.chats.toggleScope", "when": "view == benefit.chatsView", "group": "navigation@3" },
+        { "command": "benefit.chats.toggleSort", "when": "view == benefit.chatsView", "group": "navigation@4" },
+        { "command": "benefit.chats.toggleArchived", "when": "view == benefit.chatsView", "group": "navigation@5" },
         { "command": "benefit.chats.toggleGroupBy", "when": "view == benefit.chatsView", "group": "1_view" }
       ],
       "view/item/context": [
@@ -159,6 +161,16 @@
           "type": "boolean",
           "default": true,
           "description": "Enable the Chats feature."
+        },
+        "benefit.chats.scope": {
+          "type": "string",
+          "enum": ["currentWorkspace", "all"],
+          "default": "currentWorkspace",
+          "enumDescriptions": [
+            "Show only conversations belonging to the folder open in this window.",
+            "Show conversations from every project."
+          ],
+          "description": "Which conversations to list in the sidebar."
         },
         "benefit.chats.groupBy": {
           "type": "string",

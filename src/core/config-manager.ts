@@ -6,6 +6,7 @@ export type RtlMode = "off" | "active" | "always" | "auto";
 export type SoundVariant = "default" | "alt";
 export type ChatsGroupBy = "date" | "project" | "flat";
 export type ChatsSortOrder = "newest" | "oldest";
+export type ChatsScope = "currentWorkspace" | "all";
 
 export interface BenefitConfig {
   rtl: {
@@ -23,6 +24,7 @@ export interface BenefitConfig {
   };
   chats: {
     enabled: boolean;
+    scope: ChatsScope;
     groupBy: ChatsGroupBy;
     sortOrder: ChatsSortOrder;
     showArchived: boolean;
@@ -58,6 +60,7 @@ export function readConfig(): BenefitConfig {
     },
     chats: {
       enabled: readWith("chats.enabled", true),
+      scope: readWith<ChatsScope>("chats.scope", "currentWorkspace"),
       groupBy: readWith<ChatsGroupBy>("chats.groupBy", "date"),
       sortOrder: readWith<ChatsSortOrder>("chats.sortOrder", "newest"),
       showArchived: readWith("chats.showArchived", false),

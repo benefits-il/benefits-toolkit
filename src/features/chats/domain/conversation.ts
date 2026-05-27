@@ -27,6 +27,8 @@ export interface ConversationMeta {
   projectFolder: string;
   projectDisplayName: string;
   conversationId: string;
+  /** Absolute working directory recorded in the JSONL (Claude Code `cwd`), if present. */
+  cwd: string | undefined;
   title: string;
   hasSummary: boolean;
   leafUuid: string | undefined;

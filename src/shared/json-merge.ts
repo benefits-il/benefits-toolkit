@@ -5,15 +5,25 @@ export async function readJsonObject(file: string): Promise<Record<string, unkno
   if (text === undefined || text.trim().length === 0) {
     return {};
   }
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(text) as unknown;
-    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
-      return parsed as Record<string, unknown>;
-    }
-    return {};
-  } catch {
-    return {};
+    parsed = JSON.parse(text);
+  } catch (err) {
+    // CRITICAL: a non-empty file that fails to parse must NEVER be treated as
+    // an empty object — doing so would let a caller overwrite the user's real
+    // config (e.g. ~/.claude/settings.json) with whatever it writes back,
+    // destroying permissions/plugins/mcpServers. Surface the error so callers
+    // abort instead of clobbering.
+    throw new Error(
+      `Refusing to parse ${file}: not valid JSON (${(err as Error).message}). The file was left untouched.`,
+    );
   }
+  if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+    return parsed as Record<string, unknown>;
+  }
+  // Parsed, but it's not a JSON object (array / primitive). Also refuse rather
+  // than silently replacing it.
+  throw new Error(`Refusing to use ${file}: expected a JSON object at the top level.`);
 }
 
 export async function writeJsonObject(file: string, data: Record<string, unknown>): Promise<void> {

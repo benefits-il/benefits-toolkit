@@ -1,11 +1,21 @@
 import * as vscode from "vscode";
 import { logger } from "./logger";
 
+/**
+ * Why a feature is being deactivated.
+ * - "disable":  the user turned the feature off (or it was reconfigured off).
+ *               Features that patch external state should clean it up here.
+ * - "shutdown": the window is reloading / closing. Persistent patches should be
+ *               LEFT in place so they survive the restart (and the next webview
+ *               load already sees them). Only transient resources are disposed.
+ */
+export type DeactivateReason = "disable" | "shutdown";
+
 export interface Feature {
   readonly id: string;
   isEnabled(): boolean;
   activate(ctx: vscode.ExtensionContext): Promise<void> | void;
-  deactivate(): Promise<void> | void;
+  deactivate(reason: DeactivateReason): Promise<void> | void;
 }
 
 export class FeatureRegistry implements vscode.Disposable {
@@ -33,7 +43,7 @@ export class FeatureRegistry implements vscode.Disposable {
         }
       } else if (!wantOn && isOn) {
         try {
-          await feature.deactivate();
+          await feature.deactivate("disable");
           this.active.delete(feature.id);
           logger.info("registry", `Deactivated feature: ${feature.id}`);
         } catch (err) {
@@ -46,7 +56,7 @@ export class FeatureRegistry implements vscode.Disposable {
   async dispose(): Promise<void> {
     for (const [id, feature] of this.active) {
       try {
-        await feature.deactivate();
+        await feature.deactivate("shutdown");
       } catch (err) {
         logger.warn("registry", `Error while deactivating ${id} during dispose`, err);
       }

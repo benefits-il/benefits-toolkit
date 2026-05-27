@@ -1,3 +1,4 @@
+import { pathExists } from "../../../shared/fs-utils";
 import {
   getHooks,
   HookEntry,
@@ -64,6 +65,18 @@ function appendManagedHook(hooks: HooksShape, event: HookEventName, command: str
   hooks[event] = list;
 }
 
+function managedCommandFor(hooks: HooksShape, event: HookEventName): string | undefined {
+  const matchers = hooks[event];
+  if (!Array.isArray(matchers)) return undefined;
+  for (const m of matchers) {
+    if (!isHookMatcher(m)) continue;
+    for (const h of m.hooks) {
+      if (isHookEntry(h) && isManagedCommand(h.command)) return h.command;
+    }
+  }
+  return undefined;
+}
+
 export class HookInstaller {
   constructor(private readonly assets: SoundAssetManager) {}
 
@@ -78,6 +91,41 @@ export class HookInstaller {
 
     setHooks(settings, hooks);
     await writeSettings(settings);
+
+    // Drop artifacts from older mechanisms (file-based .ps1 hooks + their log)
+    // so the install dir reflects only the current inline-command approach.
+    await this.assets.cleanupLegacyArtifacts();
+  }
+
+  /**
+   * Idempotent reconcile used on activation. (Re)installs only when the managed
+   * hooks are missing, point at stale commands (e.g. an older .ps1-based build),
+   * or the sound files are gone. This is what makes sounds self-heal after a
+   * Claude Code update or a settings reset wipes the hooks. Returns true if it
+   * (re)installed.
+   */
+  async ensureInstalled(
+    stopVariant: import("../../../core/config-manager").SoundVariant,
+    notificationVariant: import("../../../core/config-manager").SoundVariant,
+  ): Promise<boolean> {
+    const expectedStop = buildPlayCommand(this.assets.installedPath("stop"));
+    const expectedNotification = buildPlayCommand(this.assets.installedPath("notification"));
+
+    const settings = await readSettings();
+    const hooks = getHooks(settings);
+    const currentStop = managedCommandFor(hooks, "Stop");
+    const currentNotification = managedCommandFor(hooks, "Notification");
+
+    const wavsExist =
+      (await pathExists(this.assets.installedPath("stop"))) &&
+      (await pathExists(this.assets.installedPath("notification")));
+
+    if (currentStop === expectedStop && currentNotification === expectedNotification && wavsExist) {
+      return false;
+    }
+
+    await this.install(stopVariant, notificationVariant);
+    return true;
   }
 
   async uninstall(): Promise<void> {

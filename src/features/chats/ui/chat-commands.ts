@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { ChatsGroupBy, ChatsSortOrder, readConfig, updateConfig } from "../../../core/config-manager";
+import { ChatsGroupBy, ChatsScope, ChatsSortOrder, readConfig, updateConfig } from "../../../core/config-manager";
 import { logger } from "../../../core/logger";
 import { ConversationMeta } from "../domain/conversation";
 import { ArchiveService } from "../services/archive-service";
@@ -148,6 +148,18 @@ export function registerChatCommands(ctx: vscode.ExtensionContext, deps: ChatCom
     vscode.commands.registerCommand("benefit.chats.toggleArchived", async () => {
       const current = readConfig().chats.showArchived;
       await updateConfig("chats.showArchived", !current);
+      deps.provider.refresh();
+    }),
+
+    vscode.commands.registerCommand("benefit.chats.toggleScope", async () => {
+      const current = readConfig().chats.scope;
+      const next: ChatsScope = current === "currentWorkspace" ? "all" : "currentWorkspace";
+      await updateConfig("chats.scope", next);
+      vscode.window.showInformationMessage(
+        next === "all"
+          ? "Benefit Chats: showing conversations from all projects."
+          : "Benefit Chats: showing only this project's conversations.",
+      );
       deps.provider.refresh();
     }),
   );

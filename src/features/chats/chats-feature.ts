@@ -62,6 +62,7 @@ export function createChatsFeature(ctx: vscode.ExtensionContext): Feature {
             statusBar.setVisible(readConfig().chats.showStatusBarRename);
           }
           if (
+            affects(e, "chats.scope") ||
             affects(e, "chats.groupBy") ||
             affects(e, "chats.sortOrder") ||
             affects(e, "chats.showArchived") ||
@@ -70,6 +71,11 @@ export function createChatsFeature(ctx: vscode.ExtensionContext): Feature {
             provider.refresh();
           }
         }),
+      );
+
+      // Re-scope the list when the user switches the open folder/workspace.
+      disposables.push(
+        vscode.workspace.onDidChangeWorkspaceFolders(() => provider?.refresh()),
       );
 
       logger.info("chats", "Feature activated.");

@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.1.0 — Bug-fix pass: all three features made reliable
+
+Fixes the three reported problems and the recurring "it worked, then it didn't" pattern. The root cause across RTL and Sounds was the same: the toolkit patches *external state* (Claude Code's webview files / the global `settings.json`) that gets reset, with no self-healing.
+
+**RTL — now actually renders**
+- The patch is **no longer stripped on every window reload/shutdown**. It was being removed on deactivate and re-applied on the next startup, so Claude Code's webview always loaded the *unpatched* CSS first — RTL never showed without a manual reload. The patch now persists across restarts and is only removed when you actually turn the feature off (`Feature.deactivate` now receives a `"disable"` vs `"shutdown"` reason).
+- The **JS shim is injected in every mode**, including `always` (it was previously stripped in `always`, leaving no fallback if the CSS scope transform was imperfect). The fragile `always`-mode regex rewrite of the stylesheet is gone; one scoped stylesheet plus the shim's `MutationObserver` drives it.
+- After a patch is *freshly* written, a one-time **"Reload Window"** prompt appears so the open chat picks up the change.
+
+**Sounds — self-healing + audible**
+- Hooks are now **auto-reconciled on activation**: if they're missing or stale (e.g. an older `.ps1`-based install, or wiped by a Claude Code update / settings reset) they're transparently re-installed. No more manually re-running the install command.
+- Standardized on the inline, reliable `Media.SoundPlayer … PlaySync()` command and **removed orphan `play-*.ps1` / log artifacts** left by the previous detached-player approach (which started but wasn't reliably audible).
+
+**Chats — scoped to the current window**
+- The sidebar now lists **only the conversations for the folder open in this window** (matched by each conversation's recorded `cwd`, falling back to the encoded project-folder name). New `benefit.chats.scope` setting (`currentWorkspace` default / `all`) and a **Toggle Scope** title-bar button + "Show All Projects" welcome link. Re-scopes automatically when you switch folders.
+
+## 0.0.5 — Toggling RTL no longer reshuffles chat-header buttons
+
+- Added an LTR override for the chat header (`[class*="header_"][class*="aqhumA"]`) so its flex children (timeline buttons, dot indicators) keep their order when RTL is enabled. Without this override, the header inherited `direction: rtl` from its parent `root_` and visually reversed the icon row.
+- Added LTR overrides for sessionsButtonText, timeline dots (success/failure/progress/warning), inputContainer/inputWrapper, selectionAttachment, attachmentInfo/Text, secondaryLine, authUrl, and thinking-block containers (thinking_, thinkingContent_, thinkingContainer_, thinkingHeader_, spinnerRow_, timelineMessage:has(thinking_)) — matching the full LTR exclusion list needed for stable chat UX.
+
+## 0.0.4 — RTL button now lives inside the chat layout
+
+- The toggle button is injected into Claude Code's chat header (`[class*="header_"]`) when one is present. When Claude Code doesn't render a header (active session on startup), the button falls back to a slim wrapper that sits **above** the input box — never floating over existing controls.
+
+## 0.0.3 — RTL toggle is now a floating button
+
+- Replaced the DOM-injected header button (which depended on Claude Code class names that changed between versions) with a fixed-position floating button anchored to `document.body`. Survives Claude Code refactors and always renders in the top corner of the chat panel.
+
 ## 0.0.2 — Conversation viewer enhancements
 
 The conversation viewer (the panel that opens when you click a conversation in the sidebar) now ships with the full feature set I had been maintaining as a private patch:

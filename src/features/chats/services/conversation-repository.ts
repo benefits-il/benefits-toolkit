@@ -77,8 +77,12 @@ export class ConversationRepository {
     let firstMessageAt: string | undefined;
     let realMessageCount = 0;
     let userPreview: string | undefined;
+    let cwd: string | undefined;
 
     for (const r of records) {
+      if (cwd === undefined && typeof r["cwd"] === "string") {
+        cwd = r["cwd"];
+      }
       if (isSummary(r)) {
         summary = { summary: r.summary, leafUuid: r.leafUuid };
         continue;
@@ -104,6 +108,7 @@ export class ConversationRepository {
       projectFolder,
       projectDisplayName: humanizeProjectFolder(projectFolder),
       conversationId,
+      cwd,
       title: summary?.summary ?? userPreview ?? "(empty conversation)",
       hasSummary: summary !== undefined,
       leafUuid: summary?.leafUuid,
@@ -186,4 +191,15 @@ function humanizeProjectFolder(folder: string): string {
     .replace(/-/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/**
+ * Reproduces Claude Code's project-folder encoding: every character that is not
+ * alphanumeric becomes a single dash. e.g.
+ *   c:\Users\darta\Desktop\projects\benefits-toolkit
+ *     -> c--Users-darta-Desktop-projects-benefits-toolkit
+ * Used as a fallback to scope conversations by workspace when a JSONL has no `cwd`.
+ */
+export function encodeProjectFolder(fsPath: string): string {
+  return fsPath.replace(/[^a-zA-Z0-9]/g, "-");
 }

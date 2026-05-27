@@ -25,7 +25,10 @@ export interface InjectOptions {
 export class RtlAssetPatcher {
   constructor(private readonly ctx: vscode.ExtensionContext) {}
 
-  private cssBody(): Promise<string> {
+  private async cssBody(): Promise<string> {
+    // Always ship the single scoped stylesheet (rules under `.benefit-rtl-on`).
+    // The JS shim is responsible for putting that class on <body> per mode — a
+    // robust, class-driven path that doesn't depend on rewriting selectors.
     const file = path.join(this.ctx.extensionPath, "dist", "assets", "rtl", "rtl-overrides.css");
     return fs.readFile(file, "utf8");
   }
@@ -39,20 +42,32 @@ export class RtlAssetPatcher {
       .replace(/__BENEFIT_RTL_CODE__/g, sanitizeFont(opts.codeFont));
   }
 
-  async apply(assets: ClaudeAssets, opts: InjectOptions): Promise<void> {
+  /** Returns true if either asset file was actually changed by this apply. */
+  async apply(assets: ClaudeAssets, opts: InjectOptions): Promise<boolean> {
     const cssBody = await this.cssBody();
+    const cssChanged = await patchFile(assets.cssFile, CSS_MARKERS, cssBody);
+
+    // The shim is injected in EVERY mode (including "always"): it adds the
+    // `benefit-rtl-on` class to <body> and re-asserts it via MutationObserver
+    // if Claude Code re-renders. This is the robust fallback that the old
+    // "always = pure CSS, no shim" path lacked.
     const jsBody = await this.jsBody(opts);
+    const jsChanged = await patchFile(assets.jsFile, JS_MARKERS, jsBody);
 
-    await patchFile(assets.cssFile, CSS_MARKERS, cssBody);
-    await patchFile(assets.jsFile, JS_MARKERS, jsBody);
-
-    logger.info("rtl", `Patched ${path.basename(assets.cssFile)} and ${path.basename(assets.jsFile)} (mode=${opts.mode}).`);
+    if (cssChanged || jsChanged) {
+      logger.info("rtl", `Patched ${path.basename(assets.cssFile)} (mode=${opts.mode}).`);
+    }
+    return cssChanged || jsChanged;
   }
 
-  async remove(assets: ClaudeAssets): Promise<void> {
-    await stripFile(assets.cssFile, CSS_MARKERS);
-    await stripFile(assets.jsFile, JS_MARKERS);
-    logger.info("rtl", "Removed sentinel blocks from Claude Code assets.");
+  /** Returns true if either asset file was actually changed by this removal. */
+  async remove(assets: ClaudeAssets): Promise<boolean> {
+    const cssChanged = await stripFile(assets.cssFile, CSS_MARKERS);
+    const jsChanged = await stripFile(assets.jsFile, JS_MARKERS);
+    if (cssChanged || jsChanged) {
+      logger.info("rtl", "Removed sentinel blocks from Claude Code assets.");
+    }
+    return cssChanged || jsChanged;
   }
 
   async isApplied(assets: ClaudeAssets): Promise<boolean> {
@@ -61,19 +76,21 @@ export class RtlAssetPatcher {
   }
 }
 
-async function patchFile(file: string, markers: { startMarker: string; endMarker: string }, body: string): Promise<void> {
+async function patchFile(file: string, markers: { startMarker: string; endMarker: string }, body: string): Promise<boolean> {
   const existing = (await readTextSafe(file)) ?? "";
   const next = applySentinelBlock(existing, markers, body);
-  if (next === existing) return;
+  if (next === existing) return false;
   await atomicWriteText(file, next);
+  return true;
 }
 
-async function stripFile(file: string, markers: { startMarker: string; endMarker: string }): Promise<void> {
+async function stripFile(file: string, markers: { startMarker: string; endMarker: string }): Promise<boolean> {
   const existing = await readTextSafe(file);
-  if (existing === undefined) return;
+  if (existing === undefined) return false;
   const next = stripSentinelBlock(existing, markers);
-  if (next === existing) return;
+  if (next === existing) return false;
   await atomicWriteText(file, next);
+  return true;
 }
 
 function sanitizeFont(value: string): string {
