@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1 — Sound hooks: drop the broken bus, fire PowerShell directly
+
+- Removed the experimental hidden-webview audio bus (a node launcher wrote events to a `.event` file, the extension watched it, and an `<audio>` element in a hidden webview was supposed to play them — the playback layer was silent).
+- The Stop/Notification hook now fires `powershell -NoProfile -WindowStyle Hidden -Command "(New-Object Media.SoundPlayer '<wav>').PlaySync()"` directly from Claude Code's hook runner. Same approach as the standalone `claude-sound-hooks` reference installer, verified to reach the speakers on Windows.
+- `ensureInstalled` reconciles the old `node play.js` command shape as stale and rewrites it to the new powershell form on activation; `cleanupLegacyArtifacts` removes the orphaned `play.js`, `.event`, and per-slot `.log` files.
+- Removed the `benefit.audioView` sidebar view, `audio-view-provider.ts`, and `sound-event-bus.ts` — all unused now.
+
 ## 0.1.0 — Bug-fix pass: all three features made reliable
 
 Fixes the three reported problems and the recurring "it worked, then it didn't" pattern. The root cause across RTL and Sounds was the same: the toolkit patches *external state* (Claude Code's webview files / the global `settings.json`) that gets reset, with no self-healing.

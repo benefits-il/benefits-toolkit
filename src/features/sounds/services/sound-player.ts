@@ -5,8 +5,11 @@ export const HOOK_MARKER = "BENEFIT_MANAGED_HOOK";
 
 export function buildPlayCommand(soundPath: string): string {
   if (isWindows()) {
+    // PowerShell's Media.SoundPlayer.PlaySync() is what actually reaches the
+    // user's speakers when fired by Claude Code's hook runner — matches the
+    // approach in the claude-sound-hooks reference installer.
     const escaped = soundPath.replace(/'/g, "''");
-    return `powershell -NoProfile -WindowStyle Hidden -Command "(New-Object Media.SoundPlayer '${escaped}').PlaySync(); # ${HOOK_MARKER}"`;
+    return `powershell -NoProfile -WindowStyle Hidden -Command "(New-Object Media.SoundPlayer '${escaped}').PlaySync()"`;
   }
   if (isMac()) {
     return `afplay '${soundPath.replace(/'/g, "'\\''")}' # ${HOOK_MARKER}`;
@@ -19,7 +22,12 @@ export function buildPlayCommand(soundPath: string): string {
 }
 
 export function isManagedCommand(cmd: string): boolean {
-  return typeof cmd === "string" && cmd.includes(HOOK_MARKER);
+  if (typeof cmd !== "string") return false;
+  // Match anything that references our managed sounds dir (covers the current
+  // powershell command, the legacy node/play.js launcher, the older .ps1
+  // hooks, and the macOS/Linux marker form). Broad on purpose so a build that
+  // changes the invocation can still purge its older shape on upgrade.
+  return cmd.includes(HOOK_MARKER) || /sounds[\\/]benefit[\\/]/i.test(cmd);
 }
 
 export async function playPreview(soundPath: string): Promise<void> {

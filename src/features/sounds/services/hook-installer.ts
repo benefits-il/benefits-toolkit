@@ -116,11 +116,11 @@ export class HookInstaller {
     const currentStop = managedCommandFor(hooks, "Stop");
     const currentNotification = managedCommandFor(hooks, "Notification");
 
-    const wavsExist =
-      (await pathExists(this.assets.installedPath("stop"))) &&
-      (await pathExists(this.assets.installedPath("notification")));
+    const stopWav = this.assets.installedPath("stop");
+    const notificationWav = this.assets.installedPath("notification");
+    const artifactsExist = (await pathExists(stopWav)) && (await pathExists(notificationWav));
 
-    if (currentStop === expectedStop && currentNotification === expectedNotification && wavsExist) {
+    if (currentStop === expectedStop && currentNotification === expectedNotification && artifactsExist) {
       return false;
     }
 

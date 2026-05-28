@@ -90,26 +90,18 @@
     return btn;
   }
 
-  function findChatHeader() {
-    // Prefer the top-level chat header (aqhumA module hash), fall back to any other header.
-    var preferred = document.querySelector('[class*="header_"][class*="aqhumA"]');
-    if (preferred) return preferred;
-    var all = document.querySelectorAll('[class*="header_"]');
-    for (var i = 0; i < all.length; i++) {
-      var el = all[i];
-      // Skip headers that live inside tools / thinking blocks / message bubbles.
-      if (el.closest('[class*="toolUse_"], [class*="thinking_"], [class*="userMessage_"], [class*="root_-a7MRw"]')) continue;
-      return el;
-    }
-    return null;
-  }
-
+  // Insertion logic copied verbatim from claude-code-rtl (yechielby.claude-code-rtl):
+  // match the FIRST chat header via [class*="header_"] and appendChild. No brittle
+  // module-hash selector, no floating corner button — the only fallback is a slim
+  // row above the input, and only when there is genuinely no header but messages exist.
   function tryInsertButton() {
-    var header = findChatHeader();
+    var header = document.querySelector('[class*="header_"]');
     var existing = document.getElementById(BTN_ID);
 
+    // Already placed in the header — nothing to do
     if (existing && header && header.contains(existing)) return;
 
+    // Header appeared but button is in fallback position — migrate to header
     if (header && existing) {
       var oldWrap = document.getElementById(WRAP_ID);
       if (oldWrap) oldWrap.remove(); else existing.remove();
@@ -117,30 +109,24 @@
       return;
     }
 
+    // Header exists, no button yet — place in header
     if (header && !existing) {
       header.appendChild(makeButton());
       return;
     }
 
+    // No header, button already in fallback — keep it
     if (existing) return;
 
-    // Fallback: insert as a slim row above the input box.
+    // No header, no button — fallback: place above the input when messages are visible
     var input = document.querySelector('[class*="inputContainer_"]');
-    if (input && input.parentNode) {
-      var wrap = document.createElement("div");
-      wrap.id = WRAP_ID;
-      wrap.appendChild(makeButton());
-      input.parentNode.insertBefore(wrap, input);
-      return;
-    }
+    if (!input || !input.parentNode) return;
+    if (!document.querySelector('[class*="messagesContainer_"]')) return;
 
-    // Last-resort fallback: pin a small button to bottom-left (a corner Claude Code never uses)
-    // so the user always has a visible toggle even when the DOM isn't where we expect.
-    if (document.body) {
-      var floatBtn = makeButton();
-      floatBtn.classList.add("is-floating");
-      document.body.appendChild(floatBtn);
-    }
+    var wrap = document.createElement("div");
+    wrap.id = WRAP_ID;
+    wrap.appendChild(makeButton());
+    input.parentNode.insertBefore(wrap, input);
   }
 
   function boot() {
