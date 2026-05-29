@@ -20,7 +20,7 @@
     --stamp:0 6px 0 0 var(--green-depth); --stamp-hover:0 8px 0 0 var(--green-depth); --stamp-active:0 2px 0 0 var(--green-depth);
   }
   *,*::before,*::after { box-sizing:border-box; }
-  html,body { margin:0; padding:0; }
+  html,body { margin:0; padding:0; overflow-x:hidden; max-width:100%; }
   html { scroll-behavior:smooth; }
   body {
     font-family:'Varela Round',system-ui,sans-serif; font-size:16px; line-height:1.6;
@@ -31,6 +31,7 @@
       radial-gradient(circle at 50% 90%, rgba(110,231,183,0.10) 0, transparent 160px);
     background-attachment:fixed; overflow-x:hidden;
   }
+  @media (max-width:880px){ body{ background-attachment:scroll; } }
   :is(a,button,input,[tabindex]):focus-visible { outline:3px solid var(--green-anchor); outline-offset:3px; border-radius:8px; }
   @media (prefers-reduced-motion: reduce){ *,*::before,*::after{ transition-duration:.01ms!important; animation-duration:.01ms!important; } html{scroll-behavior:auto;} }
   ::-webkit-scrollbar{ width:12px; } ::-webkit-scrollbar-thumb{ background:var(--green-mint); border:3px solid var(--bg); border-radius:6px; }
@@ -58,7 +59,10 @@
 
   /* HERO */
   .hero{ max-width:1160px; margin:0 auto; padding:80px 24px 56px; display:grid; grid-template-columns:1.1fr 1fr; gap:56px; align-items:center; position:relative; }
-  @media (max-width:880px){ .hero{ grid-template-columns:1fr; padding:48px 20px 36px; } }
+  @media (max-width:880px){
+    .hero{ grid-template-columns:1fr; padding:48px 20px 36px; overflow:hidden; }
+    .deco-circle, .deco-square, .deco-squiggle{ display:none; }
+  }
   .deco-circle{ position:absolute; top:36px; inset-inline-start:-36px; width:104px; height:104px; background:var(--story-sky); border:3px solid var(--ink); border-radius:50%; z-index:0; }
   .deco-square{ position:absolute; top:210px; inset-inline-end:-26px; width:74px; height:74px; background:var(--story-cheek); border:3px solid var(--ink); transform:rotate(20deg); z-index:0; }
   .deco-squiggle{ position:absolute; bottom:6px; inset-inline-start:42%; width:230px; color:var(--green-mint); opacity:.55; z-index:0; }
@@ -139,6 +143,163 @@
   .stagger>*{ opacity:0; transform:translateY(20px); transition:opacity .6s cubic-bezier(.16,1,.3,1),transform .6s cubic-bezier(.16,1,.3,1); }
   .stagger.in>*{ opacity:1; transform:translateY(0); }
   .stagger.in>*:nth-child(2){ transition-delay:.08s; } .stagger.in>*:nth-child(3){ transition-delay:.16s; }
+
+  /* Navigation styling updates for responsiveness */
+  @media (max-width: 880px) {
+    .nav__inner { padding: 10px 16px; gap: 8px; }
+    .nav__link { padding: 6px 8px; font-size: 13px; }
+    .btn--ghost { display: none !important; }
+    .btn { padding: 8px 14px; font-size: 13px; }
+  }
+  @media (max-width: 600px) {
+    .nav__inner {
+      padding: 8px 12px;
+      gap: 12px;
+      justify-content: space-between;
+      align-items: center;
+      flex-direction: row !important;
+    }
+    .logo {
+      font-size: 15px;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .logo__mark {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      box-shadow: 2px 2px 0 0 var(--ink);
+    }
+    .logo__mark i {
+      font-size: 16px;
+    }
+    .nav__links {
+      overflow-x: auto;
+      white-space: nowrap;
+      -webkit-overflow-scrolling: touch;
+      gap: 4px;
+      padding-bottom: 0;
+      margin-inline-start: 0;
+      scrollbar-width: none;
+    }
+    .nav__links::-webkit-scrollbar {
+      display: none;
+    }
+    .nav__link {
+      padding: 4px 6px;
+      font-size: 12px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .btn { display: none !important; }
+  }
+
+  /* Walkthrough Section */
+  .walkthrough-list { display: flex; flex-direction: column; gap: 32px; }
+  .walkthrough-card {
+    background: var(--paper);
+    border: 2.5px solid var(--ink);
+    border-radius: 24px;
+    padding: 36px;
+    box-shadow: 6px 6px 0 0 var(--ink);
+    display: grid;
+    grid-template-columns: 1fr 1.2fr;
+    gap: 40px;
+    align-items: center;
+    transition: transform .2s cubic-bezier(.34,1.56,.64,1), box-shadow .2s;
+  }
+  .walkthrough-card:hover { transform: translate(3px, -3px); box-shadow: 9px 9px 0 0 var(--ink); }
+  .walkthrough-card__visual { width: 100%; min-width: 0; }
+  .walkthrough-card__content { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
+  
+  @media (max-width: 880px) {
+    .walkthrough-card {
+      grid-template-columns: 1fr;
+      gap: 24px;
+      padding: 20px;
+      border-radius: 20px;
+    }
+    .walkthrough-card__visual { order: -1; }
+    .mock {
+      padding: 12px;
+      box-shadow: 4px 4px 0 0 var(--ink) !important;
+      transform: none !important;
+    }
+    .row {
+      padding: 8px;
+      gap: 8px;
+      border-width: 2px;
+      box-shadow: 2px 2px 0 0 var(--ink) !important;
+    }
+    .row__ico {
+      width: 32px;
+      height: 32px;
+      font-size: 16px;
+      border-width: 2px;
+      box-shadow: 1px 1px 0 0 var(--ink) !important;
+    }
+    .row__t { font-size: 13px; }
+    .row__s { font-size: 11px; }
+    .row__pill { font-size: 10px; padding: 2px 6px; border-width: 1.5px; }
+  }
+
+  @media (max-width: 480px) {
+    .walkthrough-card {
+      padding: 16px;
+      border-radius: 16px;
+      gap: 16px;
+    }
+    .mock {
+      padding: 8px;
+      border-radius: 16px;
+    }
+    .row {
+      padding: 6px 8px;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .row__ico {
+      width: 28px;
+      height: 28px;
+      font-size: 14px;
+    }
+    .row__t { font-size: 12px; }
+    .row__s { font-size: 10px; }
+    .row__pill { font-size: 9px; padding: 1px 4px; }
+  }
+
+  /* Usage Section */
+  .usage-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  @media (max-width: 880px) {
+    .usage-grid { grid-template-columns: 1fr; }
+  }
+  .cmd {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    background: var(--ink);
+    color: var(--green-mint);
+    padding: 3px 10px;
+    border-radius: 6px;
+    display: inline-block;
+    direction: ltr;
+    font-weight: 500;
+    max-width: 100%;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    white-space: normal;
+  }
+  .mono {
+    word-break: break-all;
+    overflow-wrap: break-word;
+    white-space: normal;
+  }
+  @media (max-width: 480px) {
+    .cmd {
+      font-size: 11px;
+      padding: 2px 6px;
+      display: inline;
+    }
+  }
 </style>
 </head>
 <body>
@@ -148,6 +309,9 @@
     <a href="#" class="logo"><span class="logo__mark"><i class="ti ti-tools"></i></span> Benefit's Toolkit</a>
     <nav class="nav__links" aria-label="ניווט">
       <a class="nav__link" href="#features">יכולות</a>
+      <a class="nav__link" href="#walkthrough">מה רואים</a>
+      <a class="nav__link" href="#usage">איך משתמשים</a>
+      <a class="nav__link" href="#value">ערך</a>
       <a class="nav__link" href="#install">התקנה</a>
       <a class="btn btn--ghost" href="https://github.com/benefits-il/benefits-toolkit"><i class="ti ti-brand-github"></i> GitHub</a>
       <a class="btn btn--primary" href="https://github.com/benefits-il/benefits-toolkit/releases/latest"><i class="ti ti-download"></i> הורד</a>
@@ -202,6 +366,236 @@
       <div class="feature__icon"><i class="ti ti-history"></i></div>
       <h3 class="feature__title">היסטוריית שיחות</h3>
       <p class="feature__body">סרגל צד שמרכז את כל השיחות שלך: דפדוף, חיפוש, וחזרה לכל שיחה קודמת בלחיצה — בלי לאבד הקשר.</p>
+    </article>
+  </div>
+</section>
+
+<section id="walkthrough" aria-labelledby="walkthrough-title">
+  <div class="section__head">
+    <span class="kicker">WALKTHROUGH</span>
+    <h2 id="walkthrough-title" class="section__title">מה רואים <span class="ul">ואיפה?</span></h2>
+    <p class="section__deck">איך הכלים השונים נראים ואיפה הם משתלבים בסביבת העבודה שלכם ב-VS Code.</p>
+  </div>
+
+  <div class="walkthrough-list stagger">
+    <!-- Walkthrough Item 1 -->
+    <div class="walkthrough-card">
+      <div class="walkthrough-card__visual">
+        <aside class="mock" style="transform:none; margin:0; box-shadow:5px 5px 0 0 var(--ink);">
+          <div class="mock__head"><div class="mock__dots"><span></span><span></span><span></span></div><span class="mock__title">Claude Chats</span></div>
+          <div class="row" style="background:var(--paper); border-color:var(--green-anchor);">
+            <div class="row__ico" style="background:var(--green-soft); font-size:16px; color:var(--green-depth);"><i class="ti ti-brand-hipchat"></i></div>
+            <div>
+              <div class="row__t">שיחה: הוספת RTL</div>
+              <div class="row__s">פרויקט: benefits-toolkit</div>
+            </div>
+            <span class="row__pill" style="background:var(--story-sun)">פעיל</span>
+          </div>
+          <div class="row" style="background:var(--paper); opacity: 0.85;">
+            <div class="row__ico" style="background:var(--bg); font-size:16px; color:var(--ink);"><i class="ti ti-check"></i></div>
+            <div>
+              <div class="row__t">תיקון שגיאת ייבוא</div>
+              <div class="row__s">פרויקט: point-to-power</div>
+            </div>
+            <span class="row__pill">לפני שעה</span>
+          </div>
+          <div class="row" style="background:var(--paper); opacity: 0.65;">
+            <div class="row__ico" style="background:var(--bg); font-size:16px; color:var(--ink);"><i class="ti ti-archive"></i></div>
+            <div>
+              <div class="row__t">שיחת בדיקה קולית</div>
+              <div class="row__s">פרויקט: benefits-toolkit</div>
+            </div>
+            <span class="row__pill">ארכיון</span>
+          </div>
+        </aside>
+      </div>
+      <div class="walkthrough-card__content">
+        <span class="pill" style="background:var(--story-cheek); color:#fff; border-color:var(--ink); margin-bottom:12px;">
+          <i class="ti ti-layout-sidebar" style="color:#fff;"></i> סרגל צד (Sidebar)
+        </span>
+        <h3 class="feature__title">היסטוריית השיחות (Claude Chats)</h3>
+        <p class="feature__body" style="margin-bottom:14px;">
+          סרגל צד פשוט שמציג את כל השיחות הקודמות שלך עם Claude Code. האייקון שלו מופיע בסרגל הצידי של VS Code ופותח את רשימת השיחות בלחיצה.
+        </p>
+        <ul style="padding-inline-start:20px; margin:0; font-size:14px; color:var(--text-muted); display:flex; flex-direction:column; gap:6px;">
+          <li><strong>חיפוש וסינון:</strong> אפשר לחפש שיחות מהר או לסנן רק את השיחות של הפרויקט שאתה עובד עליו כרגע.</li>
+          <li><strong>ניהול קל:</strong> שינוי שם, העברה לארכיון, מחיקה מהירה או שמירת השיחה לקובץ Markdown מעוצב.</li>
+          <li><strong>קיצור דרך תחתון:</strong> כפתור בסרגל הסטטוס התחתון מאפשר לתת שם לשיחה הנוכחית ברגע.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Walkthrough Item 2 -->
+    <div class="walkthrough-card">
+      <div class="walkthrough-card__visual">
+        <aside class="mock" style="transform:none; margin:0; box-shadow:5px 5px 0 0 var(--ink); background:var(--bg);">
+          <div class="mock__head"><span class="mock__title" style="margin-inline-start:0;">Claude Code terminal</span><span class="row__pill" style="margin-inline-start:auto; background:var(--green-mint);">RTL Active</span></div>
+          <div style="background:var(--paper); border:2px solid var(--ink); border-radius:12px; padding:12px; font-size:13px; text-align:right; direction:rtl; margin-bottom:10px; box-shadow: 2px 2px 0 0 var(--ink);">
+            <strong style="color:var(--green-anchor);">קלאוד:</strong> מה תרצה שאעשה היום? אני יכול לעזור לך לכתוב קוד, להריץ בדיקות ולפתור באגים בפרויקט.
+          </div>
+          <div style="background:var(--green-soft); border:2px solid var(--ink); border-radius:12px; padding:12px; font-size:13px; text-align:right; direction:rtl; box-shadow: 2px 2px 0 0 var(--ink);">
+            <strong style="color:var(--green-depth);">אתה:</strong> תעזור לי להוסיף RTL ללנדינג פייג' ותריץ <code>npm run test</code> בבקשה.
+          </div>
+        </aside>
+      </div>
+      <div class="walkthrough-card__content">
+        <span class="pill" style="background:var(--story-sun); color:var(--ink); border-color:var(--ink); margin-bottom:12px;">
+          <i class="ti ti-text-direction-rtl" style="color:var(--ink);"></i> כיווניות ופונטים
+        </span>
+        <h3 class="feature__title">יישור עברית ופונטים מותאמים בצ'אט</h3>
+        <p class="feature__body" style="margin-bottom:14px;">
+          כותבים וקוראים עברית בצורה חלקה בתוך הטרמינל של Claude Code. הטקסט לא מתהפך, וסימני הפיסוק והקוד נשארים בדיוק במקום הנכון.
+        </p>
+        <ul style="padding-inline-start:20px; margin:0; font-size:14px; color:var(--text-muted); display:flex; flex-direction:column; gap:6px;">
+          <li><strong>לבחור מתי להפעיל:</strong> מצב ידני עם כפתור החלפה (Active), מיושר תמיד (Always) או זיהוי שפה אוטומטי (Auto).</li>
+          <li><strong>להתאים את המראה:</strong> אפשר לבחור פונט מותאם אישית לטקסט ופונט לקוד כדי שיהיה נוח בעין.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Walkthrough Item 3 -->
+    <div class="walkthrough-card">
+      <div class="walkthrough-card__visual">
+        <aside class="mock" style="transform:none; margin:0; box-shadow:5px 5px 0 0 var(--ink);">
+          <div class="mock__head"><div class="mock__dots"><span></span><span></span><span></span></div><span class="mock__title">Audio Hooks</span></div>
+          <div class="row" style="background:var(--paper); align-items:center;">
+            <div class="row__ico" style="background:var(--story-sky); color:#fff;"><i class="ti ti-music"></i></div>
+            <div style="flex-grow:1;">
+              <div class="row__t">Claude Finished Task</div>
+              <div class="row__s">Stop Event ➔ <code>sound-stop.wav</code></div>
+            </div>
+            <span class="row__pill" style="background:var(--green-soft); color:var(--green-depth);">Stop (alt)</span>
+          </div>
+          <div class="row" style="background:var(--paper); align-items:center;">
+            <div class="row__ico" style="background:var(--story-sky); color:#fff;"><i class="ti ti-help"></i></div>
+            <div style="flex-grow:1;">
+              <div class="row__t">Claude Awaiting Input</div>
+              <div class="row__s">Notification Event ➔ <code>sound-alert.wav</code></div>
+            </div>
+            <span class="row__pill" style="background:var(--green-soft); color:var(--green-depth);">Alert (default)</span>
+          </div>
+        </aside>
+      </div>
+      <div class="walkthrough-card__content">
+        <span class="pill" style="background:var(--story-sky); color:#fff; border-color:var(--ink); margin-bottom:12px;">
+          <i class="ti ti-volume" style="color:#fff;"></i> התראות שמע
+        </span>
+        <h3 class="feature__title">צלילי התראה וחיבור ל-Claude</h3>
+        <p class="feature__body" style="margin-bottom:14px;">
+          צליל קצר מושמע ברגע שקלאוד מסיים לעבוד או מחכה לתשובה שלך. ככה לא צריך לבהות במסך ולחכות לו כל הזמן.
+        </p>
+        <ul style="padding-inline-start:20px; margin:0; font-size:14px; color:var(--text-muted); display:flex; flex-direction:column; gap:6px;">
+          <li><strong>סוגי צלילים שונים:</strong> אפשר לבחור איזה צליל לשמוע בכל שלב (סאונד רגיל או אלטרנטיבי).</li>
+          <li><strong>הפעלה בשני קליקים:</strong> מחברים או מנתקים את הצלילים בקלות ישר מתוך VS Code.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="usage" aria-labelledby="usage-title" style="background:var(--paper); border-top:3.5px solid var(--ink); border-bottom:3.5px solid var(--ink);">
+  <div class="section__head">
+    <span class="kicker">USAGE & COMMANDS</span>
+    <h2 id="usage-title" class="section__title">איך <span class="ul">משתמשים?</span></h2>
+    <p class="section__deck">משנים הגדרות בקלות דרך הגדרות ה-VS Code או מריצים פקודות ישירות מלוח הפקודות.</p>
+  </div>
+
+  <div class="usage-grid stagger">
+    <!-- Card 1: Settings -->
+    <div class="feature feature--a">
+      <div class="feature__icon" style="background:var(--story-sun);"><i class="ti ti-settings"></i></div>
+      <h3 class="feature__title">הגדרות פשוטות (Settings)</h3>
+      <p class="feature__body" style="margin-bottom:18px;">כל ההגדרות נמצאות תחת השם <code>benefit.*</code>. אפשר להפעיל או לכבות כל פיצ'ר בנפרד:</p>
+      
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <div style="border-bottom:1.5px dashed var(--green-soft); padding-bottom:8px;">
+          <div class="mono" style="font-weight:700; font-size:13px; color:var(--green-anchor); direction:ltr; text-align:left;">benefit.rtl.enabled</div>
+          <div style="font-size:13px; color:var(--text-muted); margin-top:2px;">להפעיל או לכבות את יישור העברית (RTL) בצ'אט.</div>
+        </div>
+        <div style="border-bottom:1.5px dashed var(--green-soft); padding-bottom:8px;">
+          <div class="mono" style="font-weight:700; font-size:13px; color:var(--green-anchor); direction:ltr; text-align:left;">benefit.rtl.mode</div>
+          <div style="font-size:13px; color:var(--text-muted); margin-top:2px;">איך ליישר את הטקסט: <code>"active"</code> (כפתור ידני), <code>"always"</code> (תמיד מיושר), <code>"auto"</code> (זיהוי אוטומטי).</div>
+        </div>
+        <div style="border-bottom:1.5px dashed var(--green-soft); padding-bottom:8px;">
+          <div class="mono" style="font-weight:700; font-size:13px; color:var(--green-anchor); direction:ltr; text-align:left;">benefit.sounds.enabled</div>
+          <div style="font-size:13px; color:var(--text-muted); margin-top:2px;">להפעיל או לכבות את צלילי ההתראה של קלאוד.</div>
+        </div>
+        <div style="border-bottom:1.5px dashed var(--green-soft); padding-bottom:8px;">
+          <div class="mono" style="font-weight:700; font-size:13px; color:var(--green-anchor); direction:ltr; text-align:left;">benefit.sounds.stopVariant</div>
+          <div style="font-size:13px; color:var(--text-muted); margin-top:2px;">איזה צליל לשמוע כשמשימה מסתיימת: <code>"default"</code> או <code>"alt"</code>.</div>
+        </div>
+        <div style="border-bottom:1.5px dashed var(--green-soft); padding-bottom:8px;">
+          <div class="mono" style="font-weight:700; font-size:13px; color:var(--green-anchor); direction:ltr; text-align:left;">benefit.chats.enabled</div>
+          <div style="font-size:13px; color:var(--text-muted); margin-top:2px;">להפעיל או לכבות את סרגל ההיסטוריה בצד.</div>
+        </div>
+        <div>
+          <div class="mono" style="font-weight:700; font-size:13px; color:var(--green-anchor); direction:ltr; text-align:left;">benefit.chats.scope</div>
+          <div style="font-size:13px; color:var(--text-muted); margin-top:2px;">איזה שיחות להציג: רק של הפרויקט הפתוח (<code>"currentWorkspace"</code>) או של כל הפרויקטים (<code>"all"</code>).</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 2: Commands -->
+    <div class="feature feature--b">
+      <div class="feature__icon" style="background:var(--story-sky); color:#fff;"><i class="ti ti-terminal-2"></i></div>
+      <h3 class="feature__title">פקודות מהירות (Commands)</h3>
+      <p class="feature__body" style="margin-bottom:18px; color:var(--text-muted);">פותחים את לוח הפקודות (קיצור <code>Ctrl+Shift+P</code> או <code>Cmd+Shift+P</code>) ומקלידים:</p>
+
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <div style="border-bottom:1.5px dashed var(--green-soft); padding-bottom:8px;">
+          <span class="cmd" style="margin-bottom:4px;">Benefit: RTL: Toggle</span>
+          <div style="font-size:13px; color:var(--text-muted);">להדליק או לכבות עברית בצ'אט הנוכחי ברגע.</div>
+        </div>
+        <div style="border-bottom:1.5px dashed var(--green-soft); padding-bottom:8px;">
+          <span class="cmd" style="margin-bottom:4px;">Benefit: Sounds: Install Hooks</span>
+          <div style="font-size:13px; color:var(--text-muted);">להתקין ולחבר את צלילי ההתראה ל-Claude Code במחשב.</div>
+        </div>
+        <div style="border-bottom:1.5px dashed var(--green-soft); padding-bottom:8px;">
+          <span class="cmd" style="margin-bottom:4px;">Benefit: Sounds: Choose Sound Variants</span>
+          <div style="font-size:13px; color:var(--text-muted);">לבחור איזה סוגי צלילים יושמעו.</div>
+        </div>
+        <div style="border-bottom:1.5px dashed var(--green-soft); padding-bottom:8px;">
+          <span class="cmd" style="margin-bottom:4px;">Benefit: Sounds: Test Playback</span>
+          <div style="font-size:13px; color:var(--text-muted);">לנגן צליל בדיקה כדי לוודא ששומעים אותו.</div>
+        </div>
+        <div style="border-bottom:1.5px dashed var(--green-soft); padding-bottom:8px;">
+          <span class="cmd" style="margin-bottom:4px;">Benefit Chats: Search Conversations</span>
+          <div style="font-size:13px; color:var(--text-muted);">לחפש שיחה ישנה במהירות מתוך כל ההיסטוריה.</div>
+        </div>
+        <div>
+          <span class="cmd" style="margin-bottom:4px;">Benefit Chats: Rename Active Conversation</span>
+          <div style="font-size:13px; color:var(--text-muted);">לתת שם לשיחה הנוכחית כדי למצוא אותה בקלות אחר כך.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="value" aria-labelledby="value-title">
+  <div class="section__head">
+    <span class="kicker">PRODUCTIVITY & VALUE</span>
+    <h2 id="value-title" class="section__title">מה זה <span class="ul">נותן לנו?</span></h2>
+    <p class="section__deck">איך Benefit's Toolkit עושה לכם חיים קלים ועוזר לכם לעבוד הרבה יותר מהר.</p>
+  </div>
+
+  <div class="features stagger">
+    <article class="feature feature--a">
+      <svg class="feature__deco" viewBox="0 0 160 160" aria-hidden="true" style="color:var(--story-sun)"><defs><pattern id="d2" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="4" cy="4" r="2.2" fill="currentColor"/></pattern></defs><rect width="160" height="160" fill="url(#d2)"/></svg>
+      <div class="feature__icon" style="background:var(--story-sun);"><i class="ti ti-rocket"></i></div>
+      <h3 class="feature__title">עבודה שוטפת ונוחה בעברית</h3>
+      <p class="feature__body">בלי להיאבק עם סימני פיסוק הפוכים או טקסט מבולגן. פשוט כותבים ומקבלים תשובות בעברית תקינה ובצורה קריאה.</p>
+    </article>
+    <article class="feature feature--b">
+      <svg class="feature__deco" viewBox="0 0 240 32" aria-hidden="true" style="color:var(--story-sky)"><path d="M5,5 L25,27 L45,5 L65,27 L85,5 L105,27 L125,5 L145,27 L165,5 L185,27 L205,5 L225,27 L235,16" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/></svg>
+      <div class="feature__icon" style="background:var(--story-sky); color:#fff;"><i class="ti ti-brain"></i></div>
+      <h3 class="feature__title">עבודה בלי להיתקע מול המסך</h3>
+      <p class="feature__body">במקום לשבת ולחכות שקלאוד יסיים להריץ פקודות או יבקש מכם אישור, אתם יכולים לעבור לטאב אחר. צליל קצר יקרא לכם ברגע שצריך אתכם.</p>
+    </article>
+    <article class="feature feature--c">
+      <svg class="feature__deco" viewBox="0 0 240 40" aria-hidden="true" style="color:var(--story-cheek)"><path d="M5,20 Q25,2 45,20 T85,20 T125,20 T165,20 T205,20 T235,20" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/></svg>
+      <div class="feature__icon" style="background:var(--story-cheek); color:#fff;"><i class="ti ti-refresh"></i></div>
+      <h3 class="feature__title">למצוא הכל ברגע</h3>
+      <p class="feature__body">בלי להתחיל שיחות מחדש מאפס או לשמור קוד בצד. בקליק אחד חוזרים לשיחה מאתמול, מחפשים פתרונות ישנים או מייצאים את השיחה לקובץ Markdown.</p>
     </article>
   </div>
 </section>
