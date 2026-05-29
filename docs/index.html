@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Benefit's Toolkit · כלים ל-Claude Code ב-VS Code</title>
+<meta name="description" content="כלי איכות-חיים ל-Claude Code בתוך VS Code: תמיכת עברית/RTL, צלילי התראה, וסרגל היסטוריית שיחות. הכל ב-extension אחד.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&family=Varela+Round&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #064E3B;
+    --spine-deep: #064E3B;
+    --spine: #047857;
+    --spine-light: #10B981;
+    --canvas: #FFF8EC;
+    --cream: #FCEFD6;
+    --purple: #6B46C1;
+    --gold: #F59E0B;
+    --terracotta: #C2410C;
+    --mint: #A7F3D0;
+    --pink: #FBCFE8;
+    --sky: #BAE6FD;
+    --lavender: #DDD6FE;
+    --border: 3px solid var(--ink);
+    --radius-card: 20px;
+    --radius-pill: 999px;
+    --stamp: 0 6px 0 0 var(--ink);
+    --stamp-sm: 0 4px 0 0 var(--ink);
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: 'Varela Round', system-ui, sans-serif;
+    background: var(--canvas);
+    color: var(--ink);
+    min-height: 100vh;
+    line-height: 1.55;
+    overflow-x: hidden;
+  }
+  .mono { font-family: 'JetBrains Mono', monospace; direction: ltr; }
+  h1, h2, h3, h4 { font-family: 'Rubik', sans-serif; margin: 0; line-height: 1.15; }
+
+  .bg-deco { position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background-image:
+      radial-gradient(circle at 10% 15%, var(--mint) 0%, transparent 8%),
+      radial-gradient(circle at 90% 20%, var(--gold) 0%, transparent 6%),
+      radial-gradient(circle at 15% 80%, var(--sky) 0%, transparent 7%),
+      radial-gradient(circle at 85% 75%, var(--lavender) 0%, transparent 8%);
+    opacity: 0.35; }
+  .bg-deco::after { content:''; position:absolute; inset:0;
+    background-image: radial-gradient(circle, var(--ink) 1px, transparent 1.5px);
+    background-size: 32px 32px; opacity: 0.06; }
+
+  .wrap { position: relative; z-index: 1; max-width: 960px; margin: 0 auto; padding: 0 24px; }
+
+  /* Hero */
+  .hero { text-align: center; padding: 64px 24px 40px; }
+  .hero-badge { display:inline-flex; align-items:center; gap:8px; padding:6px 14px;
+    background: var(--spine-deep); color: var(--canvas); font-size:13px; font-weight:600;
+    border-radius: var(--radius-pill); margin-bottom:20px; direction: ltr; }
+  .hero-badge::before { content:''; width:8px; height:8px; border-radius:50%;
+    background: var(--spine-light); box-shadow: 0 0 0 4px rgba(16,185,129,0.3); }
+  .hero h1 { font-size: clamp(40px, 7vw, 72px); font-weight:800; letter-spacing:-0.02em; margin-bottom:16px; direction: ltr; }
+  .hero h1 .accent { color: var(--purple); position: relative; display:inline-block; }
+  .hero h1 .accent::after { content:''; position:absolute; bottom:-4px; left:0; right:0; height:7px;
+    background: var(--gold); border-radius:999px; transform: skewX(-8deg); }
+  .hero p.lead { font-size: 19px; max-width: 620px; margin: 0 auto 28px;
+    color: color-mix(in srgb, var(--ink) 82%, transparent); }
+  .hero-stats { display:inline-flex; flex-wrap:wrap; justify-content:center; gap:12px; margin-bottom: 32px; }
+  .stat-pill { background: var(--canvas); border: var(--border); border-radius: var(--radius-pill);
+    padding:8px 16px; font-weight:600; font-size:14px; box-shadow: var(--stamp-sm);
+    display:inline-flex; gap:6px; align-items:center; }
+  .stat-pill .num { color: var(--purple); font-weight:800; }
+
+  .btn { display:inline-flex; align-items:center; gap:10px; font-family:'Rubik',sans-serif;
+    font-weight:700; font-size:17px; padding:14px 26px; border-radius: var(--radius-pill);
+    text-decoration:none; border: var(--border); cursor:pointer; transition: transform .18s, box-shadow .18s; }
+  .btn-primary { background: var(--spine); color:#fff; box-shadow: var(--stamp); }
+  .btn-primary:hover { transform: translate(-2px,-3px); box-shadow: 0 9px 0 0 var(--ink); }
+  .btn-primary:active { transform: translate(0,1px); box-shadow: 0 3px 0 0 var(--ink); }
+  .btn-ghost { background: var(--canvas); color: var(--ink); box-shadow: var(--stamp-sm); }
+  .btn-ghost:hover { background: var(--cream); }
+  .btn-row { display:flex; gap:14px; justify-content:center; flex-wrap:wrap; }
+
+  /* Sections */
+  section.block { padding: 24px 0 16px; }
+  .sec-head { display:flex; align-items:baseline; gap:14px; margin: 36px 0 22px;
+    padding-bottom:12px; border-bottom: 3px dashed color-mix(in srgb, var(--ink) 25%, transparent); }
+  .sec-tag { font-family:'Rubik',sans-serif; font-weight:800; font-size:13px; background:var(--ink);
+    color:var(--canvas); padding:4px 12px; border-radius: var(--radius-pill); direction:ltr; }
+  .sec-head h2 { font-size: 28px; font-weight:700; }
+
+  .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); gap:20px; }
+  .card { position:relative; background:var(--canvas); border:var(--border); border-radius:var(--radius-card);
+    padding:24px; box-shadow: var(--stamp); overflow:hidden; transition: transform .18s, box-shadow .18s; }
+  .card:hover { transform: translate(-2px,-3px); box-shadow: 0 9px 0 0 var(--ink); }
+  .card::before { content:''; position:absolute; top:-16px; inset-inline-end:-16px; width:64px; height:64px;
+    border-radius:50%; opacity:.25; z-index:0; }
+  .card[data-tint="mint"]::before { background: var(--mint); }
+  .card[data-tint="gold"]::before { background: var(--gold); }
+  .card[data-tint="sky"]::before { background: var(--sky); }
+  .card .ico { font-size: 30px; position:relative; z-index:1; margin-bottom: 10px; }
+  .card h3 { font-size: 20px; font-weight:700; margin-bottom:8px; position:relative; z-index:1; }
+  .card p { font-size:15px; position:relative; z-index:1;
+    color: color-mix(in srgb, var(--ink) 78%, transparent); margin:0; }
+
+  /* Install */
+  .install { background: var(--cream); border: var(--border); border-radius: var(--radius-card);
+    padding: 28px; box-shadow: var(--stamp); margin-top: 8px; }
+  .steps { counter-reset: step; list-style:none; margin:0; padding:0; }
+  .steps li { position:relative; padding-inline-start: 44px; margin-bottom: 16px; font-size:16px; }
+  .steps li::before { counter-increment: step; content: counter(step);
+    position:absolute; inset-inline-start:0; top:-2px; width:30px; height:30px; border-radius:50%;
+    background: var(--purple); color:#fff; font-family:'Rubik',sans-serif; font-weight:800;
+    display:flex; align-items:center; justify-content:center; font-size:15px; }
+  .codebox { background: var(--ink); color: var(--mint); font-family:'JetBrains Mono',monospace;
+    font-size:14px; padding:12px 16px; border-radius:10px; direction:ltr; text-align:left;
+    margin-top: 8px; overflow-x:auto; }
+  .note { font-size:14px; color: color-mix(in srgb, var(--ink) 65%, transparent); margin-top: 16px; }
+  .note b { color: var(--purple); }
+
+  .footer { max-width:960px; margin: 72px auto 0; padding: 32px 24px;
+    border-top: 3px dashed color-mix(in srgb, var(--ink) 25%, transparent); text-align:center;
+    font-size:14px; color: color-mix(in srgb, var(--ink) 65%, transparent); }
+  .footer a { color: var(--purple); font-weight:600; text-decoration:none; border-bottom:2px solid var(--gold); }
+  .footer a:hover { color: var(--spine-deep); }
+
+  @media (prefers-reduced-motion: reduce) { *,*::before,*::after { transition:none!important; } html{scroll-behavior:auto;} }
+  @media (max-width:640px){ .hero{padding:44px 16px 28px;} .grid{grid-template-columns:1fr;} }
+</style>
+</head>
+<body>
+<div class="bg-deco" aria-hidden="true"></div>
+
+<header class="hero">
+  <div class="hero-badge"><span>VS Code</span><span class="mono">· Claude Code</span></div>
+  <h1>Benefit's <span class="accent">Toolkit</span></h1>
+  <p class="lead">כלי איכות-חיים ל-Claude Code בתוך VS Code — תמיכת עברית מלאה, צלילי התראה, וסרגל היסטוריית שיחות. הכל ב-extension אחד, אפס תלויות.</p>
+  <div class="hero-stats">
+    <span class="stat-pill"><span class="num">3</span> כלים</span>
+    <span class="stat-pill"><span class="num">0</span> dependencies</span>
+    <span class="stat-pill"><span class="num">MIT</span> open source</span>
+  </div>
+  <div class="btn-row">
+    <a class="btn btn-primary" href="https://github.com/benefits-il/benefits-toolkit/releases/latest">הורד מ-Releases ←</a>
+    <a class="btn btn-ghost" href="https://github.com/benefits-il/benefits-toolkit">קוד מקור</a>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <section class="block">
+    <div class="sec-head"><span class="sec-tag">FEATURES</span><h2>מה יש בפנים</h2></div>
+    <div class="grid">
+      <div class="card" data-tint="mint">
+        <div class="ico" aria-hidden="true">◀▶</div>
+        <h3>עברית · RTL</h3>
+        <p>תמיכת כיווניות מלאה בצ'אט של Claude Code: טקסט עברי מיושר נכון, פיסוק במקום, וערבוב עברית-אנגלית קריא — בלי הקפיצות המעצבנות.</p>
+      </div>
+      <div class="card" data-tint="gold">
+        <div class="ico" aria-hidden="true">♪</div>
+        <h3>צלילי התראה</h3>
+        <p>Hooks קוליים שמודיעים לך מה קורה: צליל כשמשימה מסתיימת, כשצריך אישור, וכשיש שגיאה. תפסיק לבהות במסך וחכה.</p>
+      </div>
+      <div class="card" data-tint="sky">
+        <div class="ico" aria-hidden="true">▤</div>
+        <h3>היסטוריית שיחות</h3>
+        <p>סרגל צד שמרכז את כל השיחות שלך: דפדוף, חיפוש, וחזרה לכל שיחה קודמת בלחיצה — בלי לאבד הקשר.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="sec-head"><span class="sec-tag">INSTALL</span><h2>התקנה</h2></div>
+    <div class="install">
+      <ol class="steps">
+        <li>הורד את הקובץ <span class="mono">benefits-toolkit-x.x.x.vsix</span> מעמוד ה-<a href="https://github.com/benefits-il/benefits-toolkit/releases/latest" style="color:var(--purple);font-weight:600;">Releases</a>.</li>
+        <li>ב-VS Code: לוח Extensions ← תפריט (···) ← <b>Install from VSIX…</b> ← בחר את הקובץ שהורדת.</li>
+        <li>או דרך הטרמינל:
+          <div class="codebox">code --install-extension benefits-toolkit-0.1.1.vsix</div>
+        </li>
+        <li>הפעל מחדש את VS Code. סרגל ה-Benefit יופיע בצד.</li>
+      </ol>
+      <p class="note"><b>גם ב-Cursor:</b> אותו קובץ VSIX עובד — Cursor תומך ב-Install from VSIX בדיוק כמו VS Code.</p>
+    </div>
+  </section>
+
+</div>
+
+<footer class="footer">
+  חלק מ-<a href="https://github.com/benefits-il">Benefits</a> · AI that finally fits · בן עקיבא
+</footer>
+
+</body>
+</html>
