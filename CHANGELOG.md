@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.3 — Sound hooks: play via MediaPlayer (SoundPlayer was silent)
+
+Fixes "the command runs but I hear nothing" on a machine whose speakers and other VS Code sounds work fine.
+
+**Root cause.** The hook played WAVs with `System.Media.SoundPlayer.PlaySync()`, which goes through the legacy winmm/waveOut mapper. On some machines that mapper targets a different "preferred" device than the modern WASAPI default that VS Code and every other app use — so `PlaySync()` returns success (exit 0) while reaching no audible output. Confirmed on a real machine: SoundPlayer = silent, WPF `MediaPlayer` (Media Foundation, follows the true default render device) = audible, same file, same process.
+
+**Fix.** Both the hook command and the in-extension preview now play through `System.Windows.Media.MediaPlayer`. The hidden PowerShell process polls `NaturalDuration` so it lives exactly as long as the clip then exits (Play() is async). `ensureInstalled` already treats the old SoundPlayer command as stale, so the healer rewrites existing installs to the new command automatically.
+
 ## 0.1.2 — Sound hooks: continuous self-heal (stop getting clobbered)
 
 Fixes the recurring "the finish sound stopped working again" on machines where it kept coming back.
