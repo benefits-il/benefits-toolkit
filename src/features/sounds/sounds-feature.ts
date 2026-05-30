@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { affects, readConfig } from "../../core/config-manager";
-import type { Feature } from "../../core/feature-registry";
+import type { Feature, DeactivateReason } from "../../core/feature-registry";
 import { logger } from "../../core/logger";
 import { HookInstaller } from "./services/hook-installer";
 import { HookHealer } from "./services/hook-healer";
@@ -57,7 +57,7 @@ export function createSoundsFeature(ctx: vscode.ExtensionContext): Feature {
         }),
       );
     },
-    async deactivate(): Promise<void> {
+    async deactivate(reason: DeactivateReason): Promise<void> {
       for (const d of disposables) {
         try {
           d.dispose();
@@ -67,12 +67,17 @@ export function createSoundsFeature(ctx: vscode.ExtensionContext): Feature {
       }
       disposables = [];
 
+      // On an explicit "disable" (user turned sounds off — e.g. via the Sounds
+      // panel), remove the hooks; that's the intent. On "shutdown" (window
+      // reload) leave them so sounds survive the restart, unless the user opted
+      // into cleanup. The healer was disposed above, so uninstall won't be
+      // immediately re-healed.
       const cfg = readConfig().sounds;
-      if (cfg.cleanupOnDeactivate && installer) {
+      if ((reason === "disable" || cfg.cleanupOnDeactivate) && installer) {
         try {
           await installer.uninstall();
         } catch (err) {
-          logger.warn("sounds", "Cleanup-on-deactivate failed", err);
+          logger.warn("sounds", "Uninstall on deactivate failed", err);
         }
       }
       installer = undefined;

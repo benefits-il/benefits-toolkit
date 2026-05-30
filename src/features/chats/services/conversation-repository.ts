@@ -76,7 +76,7 @@ export class ConversationRepository {
     let summary: { summary: string; leafUuid: string } | undefined;
     let firstMessageAt: string | undefined;
     let realMessageCount = 0;
-    let userPreview: string | undefined;
+    const userTexts: string[] = [];
     let cwd: string | undefined;
 
     for (const r of records) {
@@ -93,8 +93,8 @@ export class ConversationRepository {
         }
         if (isRealMessage(r)) {
           realMessageCount++;
-          if (!userPreview && r.type === "user") {
-            userPreview = extractText(r).slice(0, 80);
+          if (r.type === "user" && userTexts.length < 5) {
+            userTexts.push(extractText(r));
           }
         }
       }
@@ -109,7 +109,7 @@ export class ConversationRepository {
       projectDisplayName: humanizeProjectFolder(projectFolder),
       conversationId,
       cwd,
-      title: summary?.summary ?? userPreview ?? "(empty conversation)",
+      title: summary?.summary ?? deriveTitle(userTexts) ?? "(empty conversation)",
       hasSummary: summary !== undefined,
       leafUuid: summary?.leafUuid,
       firstMessageAt,
@@ -170,6 +170,43 @@ function extractText(record: MessageRecord): string {
     }
   }
   return parts.join("\n").trim();
+}
+
+// Claude Code injects synthetic content into user messages (slash-command
+// wrappers, IDE context, system reminders) and conversations often open with a
+// bare @file reference or path. Almost no conversation has a real `summary`, so
+// the title falls back to the first user message — strip that noise so the
+// fallback reads like a human title instead of "<command-name>/md-format…".
+const INJECTED_TAGS =
+  "ide_opened_file|system-reminder|command-message|command-name|command-args|command-contents|local-command-stdout|local-command-stderr";
+
+function cleanTitleText(raw: string): string {
+  let t = raw;
+  // Remove injected blocks (tag + their content).
+  t = t.replace(new RegExp(`<(${INJECTED_TAGS})>[\\s\\S]*?</\\1>`, "gi"), " ");
+  // Remove any stray open/close tags of the injected kinds.
+  t = t.replace(/<\/?(?:ide_opened_file|system-reminder|command-[a-z-]+|local-command-[a-z]+)[^>]*>/gi, " ");
+  // Drop a run of leading @file refs / bare path tokens (the message's real text follows).
+  t = t.replace(/^(?:\s*(?:@\S+|[A-Za-z]:[\\/]\S+|\/[^\s]+\.\w+))+/g, " ");
+  return t.replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Best human-readable title from the first few user messages: the first one that
+ * still has real text after cleaning, else a slash-command label (e.g. "/md-format")
+ * if that's all the conversation was.
+ */
+function deriveTitle(userTexts: string[]): string | undefined {
+  let slashCmd: string | undefined;
+  for (const raw of userTexts) {
+    if (slashCmd === undefined) {
+      const m = raw.match(/<command-name>\s*(\/[^<\s]+)/i);
+      if (m) slashCmd = m[1];
+    }
+    const cleaned = cleanTitleText(raw);
+    if (cleaned.length >= 3) return cleaned.slice(0, 100);
+  }
+  return slashCmd;
 }
 
 async function readFirstChunk(file: string, maxBytes: number): Promise<string> {

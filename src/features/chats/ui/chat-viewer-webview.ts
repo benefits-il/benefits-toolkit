@@ -118,7 +118,8 @@ function buildHtml(meta: ConversationMeta, records: RawJsonlRecord[]): string {
     .join("\n");
 
   return TEMPLATE
-    .replace("{{TITLE}}", escapeHtml(meta.title))
+    // {{TITLE}} appears twice (document <title> + visible header), so replace ALL.
+    .replaceAll("{{TITLE}}", escapeHtml(meta.title))
     .replace("{{CTX_TOOLTIP}}", escapeHtml(stats.ctxTooltip))
     .replace("{{CTX_WARN_HTML}}", stats.isEstimate
       ? '<span class="ctx-warn" title="No usage data in JSONL — showing rough chars/4 estimate">⚠</span>'
@@ -315,21 +316,9 @@ const TEMPLATE = `<!DOCTYPE html>
       text-overflow: ellipsis;
     }
 
-    .readonly-badge {
-      background-color: var(--vscode-badge-background);
-      color: var(--vscode-badge-foreground);
-      padding: 2px 10px;
-      border-radius: var(--cc-radius-pill);
-      font-size: 10.5px;
-      font-weight: 600;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-    }
-
     @media (max-width: 600px) {
       .header { padding: 12px 16px; }
       .header-title { font-size: 14px; flex-basis: 100%; }
-      .readonly-badge { font-size: 10px; padding: 1px 6px; }
     }
 
     .messages-container {
@@ -668,7 +657,6 @@ const TEMPLATE = `<!DOCTYPE html>
     <div class="header-title">
       <svg class="title-icon" aria-hidden="true"><use href="#icon-book"/></svg>
       <span>{{TITLE}}</span>
-      <span class="readonly-badge">Read Only</span>
     </div>
     <div class="context-indicator" title="{{CTX_TOOLTIP}}">
       {{CTX_WARN_HTML}}
@@ -813,7 +801,7 @@ const TEMPLATE = `<!DOCTYPE html>
     }
 
     function buildMarkdown() {
-      const titleEl = document.querySelector('.header-title span:not(.readonly-badge)');
+      const titleEl = document.querySelector('.header-title span');
       const docTitle = titleEl ? titleEl.textContent.trim() : 'Conversation';
       const lines = ['# ' + docTitle, ''];
       const messages = document.querySelectorAll('.message');

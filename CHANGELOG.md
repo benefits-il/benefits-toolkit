@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.5 — Sounds control panel + cleaner conversation titles
+
+**Sounds control panel.** A new **Sounds** view in the sidebar (next to Claude Chats) — toggle sounds on/off, switch each event (finish / asks-you) between its Default and Alternative variant, preview each with a Play button, and Test/Reinstall. It's always available (even when sounds are off, so the switch is reachable). Turning sounds off from here now removes the hooks (an explicit "disable" uninstalls; a window reload still leaves them in place).
+
+**Conversation viewer fixes.**
+- Fixed the header showing the literal `{{TITLE}}` instead of the conversation name — the placeholder appears twice in the template and only the first was being substituted (`String.replace` replaces one match; now `replaceAll`).
+- Removed the confusing `Read Only` badge from the header.
+
+**Cleaner conversation titles.** Almost no conversation has a Claude-generated `summary`, so titles fall back to the first user message — which was often just an `@file` reference, a `/slash-command` wrapper, or an `<ide_opened_file>` tag. Titles are now derived by stripping that injected noise and using the first real human text (or a `/command` label as last resort), across both the sidebar list and the viewer header.
+
 ## 0.1.4 — Sound hooks: run via a launcher script (bash ate the $variables)
 
 The 0.1.3 MediaPlayer command worked when tested via cmd, but was still silent in real use. Cause: **Claude Code runs hooks through bash (Git Bash on Windows)**, and the inline `-Command "... $m ... $n ..."` had its `$m`/`$n` expanded away by bash before PowerShell ever saw it — PowerShell then got a mangled script and failed to parse (exit 1, silent). Verified by running the exact hook command through bash.
