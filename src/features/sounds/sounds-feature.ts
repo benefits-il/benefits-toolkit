@@ -3,6 +3,7 @@ import { affects, readConfig } from "../../core/config-manager";
 import type { Feature } from "../../core/feature-registry";
 import { logger } from "../../core/logger";
 import { HookInstaller } from "./services/hook-installer";
+import { HookHealer } from "./services/hook-healer";
 import { SoundAssetManager } from "./services/sound-asset-manager";
 import { VariantPicker } from "./services/variant-picker";
 import { registerSoundsCommands } from "./ui/sounds-commands";
@@ -21,17 +22,22 @@ export function createSoundsFeature(ctx: vscode.ExtensionContext): Feature {
       installer = new HookInstaller(assets);
       const picker = new VariantPicker(assets);
 
-      disposables = registerSoundsCommands(ctx, installer, assets, picker);
+      // Continuous self-heal. The hooks live in ~/.claude/settings.json, which
+      // Claude Code rewrites whenever a permission is approved — dropping our
+      // hooks. The healer re-applies them now AND on every change to that file,
+      // so a mid-session clobber no longer kills sounds until the next reload.
+      const healer = new HookHealer(installer, () => {
+        const s = readConfig().sounds;
+        return { stop: s.stopVariant, notification: s.notificationVariant };
+      });
 
-      // Self-heal: (re)install hooks if they're missing or stale. This is what
-      // fixes "sounds stopped working again" after a Claude Code update or a
-      // settings.json reset wipes the hooks.
-      const initial = readConfig().sounds;
+      disposables = registerSoundsCommands(ctx, installer, assets, picker, healer);
+      disposables.push(healer);
+
       try {
-        const changed = await installer.ensureInstalled(initial.stopVariant, initial.notificationVariant);
-        if (changed) logger.info("sounds", "Hooks (re)installed on activation.");
+        await healer.start();
       } catch (err) {
-        logger.error("sounds", "ensureInstalled on activation failed", err);
+        logger.error("sounds", "Hook healer failed to start", err);
       }
 
       disposables.push(

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.2 — Sound hooks: continuous self-heal (stop getting clobbered)
+
+Fixes the recurring "the finish sound stopped working again" on machines where it kept coming back.
+
+**Root cause.** The Stop/Notification hooks live in `~/.claude/settings.json` — a file Claude Code *also* owns. Every time you approve a new permission, Claude Code rewrites the whole file from its in-memory snapshot, which silently drops the hooks this extension added out-of-band. On a machine whose permission allowlist grows constantly (hundreds of entries), the hooks get clobbered over and over; on a machine with a stable allowlist the file is never rewritten, so the same hooks survive forever — which is why "it never breaks on my other computer."
+
+The 0.1.0/0.1.1 self-heal only ran **on activation**, so once the hooks were clobbered mid-session they stayed gone until the window reloaded.
+
+**Fix.** New `HookHealer` watches `~/.claude/settings.json` and re-applies the managed hooks (idempotently, debounced ~0.8s) within a second of *any* external change. `ensureInstalled` only writes when something is actually missing or stale, so re-applying after our own write is a read-only no-op and never loops. Explicit **Uninstall** pauses the healer so it doesn't fight you; **Install** resumes it.
+
 ## 0.1.1 — Sound hooks: drop the broken bus, fire PowerShell directly
 
 - Removed the experimental hidden-webview audio bus (a node launcher wrote events to a `.event` file, the extension watched it, and an `<audio>` element in a hidden webview was supposed to play them — the playback layer was silent).

@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { readConfig } from "../../../core/config-manager";
 import { logger } from "../../../core/logger";
 import { HookInstaller } from "../services/hook-installer";
+import { HookHealer } from "../services/hook-healer";
 import { SoundAssetManager } from "../services/sound-asset-manager";
 import { VariantPicker } from "../services/variant-picker";
 import { playPreview } from "../services/sound-player";
@@ -11,6 +12,7 @@ export function registerSoundsCommands(
   installer: HookInstaller,
   assets: SoundAssetManager,
   picker: VariantPicker,
+  healer: HookHealer,
 ): vscode.Disposable[] {
   const disposables: vscode.Disposable[] = [];
 
@@ -18,6 +20,7 @@ export function registerSoundsCommands(
     vscode.commands.registerCommand("benefit.sounds.install", async () => {
       const cfg = readConfig().sounds;
       try {
+        healer.resume();
         await installer.install(cfg.stopVariant, cfg.notificationVariant);
         vscode.window.showInformationMessage(
           "Benefit: sound hooks installed. They'll play next time Claude finishes a message or asks for input.",
@@ -30,6 +33,9 @@ export function registerSoundsCommands(
 
     vscode.commands.registerCommand("benefit.sounds.uninstall", async () => {
       try {
+        // Stop the healer first, otherwise it would immediately put the hooks
+        // back when it sees settings.json change.
+        healer.pause();
         await installer.uninstall();
         vscode.window.showInformationMessage("Benefit: sound hooks removed.");
       } catch (err) {
