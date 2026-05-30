@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import * as path from "node:path";
 import { isWindows, isMac, isLinux } from "../../../shared/platform-detector";
 
 export const HOOK_MARKER = "BENEFIT_MANAGED_HOOK";
@@ -29,9 +30,12 @@ function winPlayInner(soundPath: string): string {
 
 export function buildPlayCommand(soundPath: string): string {
   if (isWindows()) {
-    // winPlayInner uses only single quotes internally, so wrapping the whole
-    // script in the -Command "..." double quotes is escaping-safe.
-    return `powershell -NoProfile -WindowStyle Hidden -Command "${winPlayInner(soundPath)}"`;
+    // Claude Code runs hooks through bash (Git Bash), which would expand any
+    // '$' in an inline -Command before PowerShell sees it. So we invoke the
+    // play.ps1 launcher (which holds all the $variables) via -File and pass the
+    // wav path as a plain argument — the command itself contains no '$'.
+    const launcher = path.join(path.dirname(soundPath), "play.ps1");
+    return `powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "${launcher}" "${soundPath}"`;
   }
   if (isMac()) {
     return `afplay '${soundPath.replace(/'/g, "'\\''")}' # ${HOOK_MARKER}`;

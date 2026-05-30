@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.4 — Sound hooks: run via a launcher script (bash ate the $variables)
+
+The 0.1.3 MediaPlayer command worked when tested via cmd, but was still silent in real use. Cause: **Claude Code runs hooks through bash (Git Bash on Windows)**, and the inline `-Command "... $m ... $n ..."` had its `$m`/`$n` expanded away by bash before PowerShell ever saw it — PowerShell then got a mangled script and failed to parse (exit 1, silent). Verified by running the exact hook command through bash.
+
+(The previous SoundPlayer command had no `$`, so bash left it intact — it was silent for the *other* reason, winmm device routing. Two independent bugs stacked.)
+
+**Fix.** The PowerShell — with all its `$variables` — now lives in a `play.ps1` launcher written next to the WAVs. The hook command contains **no `$`**: `powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "…\play.ps1" "…\stop.wav"`. PowerShell reads the script directly via `-File`, so bash never touches the variables. `install()` writes the launcher; `ensureInstalled()` re-creates it if missing; uninstall removes it. The in-extension preview still plays inline (it spawns PowerShell directly, with no shell in between).
+
 ## 0.1.3 — Sound hooks: play via MediaPlayer (SoundPlayer was silent)
 
 Fixes "the command runs but I hear nothing" on a machine whose speakers and other VS Code sounds work fine.

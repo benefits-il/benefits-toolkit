@@ -82,6 +82,8 @@ export class HookInstaller {
 
   async install(stopVariant: import("../../../core/config-manager").SoundVariant, notificationVariant: import("../../../core/config-manager").SoundVariant): Promise<void> {
     const installed = await this.assets.installAll(stopVariant, notificationVariant);
+    // The hook command invokes this launcher via -File; it must exist on disk.
+    await this.assets.installLauncher();
 
     const settings = await readSettings();
     const hooks = purgeManagedHooks(getHooks(settings));
@@ -118,7 +120,11 @@ export class HookInstaller {
 
     const stopWav = this.assets.installedPath("stop");
     const notificationWav = this.assets.installedPath("notification");
-    const artifactsExist = (await pathExists(stopWav)) && (await pathExists(notificationWav));
+    const launcher = this.assets.launcherPath();
+    const artifactsExist =
+      (await pathExists(stopWav)) &&
+      (await pathExists(notificationWav)) &&
+      (await pathExists(launcher));
 
     if (currentStop === expectedStop && currentNotification === expectedNotification && artifactsExist) {
       return false;

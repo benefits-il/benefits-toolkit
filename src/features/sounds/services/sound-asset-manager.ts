@@ -23,6 +23,25 @@ const INSTALLED_NAMES: Record<SoundSlot, string> = {
   notification: "notify.wav",
 };
 
+const LAUNCHER_NAME = "play.ps1";
+
+// The hook command must contain NO '$' — Claude Code runs hooks through bash
+// (Git Bash on Windows), which would expand $m/$n before PowerShell ever sees
+// them, silently breaking the command. So the PowerShell (with its $variables)
+// lives in this launcher file, which PowerShell reads directly via -File; the
+// hook command only passes the wav path as a plain argument. Plays via
+// MediaPlayer (Media Foundation) because SoundPlayer's winmm path is silent on
+// some machines.
+const PLAY_PS1 = `param([string]$Path)
+Add-Type -AssemblyName PresentationCore
+$m = New-Object System.Windows.Media.MediaPlayer
+$m.Open([uri]("file:///" + $Path.Replace('\\','/')))
+$n = 0
+while (-not $m.NaturalDuration.HasTimeSpan -and $n -lt 50) { Start-Sleep -Milliseconds 40; $n++ }
+$m.Play()
+if ($m.NaturalDuration.HasTimeSpan) { Start-Sleep -Milliseconds ([int]$m.NaturalDuration.TimeSpan.TotalMilliseconds + 300) } else { Start-Sleep -Seconds 4 }
+`;
+
 export class SoundAssetManager {
   constructor(private readonly ctx: vscode.ExtensionContext) {}
 
@@ -32,6 +51,17 @@ export class SoundAssetManager {
 
   installedPath(slot: SoundSlot): string {
     return path.join(claudeSoundsDir(), INSTALLED_NAMES[slot]);
+  }
+
+  launcherPath(): string {
+    return path.join(claudeSoundsDir(), LAUNCHER_NAME);
+  }
+
+  async installLauncher(): Promise<string> {
+    const dst = this.launcherPath();
+    await ensureDir(path.dirname(dst));
+    await fs.writeFile(dst, PLAY_PS1, "utf8");
+    return dst;
   }
 
   async install(slot: SoundSlot, variant: SoundVariant): Promise<string> {
@@ -94,8 +124,9 @@ export class SoundAssetManager {
         }
       }
     }
-    // Legacy per-directory artifacts from the previous bus-based mechanism.
-    for (const name of ["play.js", ".event"]) {
+    // The MediaPlayer launcher, plus legacy per-directory artifacts from the
+    // previous bus-based mechanism.
+    for (const name of [LAUNCHER_NAME, "play.js", ".event"]) {
       try {
         await fs.unlink(path.join(dir, name));
       } catch {
