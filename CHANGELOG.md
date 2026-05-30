@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.6 — Fix dead Sounds panel buttons + view order
+
+- **Sounds panel buttons did nothing.** The panel set a strict CSP (`script-src 'nonce-…'`) which blocked VS Code's injected `acquireVsCodeApi` bootstrap, so the whole webview script threw on the first line and no control worked. Dropped the CSP meta to match the working chat-viewer webview — Play / Test / Reinstall / toggles now respond.
+- **Order:** "Claude Chats" is back on top, "Sounds" below it.
+
 ## 0.1.5 — Sounds control panel + cleaner conversation titles
 
 **Sounds control panel.** A new **Sounds** view in the sidebar (next to Claude Chats) — toggle sounds on/off, switch each event (finish / asks-you) between its Default and Alternative variant, preview each with a Play button, and Test/Reinstall. It's always available (even when sounds are off, so the switch is reachable). Turning sounds off from here now removes the hooks (an explicit "disable" uninstalls; a window reload still leaves them in place).

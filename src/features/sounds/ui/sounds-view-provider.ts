@@ -1,5 +1,4 @@
 import * as vscode from "vscode";
-import * as crypto from "node:crypto";
 import { readConfig, updateConfig, onConfigChanged, SoundVariant } from "../../../core/config-manager";
 import { logger } from "../../../core/logger";
 import { HookInstaller } from "../services/hook-installer";
@@ -33,7 +32,7 @@ export class SoundsViewProvider implements vscode.WebviewViewProvider {
   resolveWebviewView(view: vscode.WebviewView): void {
     this.view = view;
     view.webview.options = { enableScripts: true, localResourceRoots: [this.ctx.extensionUri] };
-    view.webview.html = this.html(view.webview);
+    view.webview.html = this.html();
 
     view.webview.onDidReceiveMessage((msg) => void this.onMessage(msg));
     view.onDidChangeVisibility(() => {
@@ -117,19 +116,14 @@ export class SoundsViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private html(webview: vscode.Webview): string {
-    const nonce = crypto.randomBytes(16).toString("hex");
-    const csp = [
-      `default-src 'none'`,
-      `style-src ${webview.cspSource} 'unsafe-inline'`,
-      `script-src 'nonce-${nonce}'`,
-    ].join("; ");
-
+  private html(): string {
+    // No CSP meta: matches the working chat-viewer webview in this extension. A
+    // strict script-src nonce blocks VS Code's injected acquireVsCodeApi
+    // bootstrap, which kills the whole script.
     return /* html */ `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta http-equiv="Content-Security-Policy" content="${csp}" />
 <style>
   :root { --gap: 14px; }
   body {
@@ -236,7 +230,7 @@ export class SoundsViewProvider implements vscode.WebviewViewProvider {
     </div>
   </div>
 
-<script nonce="${nonce}">
+<script>
   const vscode = acquireVsCodeApi();
   const post = (m) => vscode.postMessage(m);
 
