@@ -88,7 +88,11 @@ export async function playPreview(soundPath: string): Promise<void> {
 
 function runDetached(cmd: string, args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
-    const proc = spawn(cmd, args, { detached: true, stdio: "ignore" });
+    // NOT detached: a detached child on Windows can be created without the
+    // interactive audio session, so MediaPlayer runs but is silent. A normal
+    // background child of the (long-lived) extension host plays audibly. We
+    // unref so it never blocks host shutdown.
+    const proc = spawn(cmd, args, { stdio: "ignore", windowsHide: true });
     proc.once("error", reject);
     proc.once("spawn", () => {
       proc.unref();

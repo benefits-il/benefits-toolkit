@@ -1,6 +1,13 @@
 # Changelog
 
-## 0.1.6 — Fix dead Sounds panel buttons + view order
+## 0.1.9 — Sounds panel: previews are actually audible
+
+The real reason the panel's Play / Test produced nothing: previews were spawned with `detached: true`, and a detached child process on Windows is created without the interactive audio session — so PowerShell/MediaPlayer ran (exit 0) but reached no speakers, while the Claude-Code-spawned hook stayed audible. Spawn the preview as a normal background child of the extension host instead (with `windowsHide`), and it plays. (Verified end-to-end: every click was already reaching the extension; only the audio session was missing.)
+
+## 0.1.6 — Sounds panel CSP + view order
+
+- Dropped the panel's strict `script-src 'nonce-…'` CSP (it would block VS Code's injected `acquireVsCodeApi` bootstrap) to match the working chat-viewer webview.
+- Order: "Claude Chats" on top, "Sounds" below it.
 
 - **Sounds panel buttons did nothing.** The panel set a strict CSP (`script-src 'nonce-…'`) which blocked VS Code's injected `acquireVsCodeApi` bootstrap, so the whole webview script threw on the first line and no control worked. Dropped the CSP meta to match the working chat-viewer webview — Play / Test / Reinstall / toggles now respond.
 - **Order:** "Claude Chats" is back on top, "Sounds" below it.
