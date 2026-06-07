@@ -4,14 +4,14 @@ import { logger } from "../../../core/logger";
 import { HookInstaller } from "../services/hook-installer";
 import { HookHealer } from "../services/hook-healer";
 import { SoundAssetManager } from "../services/sound-asset-manager";
-import { VariantPicker } from "../services/variant-picker";
+import { SoundPicker } from "../services/variant-picker";
 import { playPreview } from "../services/sound-player";
 
 export function registerSoundsCommands(
   ctx: vscode.ExtensionContext,
   installer: HookInstaller,
   assets: SoundAssetManager,
-  picker: VariantPicker,
+  picker: SoundPicker,
   healer: HookHealer,
 ): vscode.Disposable[] {
   const disposables: vscode.Disposable[] = [];
@@ -21,7 +21,7 @@ export function registerSoundsCommands(
       const cfg = readConfig().sounds;
       try {
         healer.resume();
-        await installer.install(cfg.stopVariant, cfg.notificationVariant);
+        await installer.install(cfg.stopSound, cfg.notificationSound);
         vscode.window.showInformationMessage(
           "Benefit: sound hooks installed. They'll play next time Claude finishes a message or asks for input.",
         );
@@ -46,24 +46,24 @@ export function registerSoundsCommands(
 
     vscode.commands.registerCommand("benefit.sounds.chooseSounds", async () => {
       const cfg = readConfig().sounds;
-      const stop = await picker.pickAndSave("stop", cfg.stopVariant);
+      const stop = await picker.pickAndSave("stop", cfg.stopSound);
       if (stop === undefined) return;
       const after = readConfig().sounds;
-      await picker.pickAndSave("notification", after.notificationVariant);
+      await picker.pickAndSave("notification", after.notificationSound);
 
       if (await installer.isInstalled()) {
         const finalCfg = readConfig().sounds;
-        await installer.install(finalCfg.stopVariant, finalCfg.notificationVariant);
-        vscode.window.showInformationMessage("Benefit: sound hooks updated with new variants.");
+        await installer.install(finalCfg.stopSound, finalCfg.notificationSound);
+        vscode.window.showInformationMessage("Benefit: sound hooks updated with new sounds.");
       }
     }),
 
     vscode.commands.registerCommand("benefit.sounds.test", async () => {
       const cfg = readConfig().sounds;
       try {
-        await playPreview(assets.bundledAssetPath("stop", cfg.stopVariant));
+        await playPreview(assets.bundledAssetPath(cfg.stopSound));
         setTimeout(() => {
-          void playPreview(assets.bundledAssetPath("notification", cfg.notificationVariant));
+          void playPreview(assets.bundledAssetPath(cfg.notificationSound));
         }, 1200);
       } catch (err) {
         vscode.window.showWarningMessage(`Benefit: preview failed — ${(err as Error).message}`);
@@ -74,7 +74,7 @@ export function registerSoundsCommands(
       const installed = await installer.isInstalled();
       const cfg = readConfig().sounds;
       const msg = installed
-        ? `Benefit sounds: INSTALLED (Stop=${cfg.stopVariant}, Notification=${cfg.notificationVariant}).`
+        ? `Benefit sounds: INSTALLED (Stop=${cfg.stopSound}, Notification=${cfg.notificationSound}).`
         : "Benefit sounds: not installed. Run 'Benefit: Sounds: Install Hooks' to enable.";
       vscode.window.showInformationMessage(msg);
     }),

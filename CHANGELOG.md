@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.0 — Sound library + RTL on by default
+
+**Sound library.** The Sounds panel is no longer limited to a Default/Alternative pair. There's now a shared pool of sounds (the 4 originals plus 13 new effects), and each event picks any sound from the full list:
+
+- Two categories — **When Claude finishes** (Stop) and **When Claude asks / needs you** (Notification) — each shows the whole pool with a per-row preview ▶.
+- If a sound is already chosen for the *other* category, it's flagged in this one with a small **`!`** badge whose tooltip reads "Already selected for …". Reusing the same sound is still allowed — the badge is just a heads-up.
+- New config keys `benefit.sounds.stopSound` / `benefit.sounds.notificationSound` hold a filename from the pool. (They replace the old `stopVariant` / `notificationVariant`; existing installs fall back to the default sounds and can re-pick from the panel.)
+- mp3 and wav are both supported — the new effects ship as mp3 (≈10× smaller than wav) and play on both Windows (MediaPlayer) and macOS (`afplay`).
+
+**RTL on by default.** `benefit.rtl.mode` now defaults to `active` instead of `off`, so a fresh install shows the RTL toggle and applies RTL without a trip to Settings. (Existing installs keep whatever value they already saved.)
+
 ## 0.1.9 — Sounds panel: previews are actually audible
 
 The real reason the panel's Play / Test produced nothing: previews were spawned with `detached: true`, and a detached child process on Windows is created without the interactive audio session — so PowerShell/MediaPlayer ran (exit 0) but reached no speakers, while the Claude-Code-spawned hook stayed audible. Spawn the preview as a normal background child of the extension host instead (with `windowsHide`), and it plays. (Verified end-to-end: every click was already reaching the extension; only the audio session was missing.)

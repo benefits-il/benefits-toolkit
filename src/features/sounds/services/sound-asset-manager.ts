@@ -2,36 +2,45 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { claudeSoundsDir } from "../../../core/paths";
-import { SoundVariant } from "../../../core/config-manager";
 import { ensureDir, pathExists } from "../../../shared/fs-utils";
 
 export type SoundSlot = "stop" | "notification";
 
-const ASSET_FILES: Record<SoundSlot, Record<SoundVariant, string>> = {
-  stop: {
-    default: "stop-default.wav",
-    alt: "stop-alt.wav",
-  },
-  notification: {
-    default: "notify-default.wav",
-    alt: "notify-alt.wav",
-  },
-};
+/** Audio file extensions we treat as selectable sounds in the pool. */
+const SOUND_EXTENSIONS = new Set([".wav", ".mp3", ".ogg", ".m4a", ".aiff", ".flac"]);
 
-const INSTALLED_NAMES: Record<SoundSlot, string> = {
-  stop: "stop.wav",
-  notification: "notify.wav",
+/** Base name (no extension) of the file copied into the install dir per slot. */
+const INSTALLED_BASE: Record<SoundSlot, string> = {
+  stop: "stop",
+  notification: "notify",
 };
 
 const LAUNCHER_NAME = "play.ps1";
+
+export interface SoundChoice {
+  /** Filename within the pool, e.g. "notification-bell.mp3". Used as the id. */
+  id: string;
+  /** Human-friendly label derived from the filename, e.g. "Notification Bell". */
+  label: string;
+}
+
+/** "notification-bell.mp3" -> "Notification Bell" */
+function labelFor(id: string): string {
+  const base = id.replace(/\.[^.]+$/, "");
+  return base
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 // The hook command must contain NO '$' — Claude Code runs hooks through bash
 // (Git Bash on Windows), which would expand $m/$n before PowerShell ever sees
 // them, silently breaking the command. So the PowerShell (with its $variables)
 // lives in this launcher file, which PowerShell reads directly via -File; the
-// hook command only passes the wav path as a plain argument. Plays via
-// MediaPlayer (Media Foundation) because SoundPlayer's winmm path is silent on
-// some machines.
+// hook command only passes the sound path as a plain argument. Plays via
+// MediaPlayer (Media Foundation) — which also handles mp3, not just wav — because
+// SoundPlayer's winmm path is silent on some machines.
 const PLAY_PS1 = `param([string]$Path)
 Add-Type -AssemblyName PresentationCore
 $m = New-Object System.Windows.Media.MediaPlayer
@@ -45,12 +54,39 @@ if ($m.NaturalDuration.HasTimeSpan) { Start-Sleep -Milliseconds ([int]$m.Natural
 export class SoundAssetManager {
   constructor(private readonly ctx: vscode.ExtensionContext) {}
 
-  bundledAssetPath(slot: SoundSlot, variant: SoundVariant): string {
-    return path.join(this.ctx.extensionPath, "dist", "assets", "sounds", ASSET_FILES[slot][variant]);
+  /** Directory holding the bundled sound pool (copied here by esbuild). */
+  private bundledDir(): string {
+    return path.join(this.ctx.extensionPath, "dist", "assets", "sounds");
   }
 
-  installedPath(slot: SoundSlot): string {
-    return path.join(claudeSoundsDir(), INSTALLED_NAMES[slot]);
+  /** Absolute path to a bundled pool sound by its id (filename). */
+  bundledAssetPath(id: string): string {
+    return path.join(this.bundledDir(), id);
+  }
+
+  /** All selectable sounds in the bundled pool, sorted by label. */
+  async listSounds(): Promise<SoundChoice[]> {
+    let entries: string[] = [];
+    try {
+      entries = await fs.readdir(this.bundledDir());
+    } catch {
+      return [];
+    }
+    return entries
+      .filter((f) => SOUND_EXTENSIONS.has(path.extname(f).toLowerCase()))
+      .map((id) => ({ id, label: labelFor(id) }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }
+
+  /** The first bundled sound whose id matches, or undefined. */
+  async hasSound(id: string): Promise<boolean> {
+    return pathExists(this.bundledAssetPath(id));
+  }
+
+  /** Installed path for a slot, preserving the chosen sound's extension. */
+  installedPath(slot: SoundSlot, id: string): string {
+    const ext = path.extname(id) || ".wav";
+    return path.join(claudeSoundsDir(), INSTALLED_BASE[slot] + ext);
   }
 
   launcherPath(): string {
@@ -64,18 +100,45 @@ export class SoundAssetManager {
     return dst;
   }
 
-  async install(slot: SoundSlot, variant: SoundVariant): Promise<string> {
-    const src = this.bundledAssetPath(slot, variant);
-    const dst = this.installedPath(slot);
+  /** Remove any previously-installed file for a slot (regardless of extension). */
+  private async removeSlot(slot: SoundSlot): Promise<void> {
+    const dir = claudeSoundsDir();
+    if (!(await pathExists(dir))) return;
+    const base = INSTALLED_BASE[slot];
+    let entries: string[] = [];
+    try {
+      entries = await fs.readdir(dir);
+    } catch {
+      return;
+    }
+    for (const name of entries) {
+      const noExt = name.replace(/\.[^.]+$/, "");
+      if (noExt !== base) continue;
+      if (!SOUND_EXTENSIONS.has(path.extname(name).toLowerCase())) continue;
+      try {
+        await fs.unlink(path.join(dir, name));
+      } catch {
+        // best-effort
+      }
+    }
+  }
+
+  /** Copy a pool sound into the stable install dir for a slot. Returns its path. */
+  async install(slot: SoundSlot, id: string): Promise<string> {
+    const src = this.bundledAssetPath(id);
+    const dst = this.installedPath(slot, id);
     await ensureDir(path.dirname(dst));
+    // Drop any stale file for this slot first (e.g. switching mp3 -> wav) so the
+    // dir never holds two competing stop.* / notify.* files.
+    await this.removeSlot(slot);
     await fs.copyFile(src, dst);
     return dst;
   }
 
-  async installAll(stop: SoundVariant, notification: SoundVariant): Promise<{ stop: string; notification: string }> {
+  async installAll(stopId: string, notificationId: string): Promise<{ stop: string; notification: string }> {
     return {
-      stop: await this.install("stop", stop),
-      notification: await this.install("notification", notification),
+      stop: await this.install("stop", stopId),
+      notification: await this.install("notification", notificationId),
     };
   }
 
@@ -107,25 +170,10 @@ export class SoundAssetManager {
   async removeInstalled(): Promise<void> {
     const dir = claudeSoundsDir();
     if (!(await pathExists(dir))) return;
-    for (const wavName of Object.values(INSTALLED_NAMES)) {
-      // Remove the WAV (hard error on anything but missing), plus its sidecar
-      // .ps1/.log/.js artifacts (best-effort).
-      try {
-        await fs.unlink(path.join(dir, wavName));
-      } catch (err) {
-        if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
-      }
-      const base = wavName.replace(/\.wav$/i, "");
-      for (const ext of [".ps1", ".log"]) {
-        try {
-          await fs.unlink(path.join(dir, base + ext));
-        } catch {
-          // best-effort
-        }
-      }
-    }
-    // The MediaPlayer launcher, plus legacy per-directory artifacts from the
-    // previous bus-based mechanism.
+    // Remove the installed sound for each slot (any extension), plus the
+    // launcher and legacy per-directory artifacts from older mechanisms.
+    await this.removeSlot("stop");
+    await this.removeSlot("notification");
     for (const name of [LAUNCHER_NAME, "play.js", ".event"]) {
       try {
         await fs.unlink(path.join(dir, name));

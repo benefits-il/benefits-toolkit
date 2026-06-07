@@ -80,8 +80,8 @@ function managedCommandFor(hooks: HooksShape, event: HookEventName): string | un
 export class HookInstaller {
   constructor(private readonly assets: SoundAssetManager) {}
 
-  async install(stopVariant: import("../../../core/config-manager").SoundVariant, notificationVariant: import("../../../core/config-manager").SoundVariant): Promise<void> {
-    const installed = await this.assets.installAll(stopVariant, notificationVariant);
+  async install(stopId: string, notificationId: string): Promise<void> {
+    const installed = await this.assets.installAll(stopId, notificationId);
     // The hook command invokes this launcher via -File; it must exist on disk.
     await this.assets.installLauncher();
 
@@ -106,31 +106,28 @@ export class HookInstaller {
    * Claude Code update or a settings reset wipes the hooks. Returns true if it
    * (re)installed.
    */
-  async ensureInstalled(
-    stopVariant: import("../../../core/config-manager").SoundVariant,
-    notificationVariant: import("../../../core/config-manager").SoundVariant,
-  ): Promise<boolean> {
-    const expectedStop = buildPlayCommand(this.assets.installedPath("stop"));
-    const expectedNotification = buildPlayCommand(this.assets.installedPath("notification"));
+  async ensureInstalled(stopId: string, notificationId: string): Promise<boolean> {
+    const stopPath = this.assets.installedPath("stop", stopId);
+    const notificationPath = this.assets.installedPath("notification", notificationId);
+    const expectedStop = buildPlayCommand(stopPath);
+    const expectedNotification = buildPlayCommand(notificationPath);
 
     const settings = await readSettings();
     const hooks = getHooks(settings);
     const currentStop = managedCommandFor(hooks, "Stop");
     const currentNotification = managedCommandFor(hooks, "Notification");
 
-    const stopWav = this.assets.installedPath("stop");
-    const notificationWav = this.assets.installedPath("notification");
     const launcher = this.assets.launcherPath();
     const artifactsExist =
-      (await pathExists(stopWav)) &&
-      (await pathExists(notificationWav)) &&
+      (await pathExists(stopPath)) &&
+      (await pathExists(notificationPath)) &&
       (await pathExists(launcher));
 
     if (currentStop === expectedStop && currentNotification === expectedNotification && artifactsExist) {
       return false;
     }
 
-    await this.install(stopVariant, notificationVariant);
+    await this.install(stopId, notificationId);
     return true;
   }
 

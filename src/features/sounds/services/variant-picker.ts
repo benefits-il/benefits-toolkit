@@ -1,52 +1,52 @@
 import * as vscode from "vscode";
-import { SoundVariant, updateConfig } from "../../../core/config-manager";
+import { updateConfig } from "../../../core/config-manager";
 import { SoundAssetManager, SoundSlot } from "./sound-asset-manager";
 import { playPreview } from "./sound-player";
 
-interface VariantItem extends vscode.QuickPickItem {
-  variant: SoundVariant;
+interface SoundItem extends vscode.QuickPickItem {
+  id: string;
 }
-
-const VARIANT_LABELS: Record<SoundVariant, string> = {
-  default: "Default",
-  alt: "Alternative",
-};
 
 const SLOT_TITLES: Record<SoundSlot, string> = {
   stop: "Stop sound (Claude finished writing)",
   notification: "Notification sound (Claude needs your input)",
 };
 
-export class VariantPicker {
+const SLOT_CONFIG_KEY: Record<SoundSlot, string> = {
+  stop: "sounds.stopSound",
+  notification: "sounds.notificationSound",
+};
+
+/** QuickPick over the whole bundled sound pool, with per-row preview. */
+export class SoundPicker {
   constructor(private readonly assets: SoundAssetManager) {}
 
-  async pickFor(slot: SoundSlot, current: SoundVariant): Promise<SoundVariant | undefined> {
-    const items: VariantItem[] = (Object.keys(VARIANT_LABELS) as SoundVariant[]).map((v) => ({
-      variant: v,
-      label: VARIANT_LABELS[v],
-      description: v === current ? "(current)" : undefined,
-      detail: "Open the row's Play icon to preview.",
+  async pickFor(slot: SoundSlot, current: string): Promise<string | undefined> {
+    const sounds = await this.assets.listSounds();
+    const items: SoundItem[] = sounds.map((s) => ({
+      id: s.id,
+      label: s.label,
+      description: s.id === current ? "(current)" : undefined,
       buttons: [{ iconPath: new vscode.ThemeIcon("play"), tooltip: "Preview" }],
     }));
 
-    const qp = vscode.window.createQuickPick<VariantItem>();
+    const qp = vscode.window.createQuickPick<SoundItem>();
     qp.title = SLOT_TITLES[slot];
-    qp.placeholder = "Choose a sound variant";
+    qp.placeholder = "Choose a sound (click ▶ to preview)";
     qp.items = items;
-    qp.activeItems = items.filter((i) => i.variant === current);
+    qp.activeItems = items.filter((i) => i.id === current);
     qp.matchOnDescription = true;
 
-    return new Promise<SoundVariant | undefined>((resolve) => {
+    return new Promise<string | undefined>((resolve) => {
       qp.onDidTriggerItemButton(async (e) => {
-        const wavPath = this.assets.bundledAssetPath(slot, e.item.variant);
         try {
-          await playPreview(wavPath);
+          await playPreview(this.assets.bundledAssetPath(e.item.id));
         } catch (err) {
           vscode.window.showWarningMessage(`Preview failed: ${(err as Error).message}`);
         }
       });
       qp.onDidAccept(() => {
-        const picked = qp.activeItems[0]?.variant;
+        const picked = qp.activeItems[0]?.id;
         qp.hide();
         resolve(picked);
       });
@@ -58,11 +58,10 @@ export class VariantPicker {
     });
   }
 
-  async pickAndSave(slot: SoundSlot, current: SoundVariant): Promise<SoundVariant | undefined> {
+  async pickAndSave(slot: SoundSlot, current: string): Promise<string | undefined> {
     const picked = await this.pickFor(slot, current);
     if (picked && picked !== current) {
-      const key = slot === "stop" ? "sounds.stopVariant" : "sounds.notificationVariant";
-      await updateConfig(key, picked);
+      await updateConfig(SLOT_CONFIG_KEY[slot], picked);
     }
     return picked;
   }

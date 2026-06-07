@@ -1,12 +1,12 @@
 import * as vscode from "vscode";
 import { claudeRoot } from "../../../core/paths";
 import { logger } from "../../../core/logger";
-import { SoundVariant } from "../../../core/config-manager";
 import { HookInstaller } from "./hook-installer";
 
 const DEBOUNCE_MS = 800;
 
-export type VariantProvider = () => { stop: SoundVariant; notification: SoundVariant };
+/** Provides the currently-selected sound filenames for each slot. */
+export type SoundProvider = () => { stop: string; notification: string };
 
 /**
  * Keeps the managed sound hooks alive in ~/.claude/settings.json.
@@ -36,7 +36,7 @@ export class HookHealer implements vscode.Disposable {
 
   constructor(
     private readonly installer: HookInstaller,
-    private readonly variants: VariantProvider,
+    private readonly sounds: SoundProvider,
   ) {}
 
   /** Heal once now, then watch settings.json and heal on every change. */
@@ -78,7 +78,7 @@ export class HookHealer implements vscode.Disposable {
     }
     this.running = true;
     try {
-      const v = this.variants();
+      const v = this.sounds();
       const changed = await this.installer.ensureInstalled(v.stop, v.notification);
       if (changed) {
         logger.info("sounds", `Sound hooks re-applied after settings.json change (${source}).`);

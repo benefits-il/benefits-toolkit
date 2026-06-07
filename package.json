@@ -2,12 +2,20 @@
   "name": "benefits-toolkit",
   "displayName": "Benefit's Toolkit",
   "description": "Quality-of-life tools for Claude Code: RTL chat support, audio notifications, and conversation manager — all in one place.",
-  "version": "0.1.9",
+  "version": "0.2.0",
   "publisher": "benakiva",
   "author": {
     "name": "Ben Akiva"
   },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/benefits-il/benefits-toolkit.git"
+  },
+  "homepage": "https://github.com/benefits-il/benefits-toolkit#readme",
+  "bugs": {
+    "url": "https://github.com/benefits-il/benefits-toolkit/issues"
+  },
   "engines": {
     "vscode": "^1.95.0"
   },
@@ -118,7 +126,7 @@
         "benefit.rtl.mode": {
           "type": "string",
           "enum": ["off", "active", "always", "auto"],
-          "default": "off",
+          "default": "active",
           "enumDescriptions": [
             "RTL is off.",
             "Show a toggle button in the chat header; user toggles per session.",
@@ -147,17 +155,53 @@
           "default": true,
           "description": "Enable the Sounds feature."
         },
-        "benefit.sounds.stopVariant": {
+        "benefit.sounds.stopSound": {
           "type": "string",
-          "enum": ["default", "alt"],
-          "default": "default",
-          "description": "Sound variant for the Stop event (Claude finished a message)."
+          "enum": [
+            "arrow.mp3",
+            "bubble-pop.mp3",
+            "game-bonus.mp3",
+            "level-up.mp3",
+            "mission-complete.mp3",
+            "notification-014.mp3",
+            "notification-038.mp3",
+            "notification-062.mp3",
+            "notification-07.mp3",
+            "notification-09.mp3",
+            "notification-bell.mp3",
+            "notification-off.mp3",
+            "notify-alt.wav",
+            "notify-default.wav",
+            "stop-alt.wav",
+            "stop-default.wav",
+            "system-notification.mp3"
+          ],
+          "default": "stop-default.wav",
+          "description": "Sound file (from the bundled pool) to play when Claude finishes a message. Pick visually in the Sounds panel."
         },
-        "benefit.sounds.notificationVariant": {
+        "benefit.sounds.notificationSound": {
           "type": "string",
-          "enum": ["default", "alt"],
-          "default": "default",
-          "description": "Sound variant for the Notification event (Claude waits for input)."
+          "enum": [
+            "arrow.mp3",
+            "bubble-pop.mp3",
+            "game-bonus.mp3",
+            "level-up.mp3",
+            "mission-complete.mp3",
+            "notification-014.mp3",
+            "notification-038.mp3",
+            "notification-062.mp3",
+            "notification-07.mp3",
+            "notification-09.mp3",
+            "notification-bell.mp3",
+            "notification-off.mp3",
+            "notify-alt.wav",
+            "notify-default.wav",
+            "stop-alt.wav",
+            "stop-default.wav",
+            "system-notification.mp3"
+          ],
+          "default": "notify-default.wav",
+          "description": "Sound file (from the bundled pool) to play when Claude needs your input. Pick visually in the Sounds panel."
         },
         "benefit.sounds.cleanupOnDeactivate": {
           "type": "boolean",

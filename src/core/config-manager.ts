@@ -3,7 +3,6 @@ import * as vscode from "vscode";
 const ROOT_SECTION = "benefit";
 
 export type RtlMode = "off" | "active" | "always" | "auto";
-export type SoundVariant = "default" | "alt";
 export type ChatsGroupBy = "date" | "project" | "flat";
 export type ChatsSortOrder = "newest" | "oldest";
 export type ChatsScope = "currentWorkspace" | "all";
@@ -18,8 +17,10 @@ export interface BenefitConfig {
   };
   sounds: {
     enabled: boolean;
-    stopVariant: SoundVariant;
-    notificationVariant: SoundVariant;
+    /** Filename (within the bundled sound pool) to play when Claude finishes. */
+    stopSound: string;
+    /** Filename (within the bundled sound pool) to play when Claude needs you. */
+    notificationSound: string;
     cleanupOnDeactivate: boolean;
   };
   chats: {
@@ -47,15 +48,15 @@ export function readConfig(): BenefitConfig {
   return {
     rtl: {
       enabled: readWith("rtl.enabled", true),
-      mode: readWith<RtlMode>("rtl.mode", "off"),
+      mode: readWith<RtlMode>("rtl.mode", "active"),
       textFont: readWith("rtl.textFont", ""),
       codeFont: readWith("rtl.codeFont", ""),
       claudeCodePathOverride: readWith("rtl.claudeCodePathOverride", ""),
     },
     sounds: {
       enabled: readWith("sounds.enabled", true),
-      stopVariant: readWith<SoundVariant>("sounds.stopVariant", "default"),
-      notificationVariant: readWith<SoundVariant>("sounds.notificationVariant", "default"),
+      stopSound: readWith("sounds.stopSound", "stop-default.wav"),
+      notificationSound: readWith("sounds.notificationSound", "notify-default.wav"),
       cleanupOnDeactivate: readWith("sounds.cleanupOnDeactivate", false),
     },
     chats: {

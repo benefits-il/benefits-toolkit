@@ -5,7 +5,7 @@ import { logger } from "../../core/logger";
 import { HookInstaller } from "./services/hook-installer";
 import { HookHealer } from "./services/hook-healer";
 import { SoundAssetManager } from "./services/sound-asset-manager";
-import { VariantPicker } from "./services/variant-picker";
+import { SoundPicker } from "./services/variant-picker";
 import { registerSoundsCommands } from "./ui/sounds-commands";
 
 export function createSoundsFeature(ctx: vscode.ExtensionContext): Feature {
@@ -20,7 +20,7 @@ export function createSoundsFeature(ctx: vscode.ExtensionContext): Feature {
     async activate(): Promise<void> {
       const assets = new SoundAssetManager(ctx);
       installer = new HookInstaller(assets);
-      const picker = new VariantPicker(assets);
+      const picker = new SoundPicker(assets);
 
       // Continuous self-heal. The hooks live in ~/.claude/settings.json, which
       // Claude Code rewrites whenever a permission is approved — dropping our
@@ -28,7 +28,7 @@ export function createSoundsFeature(ctx: vscode.ExtensionContext): Feature {
       // so a mid-session clobber no longer kills sounds until the next reload.
       const healer = new HookHealer(installer, () => {
         const s = readConfig().sounds;
-        return { stop: s.stopVariant, notification: s.notificationVariant };
+        return { stop: s.stopSound, notification: s.notificationSound };
       });
 
       disposables = registerSoundsCommands(ctx, installer, assets, picker, healer);
@@ -43,14 +43,14 @@ export function createSoundsFeature(ctx: vscode.ExtensionContext): Feature {
       disposables.push(
         vscode.workspace.onDidChangeConfiguration(async (e) => {
           if (!installer) return;
-          const variantChanged =
-            affects(e, "sounds.stopVariant") || affects(e, "sounds.notificationVariant");
-          if (!variantChanged) return;
+          const soundChanged =
+            affects(e, "sounds.stopSound") || affects(e, "sounds.notificationSound");
+          if (!soundChanged) return;
           if (!(await installer.isInstalled())) return;
           const cfg = readConfig().sounds;
           try {
-            await installer.install(cfg.stopVariant, cfg.notificationVariant);
-            logger.info("sounds", "Re-installed hooks after variant config change.");
+            await installer.install(cfg.stopSound, cfg.notificationSound);
+            logger.info("sounds", "Re-installed hooks after sound config change.");
           } catch (err) {
             logger.error("sounds", "Auto re-install failed", err);
           }
