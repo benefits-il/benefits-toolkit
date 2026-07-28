@@ -66,21 +66,31 @@ export class ChatTreeProvider implements vscode.TreeDataProvider<ChatNode> {
 /**
  * Restrict the list to conversations belonging to the folder open in this window.
  * Primary match is the JSONL `cwd`; falls back to the encoded project-folder name
- * for older files that predate `cwd`. With no workspace open (or scope="all"),
- * everything is shown so the panel is never mysteriously empty.
+ * for older files that predate `cwd`.
+ *
+ * Matching is by containment in either direction, not equality: Claude Code is
+ * routinely started from a subfolder of the open workspace (or the workspace is
+ * a subfolder of where Claude Code ran), and exact equality made those
+ * conversations invisible. With no folder open, "this project" is empty by
+ * definition — returning the full list there made the toggle look inert.
  */
 function applyScope(list: ConversationMeta[], scope: ChatsScope): ConversationMeta[] {
   if (scope === "all") return list;
   const folders = vscode.workspace.workspaceFolders ?? [];
-  if (folders.length === 0) return list;
+  if (folders.length === 0) return [];
 
   const fsPaths = folders.map((f) => f.uri.fsPath);
   const normWs = fsPaths.map(normalizePath);
   const encWs = fsPaths.map((p) => encodeProjectFolder(p).toLowerCase());
 
   return list.filter((m) => {
-    if (m.cwd) return normWs.includes(normalizePath(m.cwd));
-    return encWs.includes(m.projectFolder.toLowerCase());
+    if (m.cwd) {
+      const c = normalizePath(m.cwd);
+      // The trailing separator stops "…/benefits" matching "…/benefits-repos".
+      return normWs.some((w) => c === w || c.startsWith(w + "/") || w.startsWith(c + "/"));
+    }
+    const pf = m.projectFolder.toLowerCase();
+    return encWs.some((e) => pf === e || pf.startsWith(e + "-") || e.startsWith(pf + "-"));
   });
 }
 
@@ -117,7 +127,7 @@ function groupConversations(list: ConversationMeta[], grouping: ChatsGroupBy): C
 function dateBucket(meta: ConversationMeta): { key: string; label: string; sortKey: string } {
   const d = new Date(meta.lastModifiedAt);
   const now = new Date();
-  const sameDay = sameUtcDay(d, now);
+  const sameDay = sameLocalDay(d, now);
   const ms = now.getTime() - d.getTime();
   const days = ms / (1000 * 60 * 60 * 24);
 
@@ -138,6 +148,9 @@ function ymLabel(d: Date): string {
   return d.toLocaleString(undefined, { year: "numeric", month: "long" });
 }
 
-function sameUtcDay(a: Date, b: Date): boolean {
-  return a.getUTCFullYear() === b.getUTCFullYear() && a.getUTCMonth() === b.getUTCMonth() && a.getUTCDate() === b.getUTCDate();
+// "Today" must mean the user's today. Comparing UTC days put every conversation
+// from after 21:00/22:00 local (UTC+2/+3) into "Yesterday" — and everything from
+// the small hours of the real yesterday into "Today".
+function sameLocalDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }

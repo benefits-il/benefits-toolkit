@@ -12,6 +12,14 @@ import { ChatStatusBar } from "./ui/chat-status-bar";
 import { ChatTreeProvider } from "./ui/chat-tree-provider";
 import { ChatViewerService } from "./ui/chat-viewer-webview";
 
+async function syncScopeContext(): Promise<void> {
+  await vscode.commands.executeCommand(
+    "setContext",
+    "benefit.chats.scopeAll",
+    readConfig().chats.scope === "all",
+  );
+}
+
 export function createChatsFeature(ctx: vscode.ExtensionContext): Feature {
   let disposables: vscode.Disposable[] = [];
   let provider: ChatTreeProvider | undefined;
@@ -25,7 +33,7 @@ export function createChatsFeature(ctx: vscode.ExtensionContext): Feature {
     },
     async activate(): Promise<void> {
       const repo = new ConversationRepository();
-      const rename = new RenameService(repo);
+      const rename = new RenameService();
       const archive = new ArchiveService(repo);
       const exporter = new MarkdownExporter(repo);
 
@@ -33,6 +41,10 @@ export function createChatsFeature(ctx: vscode.ExtensionContext): Feature {
       viewer = new ChatViewerService(ctx, repo);
       statusBar = new ChatStatusBar();
       statusBar.setVisible(readConfig().chats.showStatusBarRename);
+
+      // Drives which of the two scope buttons the view title bar shows, so the
+      // filter icon reflects the current scope instead of looking inert.
+      await syncScopeContext();
 
       const treeView = vscode.window.createTreeView("benefit.chatsView", {
         treeDataProvider: provider,
@@ -60,6 +72,9 @@ export function createChatsFeature(ctx: vscode.ExtensionContext): Feature {
           if (!provider || !statusBar) return;
           if (affects(e, "chats.showStatusBarRename")) {
             statusBar.setVisible(readConfig().chats.showStatusBarRename);
+          }
+          if (affects(e, "chats.scope")) {
+            void syncScopeContext();
           }
           if (
             affects(e, "chats.scope") ||

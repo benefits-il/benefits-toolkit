@@ -15,6 +15,17 @@ const INSTALLED_BASE: Record<SoundSlot, string> = {
   notification: "notify",
 };
 
+/**
+ * Pool sound used when the configured one is gone (renamed/removed from the
+ * bundle, or a settings value carried over from an older release). Without this
+ * the copy step throws ENOENT and the whole hook install fails, killing sounds
+ * entirely instead of degrading to the shipped default.
+ */
+const DEFAULT_SOUND: Record<SoundSlot, string> = {
+  stop: "stop-default.wav",
+  notification: "notify-default.wav",
+};
+
 const LAUNCHER_NAME = "play.ps1";
 
 export interface SoundChoice {
@@ -83,6 +94,17 @@ export class SoundAssetManager {
     return pathExists(this.bundledAssetPath(id));
   }
 
+  /**
+   * The pool id actually used for a slot: the requested one when it exists,
+   * otherwise the slot default. Deterministic, so callers that need the
+   * installed path up front (HookInstaller.ensureInstalled) resolve to the same
+   * id that install() will copy.
+   */
+  async resolveId(slot: SoundSlot, id: string): Promise<string> {
+    if (id && (await this.hasSound(id))) return id;
+    return DEFAULT_SOUND[slot];
+  }
+
   /** Installed path for a slot, preserving the chosen sound's extension. */
   installedPath(slot: SoundSlot, id: string): string {
     const ext = path.extname(id) || ".wav";
@@ -125,8 +147,9 @@ export class SoundAssetManager {
 
   /** Copy a pool sound into the stable install dir for a slot. Returns its path. */
   async install(slot: SoundSlot, id: string): Promise<string> {
-    const src = this.bundledAssetPath(id);
-    const dst = this.installedPath(slot, id);
+    const resolved = await this.resolveId(slot, id);
+    const src = this.bundledAssetPath(resolved);
+    const dst = this.installedPath(slot, resolved);
     await ensureDir(path.dirname(dst));
     // Drop any stale file for this slot first (e.g. switching mp3 -> wav) so the
     // dir never holds two competing stop.* / notify.* files.

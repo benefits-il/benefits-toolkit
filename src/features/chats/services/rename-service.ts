@@ -1,44 +1,27 @@
-import { RawJsonlRecord, SummaryRecord } from "../domain/conversation";
-import { isSummary } from "../domain/jsonl-parser";
-import { leafUuidIsValid, resolveLatestLeafUuid } from "../domain/leaf-uuid-resolver";
-import { ConversationRepository } from "./conversation-repository";
+import * as path from "node:path";
+import { appendJsonlLine } from "../../../shared/fs-utils";
 
+/**
+ * Renames a conversation the way Claude Code itself does: by appending a
+ * `custom-title` record keyed to the session id (the .jsonl filename).
+ *
+ * The old approach wrote a `{type:"summary"}` record via a full-file rewrite.
+ * Claude Code no longer reads `summary` records for the session title (so the
+ * rename was invisible in its own UI) and the rewrite could clobber lines the
+ * CLI appended to a live session mid-write. Appending is safe against a live
+ * writer, and because Claude Code reads `custom-title` too, the rename now
+ * shows up in both UIs.
+ */
 export class RenameService {
-  constructor(private readonly repo: ConversationRepository) {}
-
   async rename(filePath: string, newTitle: string): Promise<void> {
     const trimmed = newTitle.trim();
     if (trimmed.length === 0) {
       throw new Error("Title cannot be empty.");
     }
-    const records = await this.repo.readAllRecords(filePath);
-    const updated = applyTitle(records, trimmed);
-    await this.repo.writeAllRecords(filePath, updated);
+    await appendJsonlLine(filePath, {
+      type: "custom-title",
+      customTitle: trimmed,
+      sessionId: path.basename(filePath, ".jsonl"),
+    });
   }
-}
-
-function applyTitle(records: RawJsonlRecord[], title: string): RawJsonlRecord[] {
-  const existingIdx = records.findIndex(isSummary);
-  const existing = existingIdx >= 0 ? (records[existingIdx] as SummaryRecord) : undefined;
-
-  let leafUuid = existing?.leafUuid;
-  if (!leafUuidIsValid(records, leafUuid)) {
-    leafUuid = resolveLatestLeafUuid(records);
-  }
-  if (!leafUuid) {
-    throw new Error("No messages found in conversation; cannot anchor summary.");
-  }
-
-  const summary: SummaryRecord = {
-    type: "summary",
-    summary: title,
-    leafUuid,
-  };
-
-  if (existingIdx >= 0) {
-    const next = records.slice();
-    next[existingIdx] = summary;
-    return next;
-  }
-  return [summary, ...records];
 }

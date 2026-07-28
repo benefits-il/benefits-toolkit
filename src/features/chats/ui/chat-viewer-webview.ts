@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
+import MarkdownIt from "markdown-it";
 import { ConversationMeta, MessageRecord, RawJsonlRecord } from "../domain/conversation";
 import { ConversationRepository } from "../services/conversation-repository";
 import { atomicWriteText, ensureDir } from "../../../shared/fs-utils";
@@ -7,6 +8,14 @@ import { extractBlocks, formatModelName, readLastUsage } from "../domain/blocks"
 import { logger } from "../../../core/logger";
 
 const VIEW_TYPE = "benefit.chatViewer";
+
+// `html: false` escapes any raw HTML in the message instead of emitting it, so
+// this is XSS-safe without a sanitizer — which matters because this webview
+// deliberately has no CSP (a strict nonce CSP breaks acquireVsCodeApi here).
+// markdown-it's default validateLink already rejects javascript:/data: URLs.
+// `breaks: true` keeps plain-text chat messages readable now that the container
+// no longer uses white-space: pre-wrap.
+const md = new MarkdownIt({ html: false, linkify: true, breaks: true });
 
 export class ChatViewerService {
   private readonly panels = new Map<string, vscode.WebviewPanel>();
@@ -112,9 +121,13 @@ interface ConversationStats {
 
 function buildHtml(meta: ConversationMeta, records: RawJsonlRecord[]): string {
   const realMessages = records.filter(isRealMessage) as MessageRecord[];
+  // Stats read the chronological arrays; only the display order is reversed.
   const stats = computeContextStats(records, realMessages);
-  const messagesHtml = realMessages
-    .map((m, idx) => renderMessage(m, idx === realMessages.length - 1))
+  // Newest first, newest expanded — the end of a conversation is what you open
+  // it for, and long transcripts made you scroll to reach it.
+  const displayMessages = realMessages.slice().reverse();
+  const messagesHtml = displayMessages
+    .map((m, idx) => renderMessage(m, idx === 0))
     .join("\n");
 
   return TEMPLATE
@@ -176,7 +189,7 @@ function formatTokens(n: number): string {
   return String(n);
 }
 
-function renderMessage(message: MessageRecord, isLast: boolean): string {
+function renderMessage(message: MessageRecord, expanded: boolean): string {
   const role = message.type;
   const blocks = extractBlocks(message);
 
@@ -221,10 +234,12 @@ function renderMessage(message: MessageRecord, isLast: boolean): string {
     if (b.kind === "tool") {
       return `<div class="content-block content-block-tool">${escapeHtml(b.text)}</div>`;
     }
-    return `<div class="content-block content-block-text">${escapeHtml(b.text)}</div>`;
+    // data-md keeps the markdown source around so copy / "Save as Markdown"
+    // export the original text, not the rendered plain text.
+    return `<div class="content-block content-block-text" data-md="${escapeHtml(b.text)}">${md.render(b.text)}</div>`;
   }).join("");
 
-  const collapsedClass = isLast ? "" : " collapsed";
+  const collapsedClass = expanded ? "" : " collapsed";
   return `
     <div class="message ${role}${collapsedClass}" data-empty="${isEmpty}" data-tools-only="${isToolsOnly}" data-thinking-only="${isThinkingOnly}" data-narration="${isNarration}">
       <div class="message-header" onclick="toggleMessage(this)">
@@ -381,7 +396,9 @@ const TEMPLATE = `<!DOCTYPE html>
     .message.user .message-content { border-inline-start: 4px solid var(--vscode-textLink-foreground); }
     .message.assistant .message-content { border-inline-start: 4px solid #CC785C; }
 
-    .message-text { display: block; white-space: pre-wrap; word-wrap: break-word; }
+    /* No pre-wrap here: text blocks are rendered markdown now and manage their
+       own whitespace. Blocks that are still raw text re-add it themselves. */
+    .message-text { display: block; word-wrap: break-word; }
 
     .message-actions {
       display: flex;
@@ -575,7 +592,7 @@ const TEMPLATE = `<!DOCTYPE html>
     }
     .scroll-to-bottom.visible { display: flex; }
 
-    .content-block { display: block; white-space: pre-wrap; word-wrap: break-word; }
+    .content-block { display: block; word-wrap: break-word; }
     .content-block + .content-block { margin-top: 14px; }
 
     .content-block-thinking {
@@ -617,6 +634,96 @@ const TEMPLATE = `<!DOCTYPE html>
       border-radius: var(--cc-radius-sm);
       padding: 10px 12px;
       opacity: 0.85;
+      /* Tool output is raw text, so it keeps its own line breaks. */
+      white-space: pre-wrap;
+    }
+
+    /* ---- Rendered markdown (text blocks only) --------------------------- */
+    /* Logical properties throughout so the RTL toggle mirrors correctly. */
+    .content-block-text > :first-child { margin-top: 0; }
+    .content-block-text > :last-child { margin-bottom: 0; }
+    .content-block-text p { margin: 0 0 12px; }
+    .content-block-text h1,
+    .content-block-text h2,
+    .content-block-text h3,
+    .content-block-text h4,
+    .content-block-text h5,
+    .content-block-text h6 {
+      margin: 20px 0 10px;
+      line-height: 1.3;
+      font-weight: 600;
+    }
+    .content-block-text h1 { font-size: 1.5em; }
+    .content-block-text h2 { font-size: 1.3em; }
+    .content-block-text h3 { font-size: 1.15em; }
+    .content-block-text h4,
+    .content-block-text h5,
+    .content-block-text h6 { font-size: 1em; }
+    .content-block-text h1,
+    .content-block-text h2 {
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--vscode-editorWidget-border);
+    }
+    .content-block-text ul,
+    .content-block-text ol { margin: 0 0 12px; padding-inline-start: 1.6em; }
+    .content-block-text li { margin: 4px 0; }
+    .content-block-text li > ul,
+    .content-block-text li > ol { margin-bottom: 0; }
+    .content-block-text blockquote {
+      margin: 0 0 12px;
+      padding-block: 2px;
+      padding-inline: 14px 0;
+      border-inline-start: 3px solid var(--vscode-textBlockQuote-border, var(--vscode-editorWidget-border));
+      background-color: var(--vscode-textBlockQuote-background, transparent);
+      color: var(--vscode-descriptionForeground);
+    }
+    .content-block-text pre {
+      margin: 0 0 12px;
+      padding: 12px 14px;
+      overflow-x: auto;
+      background-color: var(--vscode-textCodeBlock-background);
+      border: 1px solid var(--vscode-editorWidget-border);
+      border-radius: var(--cc-radius-sm);
+      /* Code stays left-to-right even when the viewer is flipped to RTL. */
+      direction: ltr;
+      text-align: left;
+    }
+    .content-block-text code {
+      direction: ltr;
+      unicode-bidi: embed;
+    }
+    .content-block-text pre code {
+      display: block;
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: 0.9em;
+      white-space: pre;
+    }
+    .content-block-text a { color: var(--vscode-textLink-foreground); }
+    .content-block-text a:hover { color: var(--vscode-textLink-activeForeground); }
+    .content-block-text img { max-width: 100%; height: auto; border-radius: var(--cc-radius-sm); }
+    .content-block-text hr {
+      border: none;
+      border-top: 1px solid var(--vscode-editorWidget-border);
+      margin: 18px 0;
+    }
+    .content-block-text table {
+      border-collapse: collapse;
+      margin: 0 0 12px;
+      display: block;
+      overflow-x: auto;
+      max-width: 100%;
+    }
+    .content-block-text th,
+    .content-block-text td {
+      border: 1px solid var(--vscode-editorWidget-border);
+      padding: 6px 10px;
+      text-align: start;
+    }
+    .content-block-text th {
+      background-color: color-mix(in srgb, var(--vscode-foreground) 6%, transparent);
+      font-weight: 600;
     }
 
     .title-icon {
@@ -694,7 +801,7 @@ const TEMPLATE = `<!DOCTYPE html>
     {{MESSAGES_HTML}}
   </div>
 
-  <button class="scroll-to-bottom" id="scroll-bottom-btn" onclick="scrollToBottom()" title="Scroll to bottom">
+  <button class="scroll-to-bottom" id="scroll-bottom-btn" onclick="scrollToBottom()" title="Scroll to end (oldest)">
     <svg><use href="#icon-arrow-down"/></svg>
   </button>
 
@@ -794,7 +901,10 @@ const TEMPLATE = `<!DOCTYPE html>
         } else if (block.classList.contains('content-block-tool')) {
           parts.push({ kind: 'tool', text: block.textContent });
         } else {
-          parts.push({ kind: 'text', text: block.textContent });
+          // Text blocks are rendered markdown; data-md holds the original
+          // source so copy and export emit markdown, not flattened text.
+          var src = block.dataset ? block.dataset.md : undefined;
+          parts.push({ kind: 'text', text: typeof src === 'string' ? src : block.textContent });
         }
       });
       return parts;
@@ -804,7 +914,8 @@ const TEMPLATE = `<!DOCTYPE html>
       const titleEl = document.querySelector('.header-title span');
       const docTitle = titleEl ? titleEl.textContent.trim() : 'Conversation';
       const lines = ['# ' + docTitle, ''];
-      const messages = document.querySelectorAll('.message');
+      // The page shows newest first; the exported file stays chronological.
+      const messages = Array.from(document.querySelectorAll('.message')).reverse();
       messages.forEach(function (msg) {
         if (!isElementVisible(msg)) return;
         const roleEl = msg.querySelector('.message-role');

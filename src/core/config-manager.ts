@@ -76,6 +76,23 @@ export async function updateConfig(key: string, value: unknown, target = vscode.
   await raw().update(key, value, target);
 }
 
+/**
+ * Update a setting where the effective value actually changes.
+ *
+ * Writing to Global unconditionally is a trap for view toggles: if the key also
+ * has a workspace value, the workspace value keeps winning and the toggle looks
+ * dead — it flips the global setting forever while the UI never moves. So write
+ * to Workspace when a workspace value exists, Global otherwise.
+ */
+export async function updateConfigEffective(key: string, value: unknown): Promise<void> {
+  const cfg = raw();
+  const target =
+    cfg.inspect(key)?.workspaceValue !== undefined
+      ? vscode.ConfigurationTarget.Workspace
+      : vscode.ConfigurationTarget.Global;
+  await cfg.update(key, value, target);
+}
+
 export function onConfigChanged(handler: (cfg: BenefitConfig) => void): vscode.Disposable {
   return vscode.workspace.onDidChangeConfiguration((e) => {
     if (e.affectsConfiguration(ROOT_SECTION)) {

@@ -233,6 +233,7 @@ export class SoundsViewProvider implements vscode.WebviewViewProvider {
 
     <div class="card" id="card-notification">
       <div class="card-title">When Claude asks / needs you</div>
+      <div class="sub">Questions, permission prompts, plan approval, idle.</div>
       <div class="list" id="list-notification"></div>
     </div>
 

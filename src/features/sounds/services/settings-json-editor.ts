@@ -13,7 +13,7 @@ export interface HookMatcher {
   hooks: HookEntry[];
 }
 
-export type HookEventName = "Stop" | "Notification";
+export type HookEventName = "Stop" | "Notification" | "PermissionRequest" | "Elicitation";
 
 export interface HooksShape {
   [eventName: string]: HookMatcher[];

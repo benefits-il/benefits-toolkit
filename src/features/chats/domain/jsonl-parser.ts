@@ -31,6 +31,19 @@ export function isSummary(record: RawJsonlRecord): record is SummaryRecord {
   return record.type === "summary" && typeof record["summary"] === "string" && typeof record["leafUuid"] === "string";
 }
 
+/**
+ * Claude Code's own generated session title. Re-emitted whenever it regenerates
+ * the title, so the LAST one in the file wins.
+ */
+export function isAiTitle(record: RawJsonlRecord): boolean {
+  return record.type === "ai-title" && typeof record["aiTitle"] === "string";
+}
+
+/** A title the user set (rename). Overrides the generated one. */
+export function isCustomTitle(record: RawJsonlRecord): boolean {
+  return record.type === "custom-title" && typeof record["customTitle"] === "string";
+}
+
 export function isMessage(record: RawJsonlRecord): record is MessageRecord {
   return (record.type === "user" || record.type === "assistant") && typeof record["uuid"] === "string";
 }

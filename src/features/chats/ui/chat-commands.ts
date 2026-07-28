@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { ChatsGroupBy, ChatsScope, ChatsSortOrder, readConfig, updateConfig } from "../../../core/config-manager";
+import { ChatsGroupBy, ChatsScope, ChatsSortOrder, readConfig, updateConfigEffective } from "../../../core/config-manager";
 import { logger } from "../../../core/logger";
 import { ConversationMeta } from "../domain/conversation";
 import { ArchiveService } from "../services/archive-service";
@@ -132,7 +132,7 @@ export function registerChatCommands(ctx: vscode.ExtensionContext, deps: ChatCom
     vscode.commands.registerCommand("benefit.chats.toggleSort", async () => {
       const current = readConfig().chats.sortOrder;
       const next: ChatsSortOrder = current === "newest" ? "oldest" : "newest";
-      await updateConfig("chats.sortOrder", next);
+      await updateConfigEffective("chats.sortOrder", next);
       deps.provider.invalidate();
     }),
 
@@ -140,32 +140,39 @@ export function registerChatCommands(ctx: vscode.ExtensionContext, deps: ChatCom
       const order: ChatsGroupBy[] = ["date", "project", "flat"];
       const current = readConfig().chats.groupBy;
       const next = order[(order.indexOf(current) + 1) % order.length];
-      await updateConfig("chats.groupBy", next);
+      await updateConfigEffective("chats.groupBy", next);
       vscode.window.showInformationMessage(`Benefit Chats: group by ${next}.`);
       deps.provider.invalidate();
     }),
 
     vscode.commands.registerCommand("benefit.chats.toggleArchived", async () => {
       const current = readConfig().chats.showArchived;
-      await updateConfig("chats.showArchived", !current);
+      await updateConfigEffective("chats.showArchived", !current);
       deps.provider.refresh();
     }),
 
-    vscode.commands.registerCommand("benefit.chats.toggleScope", async () => {
-      const current = readConfig().chats.scope;
-      const next: ChatsScope = current === "currentWorkspace" ? "all" : "currentWorkspace";
-      await updateConfig("chats.scope", next);
-      vscode.window.showInformationMessage(
-        next === "all"
-          ? "Benefit Chats: showing conversations from all projects."
-          : "Benefit Chats: showing only this project's conversations.",
-      );
-      deps.provider.refresh();
-    }),
+    // One behaviour, three ids: VS Code cannot swap a single command's icon, so
+    // the title bar contributes two mutually-exclusive entries (each showing the
+    // current state) and the palette keeps the plain toggle.
+    ...["benefit.chats.toggleScope", "benefit.chats.scopeToAll", "benefit.chats.scopeToCurrent"].map((id) =>
+      vscode.commands.registerCommand(id, () => toggleScope(deps)),
+    ),
   );
 
   ctx.subscriptions.push(...out);
   return out;
+}
+
+async function toggleScope(deps: ChatCommandDeps): Promise<void> {
+  const current = readConfig().chats.scope;
+  const next: ChatsScope = current === "currentWorkspace" ? "all" : "currentWorkspace";
+  await updateConfigEffective("chats.scope", next);
+  vscode.window.showInformationMessage(
+    next === "all"
+      ? "Benefit Chats: showing conversations from all projects."
+      : "Benefit Chats: showing only this project's conversations.",
+  );
+  deps.provider.refresh();
 }
 
 async function runRename(deps: ChatCommandDeps, meta: ConversationMeta): Promise<void> {

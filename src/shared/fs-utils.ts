@@ -33,6 +33,31 @@ export async function atomicWriteText(file: string, content: string): Promise<vo
   await fs.rename(tmp, file);
 }
 
+/**
+ * Append one JSON record as a line to a JSONL file, without rewriting it.
+ *
+ * Rewriting a whole transcript is unsafe: Claude Code may be appending to the
+ * same file live, and a full rewrite would drop whatever it wrote meanwhile.
+ * Appending is the same thing Claude Code itself does. If the file does not end
+ * with a newline (interrupted write), one is inserted first so the new record
+ * never merges into the previous line.
+ */
+export async function appendJsonlLine(file: string, record: unknown): Promise<void> {
+  const handle = await fs.open(file, "r+");
+  try {
+    const { size } = await handle.stat();
+    let prefix = "";
+    if (size > 0) {
+      const tail = Buffer.alloc(1);
+      await handle.read(tail, 0, 1, size - 1);
+      if (tail[0] !== 0x0a) prefix = "\n";
+    }
+    await handle.write(prefix + JSON.stringify(record) + "\n", size, "utf8");
+  } finally {
+    await handle.close();
+  }
+}
+
 export interface SentinelBlock {
   startMarker: string;
   endMarker: string;

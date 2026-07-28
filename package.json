@@ -2,7 +2,7 @@
   "name": "benefits-toolkit",
   "displayName": "Benefit's Toolkit",
   "description": "Quality-of-life tools for Claude Code: RTL chat support, audio notifications, and conversation manager — all in one place.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "benakiva",
   "author": {
     "name": "Ben Akiva"
@@ -66,6 +66,11 @@
     "viewsWelcome": [
       {
         "view": "benefit.chatsView",
+        "when": "workbenchState == empty",
+        "contents": "No folder is open, so there is no project to scope to.\n[Show All Projects](command:benefit.chats.toggleScope)\n[Open Folder](command:workbench.action.files.openFolder)"
+      },
+      {
+        "view": "benefit.chatsView",
         "contents": "No conversations for this project yet.\nThe list is scoped to the folder open in this window.\n[Show All Projects](command:benefit.chats.toggleScope)\n[Refresh](command:benefit.chats.refresh)"
       }
     ],
@@ -94,14 +99,17 @@
       { "command": "benefit.chats.toggleSort", "title": "Toggle Sort Order", "category": "Benefit Chats", "icon": "$(sort-precedence)" },
       { "command": "benefit.chats.toggleGroupBy", "title": "Toggle Group By (Date / Project)", "category": "Benefit Chats" },
       { "command": "benefit.chats.toggleArchived", "title": "Show/Hide Archived", "category": "Benefit Chats", "icon": "$(eye)" },
-      { "command": "benefit.chats.toggleScope", "title": "Toggle Scope (Current Project / All)", "category": "Benefit Chats", "icon": "$(filter)" },
+      { "command": "benefit.chats.toggleScope", "title": "Toggle Scope (Current Project / All)", "category": "Benefit Chats" },
+      { "command": "benefit.chats.scopeToAll", "title": "Scope: This Project — click for All Projects", "category": "Benefit Chats", "icon": "$(filter-filled)" },
+      { "command": "benefit.chats.scopeToCurrent", "title": "Scope: All Projects — click for This Project", "category": "Benefit Chats", "icon": "$(filter)" },
       { "command": "benefit.chats.statusBarRename", "title": "Rename Active Conversation", "category": "Benefit Chats" }
     ],
     "menus": {
       "view/title": [
         { "command": "benefit.chats.refresh", "when": "view == benefit.chatsView", "group": "navigation@1" },
         { "command": "benefit.chats.search", "when": "view == benefit.chatsView", "group": "navigation@2" },
-        { "command": "benefit.chats.toggleScope", "when": "view == benefit.chatsView", "group": "navigation@3" },
+        { "command": "benefit.chats.scopeToAll", "when": "view == benefit.chatsView && !benefit.chats.scopeAll", "group": "navigation@3" },
+        { "command": "benefit.chats.scopeToCurrent", "when": "view == benefit.chatsView && benefit.chats.scopeAll", "group": "navigation@3" },
         { "command": "benefit.chats.toggleSort", "when": "view == benefit.chatsView", "group": "navigation@4" },
         { "command": "benefit.chats.toggleArchived", "when": "view == benefit.chatsView", "group": "navigation@5" },
         { "command": "benefit.chats.toggleGroupBy", "when": "view == benefit.chatsView", "group": "1_view" }
@@ -267,7 +275,11 @@
     "package": "vsce package",
     "test": "node --test --import tsx test/**/*.test.ts"
   },
+  "dependencies": {
+    "markdown-it": "^14.2.0"
+  },
   "devDependencies": {
+    "@types/markdown-it": "^14.1.2",
     "@types/node": "^20.12.0",
     "@types/vscode": "^1.95.0",
     "@vscode/vsce": "^3.2.0",
