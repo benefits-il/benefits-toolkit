@@ -71,6 +71,7 @@
       },
       {
         "view": "benefit.chatsView",
+        "when": "workbenchState != empty",
         "contents": "No conversations for this project yet.\nThe list is scoped to the folder open in this window.\n[Show All Projects](command:benefit.chats.toggleScope)\n[Refresh](command:benefit.chats.refresh)"
       }
     ],
