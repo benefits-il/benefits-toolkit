@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.1 — Timestamps no longer split against Hebrew titles
+
+**A Hebrew conversation title swallowed its own timestamp.** The tree row renders the label and the description inside one bidi paragraph, so the digits in `12d ago` — European numerals, which take their direction from what surrounds them — resolved into the Hebrew run. The number stuck to the end of the title and the unit drifted to the other side of the row, reading as `…וקטגוריזציה12` on one side and `d ago` on the other. Both runs are now wrapped in `FSI`/`PDI` isolates (U+2068/U+2069) so each resolves on its own regardless of the other's direction, and a `·` separator makes the boundary between title and time explicit.
+
 ## 0.3.0 — The waiting sound actually fires + real conversation titles
 
 **No sound when Claude asks / waits.**

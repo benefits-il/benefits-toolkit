@@ -20,10 +20,10 @@ export class GroupNode extends vscode.TreeItem {
 export class ConversationNode extends vscode.TreeItem {
   readonly kind = "conversation" as const;
   constructor(public readonly meta: ConversationMeta) {
-    super(meta.title, vscode.TreeItemCollapsibleState.None);
+    super(isolate(meta.title), vscode.TreeItemCollapsibleState.None);
     this.id = `conv:${meta.filePath}`;
     this.tooltip = buildTooltip(meta);
-    this.description = describe(meta);
+    this.description = isolate(`${SEPARATOR} ${describe(meta)}`);
     this.contextValue = meta.archived ? "archived-conversation" : "conversation";
     this.iconPath = new vscode.ThemeIcon(meta.archived ? "archive" : "comment-discussion");
     this.command = {
@@ -32,6 +32,20 @@ export class ConversationNode extends vscode.TreeItem {
       arguments: [this],
     };
   }
+}
+
+/**
+ * Label and description share one bidi paragraph in the tree row. Next to a
+ * Hebrew title the digits of "12d ago" resolve into the RTL run, so the
+ * timestamp visually splits — the number lands at the end of the title and the
+ * unit drifts to the other side. FSI/PDI resolve each run on its own.
+ */
+const FSI = "⁨";
+const PDI = "⁩";
+const SEPARATOR = "·";
+
+function isolate(text: string): string {
+  return `${FSI}${text}${PDI}`;
 }
 
 function describe(meta: ConversationMeta): string {
