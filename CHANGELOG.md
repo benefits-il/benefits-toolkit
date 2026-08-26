@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0 — Window colors, clickable chat links, 15 new sounds
+
+**Window Colors — tell five open windows apart.** A fourth feature. The new **Colors** panel in the sidebar shows a grid of ten real color swatches (plus a custom hex field and Clear); one click colors this window's title bar, activity bar and status bar — including while the window is unfocused, which is the whole point of having several open. The foreground is derived automatically from the background's luminance, so every color is readable in light and dark themes. The color is written per-workspace through VS Code's own configuration API (`workbench.colorCustomizations`, Workspace target), so `.vscode/settings.json` keeps its comments and only the nine managed keys are ever touched — Clear removes exactly those and nothing else. Also available as commands: `Benefit: Window Color: Pick` / `Clear`.
+
+**File links in the conversation viewer now open the file.** Clicking a file link did nothing — a webview swallows anchor navigation, and nothing listened. Links are now routed to the extension host, which resolves the path (against the conversation's recorded working directory, then the open workspace folders), opens the file beside the chat, and jumps to the line for `#L42` / `#L42-L51` fragments. A path that can't be resolved is copied to the clipboard with a "Path copied" toast — never a silent dead click. Every link shows its full destination in a hover tooltip, and web links open in the external browser.
+
+*Root cause of the "opens a browser on a filename" bug.* markdown-it's fuzzy linkify treats bare text that looks like a domain as a link — and `.ts` and `.md` are real country TLDs, so plain prose mentioning `extension.ts` became `http://extension.ts` and clicking tried to leave for the web. Fuzzy linkify is now off: only explicit `http(s)://` / `www.` / `mailto:` text auto-links, and file paths are links only when Claude writes an actual markdown link.
+
+**Sound library 17 → 32.** Fifteen new effects (Pixabay + Mixkit — intro chime, marimba, retro-game, sci-fi confirm, whooshes, blips and more), all selectable for either event from the Sounds panel.
+
 ## 0.3.1 — Timestamps no longer split against Hebrew titles
 
 **A Hebrew conversation title swallowed its own timestamp.** The tree row renders the label and the description inside one bidi paragraph, so the digits in `12d ago` — European numerals, which take their direction from what surrounds them — resolved into the Hebrew run. The number stuck to the end of the title and the unit drifted to the other side of the row, reading as `…וקטגוריזציה12` on one side and `d ago` on the other. Both runs are now wrapped in `FSI`/`PDI` isolates (U+2068/U+2069) so each resolves on its own regardless of the other's direction, and a `·` separator makes the boundary between title and time explicit.

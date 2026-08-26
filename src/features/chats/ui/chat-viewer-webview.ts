@@ -1,10 +1,12 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
+import * as fs from "node:fs";
 import MarkdownIt from "markdown-it";
 import { ConversationMeta, MessageRecord, RawJsonlRecord } from "../domain/conversation";
 import { ConversationRepository } from "../services/conversation-repository";
 import { atomicWriteText, ensureDir } from "../../../shared/fs-utils";
 import { extractBlocks, formatModelName, readLastUsage } from "../domain/blocks";
+import { isWebLink, parseFileLink, resolveCandidates, safeDecode } from "../services/link-resolver";
 import { logger } from "../../../core/logger";
 
 const VIEW_TYPE = "benefit.chatViewer";
@@ -17,8 +19,35 @@ const VIEW_TYPE = "benefit.chatViewer";
 // no longer uses white-space: pre-wrap.
 const md = new MarkdownIt({ html: false, linkify: true, breaks: true });
 
+// Fuzzy linkify treats bare filenames as domains — ".ts" and ".md" are real
+// country TLDs, so plain text like "extension.ts" became http://extension.ts
+// and clicking it tried to open a browser. Only explicit http(s)://, www. and
+// mailto: remain auto-linked; file paths are links only when Claude writes a
+// real markdown link.
+md.linkify.set({ fuzzyLink: false });
+
+// Every anchor gets the decoded destination as a tooltip (the visible text is
+// often just "file.ts:42") and as data-raw for the click handler. Decoding
+// happens once here — markdown-it percent-encodes destinations (spaces, "c:\"),
+// and re-decoding at click time would corrupt paths containing a literal "%".
+// renderToken HTML-escapes attribute values, so hostile destinations stay inert.
+const defaultLinkOpen =
+  md.renderer.rules.link_open ??
+  ((tokens, idx, options, _env, self) => self.renderToken(tokens, idx, options));
+md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
+  const token = tokens[idx];
+  const raw = safeDecode(token.attrGet("href") ?? "");
+  token.attrSet("title", raw);
+  token.attrSet("data-raw", raw);
+  return defaultLinkOpen(tokens, idx, options, env, self);
+};
+
 export class ChatViewerService {
   private readonly panels = new Map<string, vscode.WebviewPanel>();
+  // Freshest meta per open panel: the message handler closure captures the meta
+  // from open(), but refreshes re-read it — cwd (used for link resolution) must
+  // come from the latest read.
+  private readonly latestMeta = new Map<string, ConversationMeta>();
 
   constructor(
     _ctx: vscode.ExtensionContext,
@@ -46,11 +75,17 @@ export class ChatViewerService {
     );
     panel.iconPath = new vscode.ThemeIcon("comment-discussion");
     this.panels.set(meta.filePath, panel);
-    panel.onDidDispose(() => this.panels.delete(meta.filePath));
+    panel.onDidDispose(() => {
+      this.panels.delete(meta.filePath);
+      this.latestMeta.delete(meta.filePath);
+    });
 
-    panel.webview.onDidReceiveMessage(async (message: { command?: string; content?: string }) => {
+    panel.webview.onDidReceiveMessage(async (message: { command?: string; content?: string; href?: string }) => {
       if (message?.command === "saveAsMarkdownPrepared" && typeof message.content === "string") {
         await this.saveMarkdown(meta, message.content);
+      }
+      if (message?.command === "openLink" && typeof message.href === "string") {
+        await this.handleOpenLink(panel, this.latestMeta.get(meta.filePath) ?? meta, message.href);
       }
     });
 
@@ -69,6 +104,7 @@ export class ChatViewerService {
   }
 
   private async renderInto(panel: vscode.WebviewPanel, meta: ConversationMeta): Promise<void> {
+    this.latestMeta.set(meta.filePath, meta);
     const records = await this.repo.readAllRecords(meta.filePath);
     panel.title = `🕮 ${truncate(meta.title, 24)}`;
     panel.webview.html = buildHtml(meta, records);
@@ -106,6 +142,53 @@ export class ChatViewerService {
       logger.error("chats", "saveAsMarkdownPrepared failed", err);
       vscode.window.showErrorMessage(`Save failed: ${(err as Error).message}`);
     }
+  }
+
+  private async handleOpenLink(
+    panel: vscode.WebviewPanel,
+    meta: ConversationMeta,
+    href: string,
+  ): Promise<void> {
+    try {
+      if (isWebLink(href)) {
+        await vscode.env.openExternal(vscode.Uri.parse(href));
+        return;
+      }
+
+      const { path: linkPath, startLine, endLine } = parseFileLink(href);
+      const roots = (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath);
+      for (const candidate of resolveCandidates(linkPath, meta.cwd, roots)) {
+        let stat: fs.Stats;
+        try {
+          stat = await fs.promises.stat(candidate);
+        } catch {
+          continue;
+        }
+        const uri = vscode.Uri.file(candidate);
+        if (stat.isDirectory()) {
+          await vscode.commands.executeCommand("revealInExplorer", uri);
+          return;
+        }
+        const doc = await vscode.workspace.openTextDocument(uri);
+        const start = Math.min(startLine ?? 1, doc.lineCount) - 1;
+        const end = Math.min(endLine ?? startLine ?? 1, doc.lineCount) - 1;
+        await vscode.window.showTextDocument(doc, {
+          preview: true,
+          viewColumn: vscode.ViewColumn.Beside,
+          selection:
+            startLine !== undefined
+              ? new vscode.Range(new vscode.Position(start, 0), doc.lineAt(end).range.end)
+              : undefined,
+        });
+        return;
+      }
+    } catch (err) {
+      logger.warn("chats", `openLink failed for ${href}`, err);
+    }
+    // Not resolvable (or opening failed): never a silent dead click — hand the
+    // user the raw path instead.
+    await vscode.env.clipboard.writeText(href);
+    void panel.webview.postMessage({ command: "showToast", text: "Path copied" });
   }
 }
 
@@ -700,8 +783,25 @@ const TEMPLATE = `<!DOCTYPE html>
       font-size: 0.9em;
       white-space: pre;
     }
-    .content-block-text a { color: var(--vscode-textLink-foreground); }
+    .content-block-text a { color: var(--vscode-textLink-foreground); cursor: pointer; word-break: break-all; }
     .content-block-text a:hover { color: var(--vscode-textLink-activeForeground); }
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--vscode-editorWidget-background);
+      color: var(--vscode-editorWidget-foreground);
+      border: 1px solid var(--vscode-editorWidget-border, var(--vscode-panel-border));
+      padding: 6px 14px;
+      border-radius: 4px;
+      font-size: 12px;
+      opacity: 0;
+      transition: opacity .15s ease;
+      pointer-events: none;
+      z-index: 200;
+    }
+    .toast.visible { opacity: 1; }
     .content-block-text img { max-width: 100%; height: auto; border-radius: var(--cc-radius-sm); }
     .content-block-text hr {
       border: none;
@@ -805,6 +905,8 @@ const TEMPLATE = `<!DOCTYPE html>
     <svg><use href="#icon-arrow-down"/></svg>
   </button>
 
+  <div id="toast" class="toast" role="status"></div>
+
   <script>
     const vscode = acquireVsCodeApi();
     const VIEWER_STATE_KEY = 'benefit-chats-viewer-state';
@@ -885,6 +987,32 @@ const TEMPLATE = `<!DOCTYPE html>
       if (menu.contains(e.target) || (btn && btn.contains(e.target))) return;
       menu.hidden = true;
     });
+
+    // Webviews swallow anchor navigation, so links are dead without this: route
+    // every content link through the extension host, which opens files/URLs (or
+    // copies an unresolvable path). data-raw carries the decoded destination.
+    document.addEventListener('click', function (e) {
+      const a = e.target && e.target.closest ? e.target.closest('.content-block-text a[href]') : null;
+      if (!a) return;
+      e.preventDefault();
+      e.stopPropagation();
+      vscode.postMessage({ command: 'openLink', href: a.getAttribute('data-raw') || a.getAttribute('href') });
+    });
+
+    window.addEventListener('message', function (ev) {
+      const m = ev.data;
+      if (m && m.command === 'showToast') showToast(m.text);
+    });
+
+    let toastTimer;
+    function showToast(text) {
+      const t = document.getElementById('toast');
+      if (!t) return;
+      t.textContent = text;
+      t.classList.add('visible');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function () { t.classList.remove('visible'); }, 1500);
+    }
 
     function isElementVisible(el) {
       return el && window.getComputedStyle(el).display !== 'none';

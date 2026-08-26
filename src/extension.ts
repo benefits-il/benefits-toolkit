@@ -5,7 +5,9 @@ import { onConfigChanged } from "./core/config-manager";
 import { createRtlFeature } from "./features/rtl/rtl-feature";
 import { createSoundsFeature } from "./features/sounds/sounds-feature";
 import { createChatsFeature } from "./features/chats/chats-feature";
+import { createWindowColorFeature } from "./features/window-color/window-color-feature";
 import { SoundsViewProvider } from "./features/sounds/ui/sounds-view-provider";
+import { ColorsViewProvider } from "./features/window-color/ui/colors-view-provider";
 
 let registry: FeatureRegistry | undefined;
 
@@ -16,6 +18,7 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<void> {
   registry.register(createRtlFeature(ctx));
   registry.register(createSoundsFeature(ctx));
   registry.register(createChatsFeature(ctx));
+  registry.register(createWindowColorFeature(ctx));
 
   // The Sounds control panel is always available (even when sounds are off, so
   // the Enabled switch is reachable), so it lives outside the enabled-gated
@@ -24,6 +27,10 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<void> {
     vscode.window.registerWebviewViewProvider(
       SoundsViewProvider.viewType,
       new SoundsViewProvider(ctx),
+    ),
+    vscode.window.registerWebviewViewProvider(
+      ColorsViewProvider.viewType,
+      new ColorsViewProvider(ctx),
     ),
   );
 

@@ -33,6 +33,9 @@ export interface BenefitConfig {
     confirmDelete: boolean;
     showStatusBarRename: boolean;
   };
+  windowColor: {
+    enabled: boolean;
+  };
 }
 
 function raw(): vscode.WorkspaceConfiguration {
@@ -68,6 +71,9 @@ export function readConfig(): BenefitConfig {
       hideEmpty: readWith("chats.hideEmpty", true),
       confirmDelete: readWith("chats.confirmDelete", true),
       showStatusBarRename: readWith("chats.showStatusBarRename", true),
+    },
+    windowColor: {
+      enabled: readWith("windowColor.enabled", true),
     },
   };
 }

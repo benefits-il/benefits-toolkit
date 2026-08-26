@@ -2,7 +2,7 @@
   "name": "benefits-toolkit",
   "displayName": "Benefit's Toolkit",
   "description": "Quality-of-life tools for Claude Code: RTL chat support, audio notifications, and conversation manager — all in one place.",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "publisher": "benakiva",
   "author": {
     "name": "Ben Akiva"
@@ -60,6 +60,13 @@
           "name": "Sounds",
           "icon": "media/activity-icon.svg",
           "contextualTitle": "Sounds"
+        },
+        {
+          "type": "webview",
+          "id": "benefit.colorsView",
+          "name": "Colors",
+          "icon": "media/activity-icon.svg",
+          "contextualTitle": "Colors"
         }
       ]
     },
@@ -88,6 +95,9 @@
       { "command": "benefit.sounds.chooseSounds", "title": "Sounds: Choose Sound Variants", "category": "Benefit" },
       { "command": "benefit.sounds.test", "title": "Sounds: Test Playback", "category": "Benefit" },
       { "command": "benefit.sounds.status", "title": "Sounds: Show Status", "category": "Benefit" },
+
+      { "command": "benefit.windowColor.pick", "title": "Window Color: Pick", "category": "Benefit" },
+      { "command": "benefit.windowColor.clear", "title": "Window Color: Clear", "category": "Benefit" },
 
       { "command": "benefit.chats.refresh", "title": "Refresh", "category": "Benefit Chats", "icon": "$(refresh)" },
       { "command": "benefit.chats.rename", "title": "Rename", "category": "Benefit Chats", "icon": "$(edit)" },
@@ -169,21 +179,36 @@
           "enum": [
             "arrow.mp3",
             "bubble-pop.mp3",
+            "cartoon-blink.mp3",
+            "double-beep-alert.wav",
+            "game-bonus-alt.mp3",
             "game-bonus.mp3",
+            "interface-back.wav",
+            "interface-select.wav",
+            "intro-chime.mp3",
             "level-up.mp3",
+            "magic-marimba.wav",
             "mission-complete.mp3",
             "notification-014.mp3",
             "notification-038.mp3",
             "notification-062.mp3",
             "notification-07.mp3",
             "notification-09.mp3",
+            "notification-alert.mp3",
             "notification-bell.mp3",
             "notification-off.mp3",
             "notify-alt.wav",
             "notify-default.wav",
+            "pay-chime.mp3",
+            "quick-blip.mp3",
+            "retro-game-notify.wav",
+            "sci-fi-confirm.wav",
+            "simple-whoosh.mp3",
             "stop-alt.wav",
             "stop-default.wav",
-            "system-notification.mp3"
+            "surprise-sting.mp3",
+            "system-notification.mp3",
+            "tile-reveal.wav"
           ],
           "default": "stop-default.wav",
           "description": "Sound file (from the bundled pool) to play when Claude finishes a message. Pick visually in the Sounds panel."
@@ -193,21 +218,36 @@
           "enum": [
             "arrow.mp3",
             "bubble-pop.mp3",
+            "cartoon-blink.mp3",
+            "double-beep-alert.wav",
+            "game-bonus-alt.mp3",
             "game-bonus.mp3",
+            "interface-back.wav",
+            "interface-select.wav",
+            "intro-chime.mp3",
             "level-up.mp3",
+            "magic-marimba.wav",
             "mission-complete.mp3",
             "notification-014.mp3",
             "notification-038.mp3",
             "notification-062.mp3",
             "notification-07.mp3",
             "notification-09.mp3",
+            "notification-alert.mp3",
             "notification-bell.mp3",
             "notification-off.mp3",
             "notify-alt.wav",
             "notify-default.wav",
+            "pay-chime.mp3",
+            "quick-blip.mp3",
+            "retro-game-notify.wav",
+            "sci-fi-confirm.wav",
+            "simple-whoosh.mp3",
             "stop-alt.wav",
             "stop-default.wav",
-            "system-notification.mp3"
+            "surprise-sting.mp3",
+            "system-notification.mp3",
+            "tile-reveal.wav"
           ],
           "default": "notify-default.wav",
           "description": "Sound file (from the bundled pool) to play when Claude needs your input. Pick visually in the Sounds panel."
@@ -263,6 +303,11 @@
           "type": "boolean",
           "default": true,
           "description": "Show a status bar shortcut to rename the active conversation."
+        },
+        "benefit.windowColor.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable the Window Color feature (per-workspace title/activity/status bar colors)."
         }
       }
     }
