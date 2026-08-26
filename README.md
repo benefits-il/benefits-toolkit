@@ -11,11 +11,13 @@ Four features in one place:
 
 ## Install
 
-Until the marketplace listing is ready, install the packaged `.vsix` directly:
+From the [VS Marketplace](https://marketplace.visualstudio.com/items?itemName=benakiva.benefits-toolkit) — search for "Benefit's Toolkit" in the Extensions view, or:
 
 ```
-code --install-extension benefits-toolkit-<version>.vsix
+code --install-extension benakiva.benefits-toolkit
 ```
+
+Offline / pre-release builds can be installed from the packaged `.vsix` on the [GitHub releases page](https://github.com/benefits-il/benefits-toolkit/releases).
 
 After installing, look for the activity bar icon — it opens the **Claude Chats** sidebar.
 
