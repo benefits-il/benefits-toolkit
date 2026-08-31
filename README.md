@@ -2,12 +2,13 @@
 
 Quality-of-life tools for [Claude Code](https://github.com/anthropics/claude-code) inside VS Code, bundled into a single extension.
 
-Four features in one place:
+Five features in one place:
 
 - **RTL** — Right-to-left support in the Claude Code chat (Active / Always / Auto modes), for Hebrew, Arabic, Persian.
 - **Sounds** — Audio notification when Claude finishes a message or asks for your input. Pick any sound from a shared library for each event; reused sounds are flagged so you can keep the two distinct.
 - **Chats** — A sidebar list of your past Claude Code conversations. Rename, archive, restore, search, export to Markdown, view inline — with file links in the viewer that open the file right in VS Code.
 - **Colors** — Give each VS Code window its own color (title, activity and status bars), so five open projects stop looking identical. Pick from the Colors panel or a custom hex.
+- **HTML Open** — One-click "Open in External Browser" for HTML files: a button in the editor title bar and an Explorer right-click entry. Uses the system default browser, or set `benefit.htmlOpen.browserPath` to force a specific one (e.g. Chrome).
 
 ## Install
 

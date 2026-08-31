@@ -2,7 +2,7 @@
   "name": "benefits-toolkit",
   "displayName": "Benefit's Toolkit",
   "description": "Quality-of-life tools for Claude Code: RTL chat support, audio notifications, and conversation manager — all in one place.",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "publisher": "benakiva",
   "author": {
     "name": "Ben Akiva"
@@ -99,6 +99,8 @@
       { "command": "benefit.windowColor.pick", "title": "Window Color: Pick", "category": "Benefit" },
       { "command": "benefit.windowColor.clear", "title": "Window Color: Clear", "category": "Benefit" },
 
+      { "command": "benefit.html.openInBrowser", "title": "Open in External Browser", "category": "Benefit", "icon": "$(link-external)" },
+
       { "command": "benefit.chats.refresh", "title": "Refresh", "category": "Benefit Chats", "icon": "$(refresh)" },
       { "command": "benefit.chats.rename", "title": "Rename", "category": "Benefit Chats", "icon": "$(edit)" },
       { "command": "benefit.chats.archive", "title": "Archive", "category": "Benefit Chats", "icon": "$(archive)" },
@@ -116,6 +118,20 @@
       { "command": "benefit.chats.statusBarRename", "title": "Rename Active Conversation", "category": "Benefit Chats" }
     ],
     "menus": {
+      "editor/title": [
+        {
+          "command": "benefit.html.openInBrowser",
+          "when": "resourceExtname == .html || resourceExtname == .htm",
+          "group": "navigation@1"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "benefit.html.openInBrowser",
+          "when": "resourceExtname == .html || resourceExtname == .htm",
+          "group": "navigation@10"
+        }
+      ],
       "view/title": [
         { "command": "benefit.chats.refresh", "when": "view == benefit.chatsView", "group": "navigation@1" },
         { "command": "benefit.chats.search", "when": "view == benefit.chatsView", "group": "navigation@2" },
@@ -308,6 +324,16 @@
           "type": "boolean",
           "default": true,
           "description": "Enable the Window Color feature (per-workspace title/activity/status bar colors)."
+        },
+        "benefit.htmlOpen.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable the Open HTML in External Browser feature."
+        },
+        "benefit.htmlOpen.browserPath": {
+          "type": "string",
+          "default": "",
+          "description": "Full path to a browser executable (e.g. chrome.exe). Leave empty to use the system default browser."
         }
       }
     }

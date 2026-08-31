@@ -36,6 +36,11 @@ export interface BenefitConfig {
   windowColor: {
     enabled: boolean;
   };
+  htmlOpen: {
+    enabled: boolean;
+    /** Full path to a browser executable; empty = system default browser. */
+    browserPath: string;
+  };
 }
 
 function raw(): vscode.WorkspaceConfiguration {
@@ -74,6 +79,10 @@ export function readConfig(): BenefitConfig {
     },
     windowColor: {
       enabled: readWith("windowColor.enabled", true),
+    },
+    htmlOpen: {
+      enabled: readWith("htmlOpen.enabled", true),
+      browserPath: readWith("htmlOpen.browserPath", ""),
     },
   };
 }
