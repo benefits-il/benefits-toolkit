@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.1 — Open HTML files in your real browser
+
+**One click from an HTML file to Chrome.** A fifth feature. VS Code's built-in preview opens HTML in the integrated Simple Browser — a cramped iframe when what you usually want is your actual browser with its devtools. Every `.html`/`.htm` file now gets an "Open in External Browser" button in the editor title bar and an entry in the Explorer right-click menu. By default the file opens in the system default browser; set `benefit.htmlOpen.browserPath` to a browser executable (e.g. `chrome.exe`) to force a specific one — the file is handed over as a `file://` URL, so paths with spaces and relative assets (CSS/JS/images next to the file) just work. A wrong `browserPath` produces a clear error naming the setting instead of failing silently. Gated by `benefit.htmlOpen.enabled` like every other feature. Also available as a command: `Benefit: Open in External Browser`.
+
+*(0.5.0 shipped the same feature; 0.5.1 adds this changelog entry.)*
+
 ## 0.4.0 — Window colors, clickable chat links, 15 new sounds
 
 **Window Colors — tell five open windows apart.** A fourth feature. The new **Colors** panel in the sidebar shows a grid of ten real color swatches (plus a custom hex field and Clear); one click colors this window's title bar, activity bar and status bar — including while the window is unfocused, which is the whole point of having several open. The foreground is derived automatically from the background's luminance, so every color is readable in light and dark themes. The color is written per-workspace through VS Code's own configuration API (`workbench.colorCustomizations`, Workspace target), so `.vscode/settings.json` keeps its comments and only the nine managed keys are ever touched — Clear removes exactly those and nothing else. Also available as commands: `Benefit: Window Color: Pick` / `Clear`.
