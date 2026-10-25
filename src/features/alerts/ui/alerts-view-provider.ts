@@ -5,7 +5,8 @@ import { currentPlatform } from "../../../shared/platform-detector";
 import { AlertAssets, SoundChoice, SoundSlot } from "../services/alert-assets";
 import { POPUP_SECONDS_MAX, POPUP_SECONDS_MIN } from "../services/alert-config";
 import { HookInstaller } from "../services/hook-installer";
-import { onProjectSoundsChanged, ProjectSoundOverrides, ProjectSoundStore } from "../services/project-sound-store";
+import { onProjectPrefsChanged, ProjectPrefsStore, ProjectSoundOverrides } from "../services/project-prefs-store";
+import { DISPLAY_NAME_MAX } from "../services/project-registry";
 import { playPreview } from "../services/sound-player";
 
 interface PanelState {
@@ -18,8 +19,11 @@ interface PanelState {
   installed: boolean;
   sounds: SoundChoice[];
   defaults: Record<SoundSlot, string>;
-  /** The window's (first) project and its own sounds; null with no folder open. */
-  project: { name: string; overrides: ProjectSoundOverrides } | null;
+  /**
+   * The window's (first) project: folder name, the name the user gave its
+   * popup (if any) and its own sounds; null with no folder open.
+   */
+  project: { name: string; customName: string | null; overrides: ProjectSoundOverrides } | null;
 }
 
 const SLOT_CONFIG_KEY: Record<SoundSlot, string> = {
@@ -32,7 +36,7 @@ const FLAG_KEYS = new Set(["sounds.enabled", "popup.enabled", "popup.onDone", "p
 
 /**
  * The "Alerts" panel in the benefit-sidebar: sounds (default, or this
- * project's own) and the desktop popup. Registered unconditionally so the
+ * project's own) and the desktop popup, with the name it shows for this project. Registered unconditionally so the
  * switches are reachable while alerts are off. The hooks themselves are the
  * alerts feature's job; this is UI + settings.
  */
@@ -41,11 +45,11 @@ export class AlertsViewProvider implements vscode.WebviewViewProvider {
 
   private view: vscode.WebviewView | undefined;
   private readonly assets: AlertAssets;
-  private readonly store: ProjectSoundStore;
+  private readonly store: ProjectPrefsStore;
 
   constructor(private readonly ctx: vscode.ExtensionContext) {
     this.assets = new AlertAssets(ctx);
-    this.store = new ProjectSoundStore(ctx);
+    this.store = new ProjectPrefsStore(ctx);
   }
 
   resolveWebviewView(view: vscode.WebviewView): void {
@@ -59,7 +63,7 @@ export class AlertsViewProvider implements vscode.WebviewViewProvider {
     });
     const subs = [
       onConfigChanged(() => void this.postState()),
-      onProjectSoundsChanged(() => void this.postState()),
+      onProjectPrefsChanged(() => void this.postState()),
       vscode.workspace.onDidChangeWorkspaceFolders(() => void this.postState()),
     ];
     view.onDidDispose(() => subs.forEach((s) => s.dispose()));
@@ -94,7 +98,13 @@ export class AlertsViewProvider implements vscode.WebviewViewProvider {
       installed,
       sounds: await this.assets.listSounds().catch(() => []),
       defaults: { stop: cfg.sounds.stopSound, notification: cfg.sounds.notificationSound },
-      project: folder ? { name: folder.name, overrides: this.store.get(folder.uri.fsPath) } : null,
+      project: folder
+        ? {
+            name: folder.name,
+            customName: this.store.name(folder.uri.fsPath) ?? null,
+            overrides: this.store.sounds(folder.uri.fsPath),
+          }
+        : null,
     };
     void this.view.webview.postMessage({ type: "state", state });
   }
@@ -124,11 +134,18 @@ export class AlertsViewProvider implements vscode.WebviewViewProvider {
           }
           break;
         }
+        case "setName": {
+          // The registry writer hears the change and rewrites the record the
+          // dispatcher reads, so the next popup already shows the new name.
+          const folder = this.projectFolder();
+          if (folder) await this.store.setName(folder.uri.fsPath, String(msg.value ?? ""));
+          break;
+        }
         case "select":
           if (!msg.slot) break;
           if (msg.scope === "project") {
             const folder = this.projectFolder();
-            if (folder) await this.store.set(folder.uri.fsPath, msg.slot, msg.id ?? undefined);
+            if (folder) await this.store.setSound(folder.uri.fsPath, msg.slot, msg.id ?? undefined);
           } else if (msg.id) {
             await updateConfig(SLOT_CONFIG_KEY[msg.slot], msg.id);
           }
@@ -253,6 +270,18 @@ export class AlertsViewProvider implements vscode.WebviewViewProvider {
     border: 1px solid var(--vscode-input-border, rgba(128,128,128,0.4));
   }
 
+  .name-input {
+    width: 100%; box-sizing: border-box; padding: 4px 8px; border-radius: 4px; font: inherit;
+    background: var(--vscode-input-background); color: var(--vscode-input-foreground);
+    border: 1px solid var(--vscode-input-border, rgba(128,128,128,0.4));
+  }
+  .name-input:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+  .name-input::placeholder { color: var(--vscode-input-placeholderForeground); }
+  .linkbtn {
+    border: 0; padding: 0; background: none; cursor: pointer; font: inherit;
+    color: var(--vscode-textLink-foreground); text-decoration: underline;
+  }
+
   .status { display: flex; align-items: center; gap: 8px; font-size: 0.9em; }
   .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
   .dot.on { background: var(--vscode-testing-iconPassed, #3fb950); }
@@ -297,6 +326,11 @@ export class AlertsViewProvider implements vscode.WebviewViewProvider {
       <label class="check"><input type="checkbox" id="popup-done" /> When Claude finishes</label>
       <label class="check"><input type="checkbox" id="popup-waiting" /> When Claude needs you</label>
       <div class="seconds"><span>Stays for</span><input type="number" id="popup-seconds" min="${POPUP_SECONDS_MIN}" max="${POPUP_SECONDS_MAX}" /><span>seconds</span></div>
+      <div class="hidden" id="name-block">
+        <div class="card-title"><label for="name-input">Name on this project's popup</label></div>
+        <input class="name-input" id="name-input" maxlength="${DISPLAY_NAME_MAX}" spellcheck="false" dir="auto" autocomplete="off" />
+        <div class="scope-note" id="name-note"></div>
+      </div>
       <div class="btnrow"><button class="btn" id="test-popup-btn">Test popup</button></div>
     </div>
   </div>
@@ -328,6 +362,49 @@ export class AlertsViewProvider implements vscode.WebviewViewProvider {
   $('reinstall-btn').addEventListener('click', () => post({ type: 'reinstall' }));
   $('scope-default').addEventListener('click', () => setScope('default'));
   $('scope-project').addEventListener('click', () => setScope('project'));
+
+  // The popup's name for this project: saved on Enter or when the field loses
+  // focus; Escape puts the saved one back; empty means the folder name.
+  const nameInput = $('name-input');
+  nameInput.addEventListener('change', () => {
+    if (!state || !state.project) return;
+    const value = nameInput.value.trim();
+    if (value === (state.project.customName || '')) return;
+    state.project.customName = value || null;
+    post({ type: 'setName', value });
+    renderName();
+  });
+  nameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') nameInput.blur();
+    if (e.key === 'Escape' && state && state.project) {
+      nameInput.value = state.project.customName || '';
+      nameInput.blur();
+    }
+  });
+
+  function renderName() {
+    const pr = state.project;
+    $('name-block').classList.toggle('hidden', !pr);
+    if (!pr) return;
+    if (document.activeElement !== nameInput) nameInput.value = pr.customName || '';
+    nameInput.placeholder = pr.name;
+    const note = $('name-note');
+    note.textContent = '';
+    if (pr.customName) {
+      const reset = document.createElement('button');
+      reset.className = 'linkbtn';
+      reset.textContent = 'Use the folder name';
+      reset.addEventListener('click', () => {
+        nameInput.value = '';
+        state.project.customName = null;
+        post({ type: 'setName', value: '' });
+        renderName();
+      });
+      note.append('Instead of the folder name, ' + pr.name + '. ', reset);
+    } else {
+      note.textContent = 'Empty: the folder name, ' + pr.name + '. Kept on this computer only.';
+    }
+  }
 
   function setScope(next) {
     scope = next;
@@ -423,6 +500,7 @@ export class AlertsViewProvider implements vscode.WebviewViewProvider {
     $('popup-done').checked = state.popupOnDone;
     $('popup-waiting').checked = state.popupOnWaiting;
     if (document.activeElement !== $('popup-seconds')) $('popup-seconds').value = state.popupSeconds;
+    renderName();
 
     const active = state.soundsEnabled || state.popupEnabled;
     const on = active && state.installed;

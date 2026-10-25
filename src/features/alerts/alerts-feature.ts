@@ -7,7 +7,7 @@ import { AlertAssets } from "./services/alert-assets";
 import { HookInstaller } from "./services/hook-installer";
 import { HookHealer } from "./services/hook-healer";
 import { ProjectRegistryWriter } from "./services/project-registry-writer";
-import { ProjectSoundStore } from "./services/project-sound-store";
+import { ProjectPrefsStore } from "./services/project-prefs-store";
 import { SoundPicker } from "./services/variant-picker";
 import { registerAlertsCommands } from "./ui/alerts-commands";
 
@@ -38,8 +38,8 @@ export function createAlertsFeature(ctx: vscode.ExtensionContext): Feature {
       await assets.installRuntime(platform);
       await assets.writeConfig(readConfig());
 
-      const store = new ProjectSoundStore(ctx);
-      registry = new ProjectRegistryWriter(ctx, store, platform);
+      const prefs = new ProjectPrefsStore(ctx);
+      registry = new ProjectRegistryWriter(ctx, prefs, platform);
       registry.start();
 
       let warned = false;
@@ -59,7 +59,7 @@ export function createAlertsFeature(ctx: vscode.ExtensionContext): Feature {
       // hooks. The healer re-applies them now AND on every change to that file.
       const healer = new HookHealer(installer);
 
-      disposables = registerAlertsCommands(ctx, { installer, assets, picker, healer, platform });
+      disposables = registerAlertsCommands(ctx, { installer, assets, picker, healer, prefs, platform });
       disposables.push(healer, registry);
 
       try {

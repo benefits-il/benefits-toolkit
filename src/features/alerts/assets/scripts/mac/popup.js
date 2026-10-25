@@ -5,16 +5,33 @@
 // menu bar, stacked under popups already showing. It never takes focus by
 // itself; clicking it runs "<cli> <folder>", which brings that project's
 // editor window to the front. The x in the corner just closes it.
+//
+// Written to run unchanged on Intel and Apple Silicon Macs, which disagree on
+// several low-level values: BOOL is a char on Intel and a bool on Apple
+// Silicon (so no ObjC.registerSubclass with BOOL methods: a type mismatch
+// throws before anything shows), NSTextAlignmentRight is 1 on one and 2 on
+// the other, and NSEventMaskAny (2^64-1) does not survive a JS number.
+// Clicks are therefore read straight off the event queue.
+// Failures are appended to state/dispatch.log, tagged [popup] as on Windows.
 ObjC.import('Cocoa');
 
 const W = 320;
 const H = 64;
 const GAP = 10;
 const EDGE = 12;
+const LEFT_MOUSE_DOWN = 1; // NSEventTypeLeftMouseDown
+const EVENT_MASK = 0xFFFFFFFF; // every event type below 32 (mouse, keys, app-defined)
+const ALIGN_NATURAL = 4; // NSTextAlignmentNatural, the same value on both architectures
+const WRITING_RTL = 1; // NSWritingDirectionRightToLeft
+const BOX_CUSTOM = 4; // NSBoxCustom
+const NO_TITLE = 0; // NSNoTitle
 
 function readText(path) {
   const s = $.NSString.stringWithContentsOfFileEncodingError(path, $.NSUTF8StringEncoding, null);
   return s.isNil() ? null : s.js;
+}
+function writeText(path, text) {
+  $(text).writeToFileAtomicallyEncodingError(path, true, $.NSUTF8StringEncoding, null);
 }
 function quote(s) { return "'" + String(s).replace(/'/g, "'\\''") + "'"; }
 
@@ -31,39 +48,20 @@ function label(text, size, bold, color, frame, rtl) {
   field.setFrame(frame);
   field.setLineBreakMode(4); // NSLineBreakByTruncatingTail
   if (rtl) {
-    field.setAlignment(1); // NSTextAlignmentRight (AppKit)
-    field.setBaseWritingDirection(1); // NSWritingDirectionRightToLeft
+    // Natural alignment follows the writing direction: right for RTL.
+    field.setBaseWritingDirection(WRITING_RTL);
+    field.setAlignment(ALIGN_NATURAL);
   }
   return field;
 }
 
-let clicked = null; // 'open' | 'close'
+function inside(p, r) {
+  return p.x >= r.origin.x && p.x <= r.origin.x + r.size.width &&
+    p.y >= r.origin.y && p.y <= r.origin.y + r.size.height;
+}
 
-ObjC.registerSubclass({
-  name: 'BenefitPopupView',
-  superclass: 'NSView',
-  methods: {
-    'acceptsFirstMouse:': { types: ['bool', ['id']], implementation: function () { return true; } },
-    'mouseDown:': {
-      types: ['void', ['id']],
-      implementation: function (event) {
-        const p = event.locationInWindow;
-        clicked = p.x > W - 34 && p.y > H - 30 ? 'close' : 'open';
-      },
-    },
-  },
-});
-
-function run(argv) {
-  const jobPath = argv[0];
-  const job = JSON.parse(readText(jobPath));
-  $.NSFileManager.defaultManager.removeItemAtPathError(jobPath, null);
-
-  const sh = Application.currentApplication();
-  sh.includeStandardAdditions = true;
-
+function show(job, slotsDir, sh) {
   // Stack position: the lowest slot no live popup holds.
-  const slotsDir = jobPath.replace(/\/popups\/[^\/]+$/, '/popup-slots');
   $.NSFileManager.defaultManager.createDirectoryAtPathWithIntermediateDirectoriesAttributesError(slotsDir, true, $(), null);
   let slot = 0;
   for (; slot < 4; slot++) {
@@ -73,59 +71,95 @@ function run(argv) {
   }
   if (slot >= 4) slot = 3;
   const slotFile = slotsDir + '/' + slot;
-  $(String($.NSProcessInfo.processInfo.processIdentifier)).writeToFileAtomicallyEncodingError(slotFile, true, $.NSUTF8StringEncoding, null);
+  writeText(slotFile, String($.NSProcessInfo.processInfo.processIdentifier));
 
-  const app = $.NSApplication.sharedApplication;
-  app.setActivationPolicy(1); // Accessory: no Dock icon, no menu bar
-  app.finishLaunching;
+  try {
+    const app = $.NSApplication.sharedApplication;
+    app.setActivationPolicy(1); // Accessory: no Dock icon, no menu bar
+    app.finishLaunching;
 
-  const bg = colorFromHex(job.color);
-  const fg = bg.luminance > 0.45
-    ? $.NSColor.colorWithSRGBRedGreenBlueAlpha(0.08, 0.13, 0.17, 1)
-    : $.NSColor.whiteColor;
-  const rtl = new RegExp('[' + String.fromCharCode(0x0590) + '-' + String.fromCharCode(0x06FF) + ']').test(job.title || '');
+    const bg = colorFromHex(job.color);
+    const fg = bg.luminance > 0.45
+      ? $.NSColor.colorWithSRGBRedGreenBlueAlpha(0.08, 0.13, 0.17, 1)
+      : $.NSColor.whiteColor;
+    const rtl = new RegExp('[' + String.fromCharCode(0x0590) + '-' + String.fromCharCode(0x06FF) + ']').test(job.title || '');
 
-  const vf = $.NSScreen.mainScreen.visibleFrame;
-  const x = vf.origin.x + vf.size.width - W - EDGE;
-  const y = vf.origin.y + vf.size.height - EDGE - H - slot * (H + GAP);
-  // Borderless (0) | NonactivatingPanel (1 << 7)
-  const panel = $.NSPanel.alloc.initWithContentRectStyleMaskBackingDefer($.NSMakeRect(x, y, W, H), 1 << 7, 2, false);
-  panel.setLevel(25); // NSStatusWindowLevel
-  panel.setOpaque(false);
-  panel.setBackgroundColor($.NSColor.clearColor);
-  panel.setHasShadow(true);
-  panel.setCollectionBehavior(1 | 256); // all Spaces, over full-screen apps
+    const vf = $.NSScreen.mainScreen.visibleFrame;
+    const x = vf.origin.x + vf.size.width - W - EDGE;
+    const y = vf.origin.y + vf.size.height - EDGE - H - slot * (H + GAP);
+    // Borderless (0) | NonactivatingPanel (1 << 7)
+    const panel = $.NSPanel.alloc.initWithContentRectStyleMaskBackingDefer($.NSMakeRect(x, y, W, H), 1 << 7, 2, false);
+    panel.setLevel(25); // NSStatusWindowLevel
+    panel.setOpaque(false);
+    panel.setBackgroundColor($.NSColor.clearColor);
+    panel.setHasShadow(true);
+    panel.setCollectionBehavior(1 | 256); // all Spaces, over full-screen apps
 
-  const view = $.BenefitPopupView.alloc.initWithFrame($.NSMakeRect(0, 0, W, H));
-  view.setWantsLayer(true);
-  view.layer.setCornerRadius(12);
-  view.layer.setBackgroundColor(bg.color.CGColor);
-  panel.setContentView(view);
+    // A custom NSBox draws the rounded card itself: plain AppKit, no layer
+    // or CGColor bridging.
+    const card = $.NSBox.alloc.initWithFrame($.NSMakeRect(0, 0, W, H));
+    card.setBoxType(BOX_CUSTOM);
+    card.setTitlePosition(NO_TITLE);
+    card.setBorderWidth(0);
+    card.setCornerRadius(12);
+    card.setFillColor(bg.color);
+    card.setContentViewMargins($.NSMakeSize(0, 0));
+    panel.setContentView(card);
 
-  const textW = W - 16 - 34;
-  view.addSubview(label(job.title || '', 14, true, fg, $.NSMakeRect(16, 32, textW, 20), rtl));
-  view.addSubview(label(job.subtitle || '', 12, false, fg, $.NSMakeRect(16, 12, textW, 18), rtl));
-  view.addSubview(label(String.fromCharCode(0xD7), 15, false, fg, $.NSMakeRect(W - 28, H - 28, 18, 20), false));
+    const content = card.contentView;
+    const textW = W - 16 - 34;
+    content.addSubview(label(job.title || '', 14, true, fg, $.NSMakeRect(16, 32, textW, 20), rtl));
+    content.addSubview(label(job.subtitle || '', 12, false, fg, $.NSMakeRect(16, 12, textW, 18), rtl));
+    content.addSubview(label(String.fromCharCode(0xD7), 15, false, fg, $.NSMakeRect(W - 28, H - 28, 18, 20), false));
 
-  panel.orderFrontRegardless;
+    panel.orderFrontRegardless;
 
-  // Event loop with a countdown that pauses while the mouse is over the panel.
-  let remaining = Number(job.seconds) > 0 ? Number(job.seconds) : 8;
-  const anyEvent = $.NSEventMaskAny !== undefined ? $.NSEventMaskAny : $.NSAnyEventMask;
-  let last = Date.now();
-  while (remaining > 0 && !clicked) {
-    const event = app.nextEventMatchingMaskUntilDateInModeDequeue(
-      anyEvent, $.NSDate.dateWithTimeIntervalSinceNow(0.1), $.NSDefaultRunLoopMode, true);
-    if (!event.isNil()) app.sendEvent(event);
-    const now = Date.now();
-    const hovering = $.NSPointInRect($.NSEvent.mouseLocation, panel.frame);
-    if (!hovering) remaining -= (now - last) / 1000;
-    last = now;
+    // Event loop with a countdown that pauses while the mouse is over the panel.
+    const mode = $.NSDefaultRunLoopMode || $('kCFRunLoopDefaultMode');
+    let remaining = Number(job.seconds) > 0 ? Number(job.seconds) : 8;
+    let clicked = null; // 'open' | 'close'
+    let last = Date.now();
+    while (remaining > 0 && !clicked) {
+      const event = app.nextEventMatchingMaskUntilDateInModeDequeue(
+        EVENT_MASK, $.NSDate.dateWithTimeIntervalSinceNow(0.1), mode, true);
+      if (!event.isNil()) {
+        if (event.type === LEFT_MOUSE_DOWN && event.windowNumber === panel.windowNumber) {
+          const p = event.locationInWindow;
+          clicked = p.x > W - 34 && p.y > H - 30 ? 'close' : 'open';
+        }
+        app.sendEvent(event);
+      }
+      const now = Date.now();
+      if (!inside($.NSEvent.mouseLocation, panel.frame)) remaining -= (now - last) / 1000;
+      last = now;
+    }
+
+    if (clicked === 'open' && job.cli && job.folder) {
+      sh.doShellScript(quote(job.cli) + ' ' + quote(job.folder) + ' > /dev/null 2>&1 &');
+    }
+    panel.orderOut(null);
+  } finally {
+    $.NSFileManager.defaultManager.removeItemAtPathError(slotFile, null);
   }
+}
 
-  if (clicked === 'open' && job.cli && job.folder) {
-    sh.doShellScript(quote(job.cli) + ' ' + quote(job.folder) + ' > /dev/null 2>&1 &');
+function run(argv) {
+  const jobPath = argv[0] || '';
+  const inPopups = /\/popups\/[^\/]+$/;
+  const stateDir = inPopups.test(jobPath)
+    ? jobPath.replace(inPopups, '')
+    : $.NSHomeDirectory().js + '/.benefits-toolkit/state';
+  try {
+    const job = JSON.parse(readText(jobPath));
+    $.NSFileManager.defaultManager.removeItemAtPathError(jobPath, null);
+    const sh = Application.currentApplication();
+    sh.includeStandardAdditions = true;
+    show(job, stateDir + '/popup-slots', sh);
+  } catch (e) {
+    try {
+      const log = stateDir + '/dispatch.log';
+      writeText(log, (readText(log) || '').slice(-100000) + new Date().toISOString() + ' [popup] ' + e + '\n');
+    } catch (e2) { /* nothing left to do */ }
+    throw e; // osascript exits non-zero, so "Test popup" can report it
   }
-  panel.orderOut(null);
-  $.NSFileManager.defaultManager.removeItemAtPathError(slotFile, null);
 }

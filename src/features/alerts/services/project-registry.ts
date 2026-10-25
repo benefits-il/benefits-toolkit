@@ -33,6 +33,21 @@ export function normalizeFolder(folder: string): string {
   return folder.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
 }
 
+/** Longest popup name we keep; the popup trims anything wider with an ellipsis anyway. */
+export const DISPLAY_NAME_MAX = 60;
+
+/**
+ * A user-typed popup name, tidied: control characters dropped, whitespace
+ * collapsed, capped at DISPLAY_NAME_MAX. Empty means "no custom name".
+ */
+export function cleanDisplayName(raw: string): string | undefined {
+  const name = [...raw.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim()]
+    .slice(0, DISPLAY_NAME_MAX)
+    .join("")
+    .trim();
+  return name || undefined;
+}
+
 /** Stable file name for a folder's record. */
 export function projectKey(folder: string): string {
   return createHash("sha1").update(normalizeFolder(folder)).digest("hex").slice(0, 16);

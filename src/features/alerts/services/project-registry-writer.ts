@@ -8,7 +8,7 @@ import { WindowColorService } from "../../window-color/services/window-color-ser
 import { findEditorCli } from "./editor-cli";
 import type { HookPlatform } from "./hook-command";
 import { projectKey, ProjectRecord } from "./project-registry";
-import { onProjectSoundsChanged, ProjectSoundStore } from "./project-sound-store";
+import { onProjectPrefsChanged, ProjectPrefsStore } from "./project-prefs-store";
 
 function listDirSync(dir: string): string[] | undefined {
   try {
@@ -20,9 +20,9 @@ function listDirSync(dir: string): string[] | undefined {
 
 /**
  * Keeps this window's project records in ~/.benefits-toolkit/projects current:
- * name, window color, the project's own sounds, how to bring the window back,
- * and whether it is focused right now (so the dispatcher stays quiet while
- * the user is already looking at it).
+ * name (the user's own, else the folder's), window color, the project's own
+ * sounds, how to bring the window back, and whether it is focused right now
+ * (so the dispatcher stays quiet while the user is already looking at it).
  */
 export class ProjectRegistryWriter implements vscode.Disposable {
   private readonly disposables: vscode.Disposable[] = [];
@@ -34,7 +34,7 @@ export class ProjectRegistryWriter implements vscode.Disposable {
 
   constructor(
     ctx: vscode.ExtensionContext,
-    private readonly store: ProjectSoundStore,
+    private readonly prefs: ProjectPrefsStore,
     platform: HookPlatform,
   ) {
     this.colors = new WindowColorService(ctx);
@@ -49,7 +49,7 @@ export class ProjectRegistryWriter implements vscode.Disposable {
       vscode.workspace.onDidChangeConfiguration((e) => {
         if (e.affectsConfiguration("workbench.colorCustomizations")) this.sync();
       }),
-      onProjectSoundsChanged(() => this.sync()),
+      onProjectPrefsChanged(() => this.sync()),
     );
     this.sync();
   }
@@ -81,10 +81,10 @@ export class ProjectRegistryWriter implements vscode.Disposable {
       const folder = wf.uri.fsPath;
       const key = projectKey(folder);
       keep.add(key);
-      const own = this.store.get(folder);
+      const own = this.prefs.sounds(folder);
       const record: ProjectRecord = {
         folder,
-        name: wf.name,
+        name: this.prefs.displayName(folder, wf.name),
         color,
         sounds: { done: own.stop, waiting: own.notification },
         cli: this.cli,

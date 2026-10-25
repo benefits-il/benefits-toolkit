@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  cleanDisplayName,
+  DISPLAY_NAME_MAX,
   findProject,
   normalizeFolder,
   projectKey,
@@ -55,4 +57,12 @@ test("findProject handles Hebrew folder names", () => {
 
 test("findProject returns nothing for an empty cwd", () => {
   assert.equal(findProject([record("C:\\work")], ""), undefined);
+});
+
+test("cleanDisplayName tidies a typed popup name and treats blank as none", () => {
+  assert.equal(cleanDisplayName("  Shop   front \n"), "Shop front");
+  assert.equal(cleanDisplayName("\t"), undefined);
+  assert.equal(cleanDisplayName(""), undefined);
+  assert.equal(cleanDisplayName("חנות · ראשי"), "חנות · ראשי");
+  assert.equal(cleanDisplayName("x".repeat(DISPLAY_NAME_MAX + 10))?.length, DISPLAY_NAME_MAX);
 });

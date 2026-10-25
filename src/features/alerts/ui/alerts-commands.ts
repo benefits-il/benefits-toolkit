@@ -8,6 +8,7 @@ import { findEditorCli } from "../services/editor-cli";
 import type { HookPlatform } from "../services/hook-command";
 import { HookHealer } from "../services/hook-healer";
 import { HookInstaller } from "../services/hook-installer";
+import { ProjectPrefsStore } from "../services/project-prefs-store";
 import { showPopup } from "../services/popup-launcher";
 import { playPreview } from "../services/sound-player";
 import { SoundPicker } from "../services/variant-picker";
@@ -17,6 +18,7 @@ export interface AlertsServices {
   assets: AlertAssets;
   picker: SoundPicker;
   healer: HookHealer;
+  prefs: ProjectPrefsStore;
   platform: HookPlatform;
 }
 
@@ -30,7 +32,7 @@ function listDirSync(dir: string): string[] | undefined {
 
 export function registerAlertsCommands(
   ctx: vscode.ExtensionContext,
-  { installer, assets, picker, healer, platform }: AlertsServices,
+  { installer, assets, picker, healer, prefs, platform }: AlertsServices,
 ): vscode.Disposable[] {
   const disposables: vscode.Disposable[] = [];
 
@@ -91,13 +93,14 @@ export function registerAlertsCommands(
       vscode.window.showInformationMessage(msg);
     }),
 
-    // The popup this window would get, shown now.
+    // The popup this window would get, shown now: same name and color as
+    // the record the dispatcher reads for the (first) project folder.
     vscode.commands.registerCommand("benefit.popup.test", async () => {
       try {
-        const folder = vscode.workspace.workspaceFolders?.[0];
+        const folder = vscode.workspace.workspaceFolders?.find((f) => f.uri.scheme === "file");
         await showPopup(
           {
-            title: vscode.workspace.name ?? folder?.name ?? "Benefit's Toolkit",
+            title: folder ? prefs.displayName(folder.uri.fsPath, folder.name) : "Benefit's Toolkit",
             subtitle: "Claude finished",
             color: new WindowColorService(ctx).getCurrentColor() ?? "#047857",
             cli: findEditorCli(vscode.env.appRoot, platform, listDirSync) ?? null,

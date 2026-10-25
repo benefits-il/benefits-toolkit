@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.1 — The popup on Intel Macs, and a name of your own on it
+
+**Fixed: no popup at all on Intel Macs.** The macOS popup script declared a mouse handler with a `bool` return type, which is right on Apple Silicon, but on Intel `BOOL` is a `char`. JavaScript for Automation refused the class before anything showed (`method types do not match the superclass method types`), and because the hooks send the script's output to `/dev/null`, it failed silently. The popup now reads clicks straight off its event queue instead, with no custom class. Two other values that differ between the two kinds of Mac were also changed: a Hebrew name was centered instead of right-aligned on Apple Silicon, and the "any event" mask didn't survive the trip through a JavaScript number on Intel. A failing popup now leaves a `[popup]` line in `~/.benefits-toolkit/state/dispatch.log`, and **Test popup** shows the error instead of nothing.
+
+**Name the popup.** A project's popup used to show its folder name, so `app` or `web-2` was what you got. The Popup card in the Alerts panel now has a *Name on this project's popup* field for the project open in the window. Leave it empty to go back to the folder name. Like a project's own sounds, the name is kept in the extension's storage, not in `.vscode/settings.json`. **Test popup** shows the same name the real popup will.
+
 ## 0.7.0 — A popup that takes you back, and a sound per project
 
 **A desktop popup when Claude finishes or needs you (Windows and macOS).** A small card in the project's window color and name slides into the corner of the screen. Click it and that project's VS Code window comes to the front; the x just closes it. It never shows while you're already in that window, so it only interrupts when you're elsewhere. Several projects finishing at once stack up to four cards. Hovering pauses the countdown, and Claude Code's one-minute idle reminder gets no popup, since the "finished" one already said it. Switches: `benefit.popup.enabled`, `benefit.popup.onDone`, `benefit.popup.onWaiting`, plus `benefit.popup.seconds` (default 8). The Alerts panel has a **Test popup** button.
