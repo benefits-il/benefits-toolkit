@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.1 — Benefits at the top
+
+**The Benefits strip moved to the very top of the sidebar.** It used to sit at the bottom of the Toolkit panel, below everything else; it now has a small view of its own, first in the sidebar, above the chats list. The tagline's long dash became a bold middle dot (·), here, in the viewer, in the README, on the landing page and on md-he.
+
 ## 0.6.0 — Copy code, read in md-he, switch anything off
 
 **A Copy button on every code block in the conversation viewer.** Claude Code's own chat has one; our viewer didn't, so copying a snippet meant dragging a selection across a scrolling block. Hover any code block (fenced or indented) and a Copy button appears in its corner; it copies the raw code, exactly as Claude wrote it. Switch: `benefit.chats.codeCopyButtons`.

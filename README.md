@@ -1,7 +1,7 @@
 # Benefit's Toolkit
 
-**Part of [Benefits](https://benefits-il.dev/)** — the course that teaches you to work right with AI.
-<br>הכלי הזה הוא חלק מ-Benefits — הקורס שמלמד לעבוד נכון עם בינה מלאכותית.
+**Part of [Benefits](https://benefits-il.dev/)** **·** the course that teaches you to work right with AI.
+<br>הכלי הזה הוא חלק מ-Benefits **·** הקורס שמלמד לעבוד נכון עם בינה מלאכותית
 
 Quality-of-life tools for [Claude Code](https://github.com/anthropics/claude-code) inside VS Code, bundled into a single extension.
 

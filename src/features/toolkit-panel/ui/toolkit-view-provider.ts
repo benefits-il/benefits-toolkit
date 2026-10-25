@@ -1,7 +1,6 @@
 import * as vscode from "vscode";
 import { onConfigChanged, readFlag, updateConfigEffective } from "../../../core/config-manager";
 import { logger } from "../../../core/logger";
-import { BENEFITS_URL, BRAND_CLICK_SCRIPT, brandBarCss, brandBarHtml } from "../../../shared/brand-bar";
 import { TOOLKIT_SWITCHES, ToolkitSwitch } from "../toolkit-switches";
 
 interface SwitchState extends ToolkitSwitch {
@@ -51,9 +50,6 @@ export class ToolkitViewProvider implements vscode.WebviewViewProvider {
           if (msg.key && TOOLKIT_SWITCHES.some((s) => s.key === msg.key)) {
             await updateConfigEffective(msg.key, !!msg.value);
           }
-          break;
-        case "openBrand":
-          await vscode.env.openExternal(vscode.Uri.parse(BENEFITS_URL));
           break;
       }
     } catch (err) {
@@ -111,13 +107,11 @@ export class ToolkitViewProvider implements vscode.WebviewViewProvider {
   .switch input:checked + .slider { background: var(--vscode-button-background); border-color: var(--vscode-button-background); }
   .switch input:checked + .slider::before { transform: translateX(16px); background: var(--vscode-button-foreground); }
   .switch input:focus-visible + .slider { outline: 1px solid var(--vscode-focusBorder); outline-offset: 1px; }
-${brandBarCss()}
 </style>
 </head>
 <body>
   <p class="intro">Turn any part of the toolkit on or off. A feature that is off disappears from the sidebar until you turn it back on here.</p>
   <div class="card" id="list"></div>
-  ${brandBarHtml("panel")}
 
 <script>
   const vscode = acquireVsCodeApi();
@@ -161,7 +155,6 @@ ${brandBarCss()}
       list.appendChild(row);
     });
   }
-${BRAND_CLICK_SCRIPT}
 
   window.addEventListener('message', (e) => {
     if (e.data && e.data.type === 'state') render(e.data.switches);

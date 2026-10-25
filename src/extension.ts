@@ -10,6 +10,7 @@ import { createHtmlOpenFeature } from "./features/html-open/html-open-feature";
 import { SoundsViewProvider } from "./features/sounds/ui/sounds-view-provider";
 import { ColorsViewProvider } from "./features/window-color/ui/colors-view-provider";
 import { ToolkitViewProvider } from "./features/toolkit-panel/ui/toolkit-view-provider";
+import { BrandViewProvider } from "./features/brand/ui/brand-view-provider";
 
 let registry: FeatureRegistry | undefined;
 
@@ -28,6 +29,10 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<void> {
   // feature lifecycle. The Toolkit panel likewise: it is where every feature
   // is turned back on.
   ctx.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      BrandViewProvider.viewType,
+      new BrandViewProvider(),
+    ),
     vscode.window.registerWebviewViewProvider(
       ToolkitViewProvider.viewType,
       new ToolkitViewProvider(),

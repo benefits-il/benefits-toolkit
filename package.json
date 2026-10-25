@@ -2,7 +2,7 @@
   "name": "benefits-toolkit",
   "displayName": "Benefit's Toolkit",
   "description": "Quality-of-life tools for Claude Code: RTL chat, sounds, a conversation manager and viewer, window colors and HTML in your browser. Part of Benefits, the course that teaches you to work right with AI (benefits-il.dev).",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "publisher": "benakiva",
   "author": {
     "name": "Ben Akiva"
@@ -52,6 +52,14 @@
     },
     "views": {
       "benefit-sidebar": [
+        {
+          "type": "webview",
+          "id": "benefit.brandView",
+          "name": "Benefits",
+          "icon": "media/activity-icon.svg",
+          "contextualTitle": "Benefits",
+          "initialSize": 10
+        },
         {
           "id": "benefit.chatsView",
           "name": "Claude Chats",
