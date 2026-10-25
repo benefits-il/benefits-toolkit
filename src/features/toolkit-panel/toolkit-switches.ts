@@ -33,7 +33,24 @@ export const TOOLKIT_SWITCHES: readonly ToolkitSwitch[] = [
   {
     key: "sounds.enabled",
     label: "Sounds",
-    hint: "A sound when Claude finishes or needs you.",
+    hint: "A sound when Claude finishes or needs you. Pick one per project in the Alerts panel.",
+  },
+  {
+    key: "popup.enabled",
+    label: "Popup",
+    hint: "A small window in the project's color; click it to jump back.",
+  },
+  {
+    key: "popup.onDone",
+    label: "When Claude finishes",
+    hint: "Not while you are already in that window.",
+    parent: "popup.enabled",
+  },
+  {
+    key: "popup.onWaiting",
+    label: "When Claude needs you",
+    hint: "Permission prompts, questions, plan approval.",
+    parent: "popup.enabled",
   },
   {
     key: "rtl.enabled",

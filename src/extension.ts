@@ -3,11 +3,11 @@ import { logger } from "./core/logger";
 import { FeatureRegistry } from "./core/feature-registry";
 import { onConfigChanged } from "./core/config-manager";
 import { createRtlFeature } from "./features/rtl/rtl-feature";
-import { createSoundsFeature } from "./features/sounds/sounds-feature";
+import { createAlertsFeature } from "./features/alerts/alerts-feature";
 import { createChatsFeature } from "./features/chats/chats-feature";
 import { createWindowColorFeature } from "./features/window-color/window-color-feature";
 import { createHtmlOpenFeature } from "./features/html-open/html-open-feature";
-import { SoundsViewProvider } from "./features/sounds/ui/sounds-view-provider";
+import { AlertsViewProvider } from "./features/alerts/ui/alerts-view-provider";
 import { ColorsViewProvider } from "./features/window-color/ui/colors-view-provider";
 import { ToolkitViewProvider } from "./features/toolkit-panel/ui/toolkit-view-provider";
 import { BrandViewProvider } from "./features/brand/ui/brand-view-provider";
@@ -19,13 +19,13 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<void> {
 
   registry = new FeatureRegistry(ctx);
   registry.register(createRtlFeature(ctx));
-  registry.register(createSoundsFeature(ctx));
+  registry.register(createAlertsFeature(ctx));
   registry.register(createChatsFeature(ctx));
   registry.register(createWindowColorFeature(ctx));
   registry.register(createHtmlOpenFeature(ctx));
 
-  // The Sounds control panel is always available (even when sounds are off, so
-  // the Enabled switch is reachable), so it lives outside the enabled-gated
+  // The Alerts panel is always available (even when sounds and popup are off, so
+  // its switches are reachable), so it lives outside the enabled-gated
   // feature lifecycle. The Toolkit panel likewise: it is where every feature
   // is turned back on.
   ctx.subscriptions.push(
@@ -38,8 +38,8 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<void> {
       new ToolkitViewProvider(),
     ),
     vscode.window.registerWebviewViewProvider(
-      SoundsViewProvider.viewType,
-      new SoundsViewProvider(ctx),
+      AlertsViewProvider.viewType,
+      new AlertsViewProvider(ctx),
     ),
     vscode.window.registerWebviewViewProvider(
       ColorsViewProvider.viewType,

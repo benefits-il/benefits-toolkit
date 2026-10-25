@@ -8,12 +8,14 @@ Quality-of-life tools for [Claude Code](https://github.com/anthropics/claude-cod
 Five features in one place:
 
 - **RTL** — Right-to-left support in the Claude Code chat (Active / Always / Auto modes), for Hebrew, Arabic, Persian.
-- **Sounds** — Audio notification when Claude finishes a message or asks for your input. Pick any sound from a shared library for each event; reused sounds are flagged so you can keep the two distinct.
+- **Alerts** — Know when Claude is done without watching it:
+  - **Sounds** when Claude finishes a message or asks for your input. Pick any sound from a shared library for each event, as a default for all projects or just for this one, so each window can sound different.
+  - **Popup** (Windows and macOS): a small card in the project's window color and name. Click it to jump straight back to that window. It never shows while you're already in that window.
 - **Chats** — A sidebar list of your past Claude Code conversations. Rename, archive, restore, search, export to Markdown, view inline — with file links in the viewer that open the file right in VS Code, a Copy button on every code block, and an "Open in md-he" button that opens any message at [benefits-il.dev/md-he](https://benefits-il.dev/md-he/) for comfortable reading.
 - **Colors** — Give each VS Code window its own color (title, activity and status bars), so five open projects stop looking identical. Pick from the Colors panel or a custom hex.
 - **HTML Open** — One-click "Open in External Browser" for HTML files: a button in the editor title bar and an Explorer right-click entry. Uses the system default browser, or set `benefit.htmlOpen.browserPath` to force a specific one (e.g. Chrome).
 
-Every feature can be switched off (and back on) from the **Toolkit** panel at the bottom of the sidebar.
+Every feature can be switched off (and back on) from the **Toolkit** panel at the bottom of the sidebar, including the popup and each of its two triggers.
 
 ## Install
 
@@ -31,9 +33,13 @@ After installing, look for the activity bar icon — it opens the **Claude Chats
 
 All settings live under `benefit.*`. Each feature has an `enabled` toggle so you can disable individual features without uninstalling the extension — the **Toolkit** panel shows them all as switches. The two viewer buttons have their own switches: `benefit.chats.codeCopyButtons` and `benefit.chats.mdHeButton`.
 
+## How alerts work
+
+Claude Code's hooks (in `~/.claude/settings.json`) run a small dispatcher script from `~/.benefits-toolkit/bin`. Every open VS Code window keeps a record of its project in `~/.benefits-toolkit/projects`, with its name, window color, its own sounds and whether it's focused right now. The dispatcher uses those records to pick the sound and the popup. Settings are mirrored to `~/.benefits-toolkit/config.json`, so changing a sound never touches `settings.json`. Claude Code reads hooks when a session starts, so a session that was already running picks up a change only after a restart.
+
 ## Status
 
-This is a fresh release built by Ben Akiva. Tested primarily on Windows.
+This is a fresh release built by Ben Akiva. Tested primarily on Windows. On Linux, alerts are sound-only (the default sounds, no popup).
 
 ## Inspired by
 

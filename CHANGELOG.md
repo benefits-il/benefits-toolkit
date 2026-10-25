@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.7.0 — A popup that takes you back, and a sound per project
+
+**A desktop popup when Claude finishes or needs you (Windows and macOS).** A small card in the project's window color and name slides into the corner of the screen. Click it and that project's VS Code window comes to the front; the x just closes it. It never shows while you're already in that window, so it only interrupts when you're elsewhere. Several projects finishing at once stack up to four cards. Hovering pauses the countdown, and Claude Code's one-minute idle reminder gets no popup, since the "finished" one already said it. Switches: `benefit.popup.enabled`, `benefit.popup.onDone`, `benefit.popup.onWaiting`, plus `benefit.popup.seconds` (default 8). The Alerts panel has a **Test popup** button.
+
+**A different sound for each project.** The Sounds panel is now **Alerts**. Its sound lists switch between *All projects* (the default) and *This project*, so five open windows can sound five different ways. A project's own sounds are kept in the extension's storage, not in `.vscode/settings.json`, which you might commit.
+
+*How it works now.* Claude Code's hooks used to play a fixed sound file. They now run a small dispatcher from `~/.benefits-toolkit/bin`, which reads the hook's working folder, finds the project among the records each open window keeps in `~/.benefits-toolkit/projects` (name, color, own sounds, focused or not), then shows the popup and plays the sound. Settings are mirrored to `~/.benefits-toolkit/config.json`, so changing a sound no longer rewrites `~/.claude/settings.json` at all. Folders with Hebrew names work.
+
+*Upgrading with several windows open.* A window still running an older toolkit keeps putting its old hooks back. Instead of fighting it (which would rewrite `settings.json` every second), the new version leaves those hooks in place but silences them, and asks you once to reload that window. Claude Code reads hooks when a session starts: restart running Claude sessions to get the popup.
+
 ## 0.6.1 — Benefits at the top
 
 **The Benefits strip moved to the very top of the sidebar.** It used to sit at the bottom of the Toolkit panel, below everything else; it now has a small view of its own, first in the sidebar, above the chats list. The tagline's long dash became a bold middle dot (·), here, in the viewer, in the README, on the landing page and on md-he.

@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { updateConfig } from "../../../core/config-manager";
-import { SoundAssetManager, SoundSlot } from "./sound-asset-manager";
+import { AlertAssets, SoundSlot } from "./alert-assets";
 import { playPreview } from "./sound-player";
 
 interface SoundItem extends vscode.QuickPickItem {
@@ -19,7 +19,7 @@ const SLOT_CONFIG_KEY: Record<SoundSlot, string> = {
 
 /** QuickPick over the whole bundled sound pool, with per-row preview. */
 export class SoundPicker {
-  constructor(private readonly assets: SoundAssetManager) {}
+  constructor(private readonly assets: AlertAssets) {}
 
   async pickFor(slot: SoundSlot, current: string): Promise<string | undefined> {
     const sounds = await this.assets.listSounds();

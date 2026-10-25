@@ -2,7 +2,7 @@
   "name": "benefits-toolkit",
   "displayName": "Benefit's Toolkit",
   "description": "Quality-of-life tools for Claude Code: RTL chat, sounds, a conversation manager and viewer, window colors and HTML in your browser. Part of Benefits, the course that teaches you to work right with AI (benefits-il.dev).",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "publisher": "benakiva",
   "author": {
     "name": "Ben Akiva"
@@ -70,9 +70,9 @@
         {
           "type": "webview",
           "id": "benefit.soundsView",
-          "name": "Sounds",
+          "name": "Alerts",
           "icon": "media/activity-icon.svg",
-          "contextualTitle": "Sounds"
+          "contextualTitle": "Alerts"
         },
         {
           "type": "webview",
@@ -116,6 +116,7 @@
       { "command": "benefit.sounds.chooseSounds", "title": "Sounds: Choose Sound Variants", "category": "Benefit" },
       { "command": "benefit.sounds.test", "title": "Sounds: Test Playback", "category": "Benefit" },
       { "command": "benefit.sounds.status", "title": "Sounds: Show Status", "category": "Benefit" },
+      { "command": "benefit.popup.test", "title": "Popup: Test", "category": "Benefit" },
 
       { "command": "benefit.windowColor.pick", "title": "Window Color: Pick", "category": "Benefit" },
       { "command": "benefit.windowColor.clear", "title": "Window Color: Clear", "category": "Benefit" },
@@ -288,6 +289,28 @@
           ],
           "default": "notify-default.wav",
           "description": "Sound file (from the bundled pool) to play when Claude needs your input. Pick visually in the Sounds panel."
+        },
+        "benefit.popup.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a small desktop popup, in the project's window color and name, when the agent finishes or needs you. Clicking it brings that project's window to the front. Never shown while that window is already focused."
+        },
+        "benefit.popup.onDone": {
+          "type": "boolean",
+          "default": true,
+          "description": "Pop up when the agent finishes a reply."
+        },
+        "benefit.popup.onWaiting": {
+          "type": "boolean",
+          "default": true,
+          "description": "Pop up when the agent is waiting for you (a permission prompt, a question, plan approval)."
+        },
+        "benefit.popup.seconds": {
+          "type": "number",
+          "default": 8,
+          "minimum": 3,
+          "maximum": 60,
+          "description": "How many seconds the popup stays up. Hovering over it pauses the countdown."
         },
         "benefit.sounds.cleanupOnDeactivate": {
           "type": "boolean",

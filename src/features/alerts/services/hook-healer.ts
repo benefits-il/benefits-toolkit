@@ -5,11 +5,8 @@ import { HookInstaller } from "./hook-installer";
 
 const DEBOUNCE_MS = 800;
 
-/** Provides the currently-selected sound filenames for each slot. */
-export type SoundProvider = () => { stop: string; notification: string };
-
 /**
- * Keeps the managed sound hooks alive in ~/.claude/settings.json.
+ * Keeps the managed alert hooks alive in ~/.claude/settings.json.
  *
  * Those hooks live in a file that Claude Code ALSO owns and rewrites: every time
  * a new permission is approved, Claude Code writes the whole settings.json from
@@ -21,7 +18,7 @@ export type SoundProvider = () => { stop: string; notification: string };
  * forever — which is exactly why "it never breaks on my other computer".)
  *
  * This watcher re-applies the hooks idempotently, debounced, within ~1s of any
- * external change to settings.json, so sounds keep working no matter who
+ * external change to settings.json, so alerts keep working no matter who
  * rewrites the file. ensureInstalled() only writes when something is actually
  * missing or stale, so re-applying after our own write is a cheap read-only
  * no-op and never loops.
@@ -34,10 +31,7 @@ export class HookHealer implements vscode.Disposable {
   private active = true;
   private disposed = false;
 
-  constructor(
-    private readonly installer: HookInstaller,
-    private readonly sounds: SoundProvider,
-  ) {}
+  constructor(private readonly installer: HookInstaller) {}
 
   /** Heal once now, then watch settings.json and heal on every change. */
   async start(): Promise<void> {
@@ -48,7 +42,7 @@ export class HookHealer implements vscode.Disposable {
       this.watcher.onDidChange(() => this.schedule());
       this.watcher.onDidCreate(() => this.schedule());
     } catch (err) {
-      logger.warn("sounds", "Could not watch settings.json for hook healing", err);
+      logger.warn("alerts", "Could not watch settings.json for hook healing", err);
     }
   }
 
@@ -78,16 +72,15 @@ export class HookHealer implements vscode.Disposable {
     }
     this.running = true;
     try {
-      const v = this.sounds();
-      const changed = await this.installer.ensureInstalled(v.stop, v.notification);
+      const changed = await this.installer.ensureInstalled();
       if (changed) {
-        logger.info("sounds", `Sound hooks re-applied after settings.json change (${source}).`);
+        logger.info("alerts", `Alert hooks re-applied after settings.json change (${source}).`);
       }
     } catch (err) {
       // settings.json may be momentarily missing / half-written / invalid JSON
       // (Claude Code mid-write). readJsonObject refuses to clobber and throws;
       // we just wait for the next change event and retry.
-      logger.warn("sounds", `Hook heal skipped (${source})`, err);
+      logger.warn("alerts", `Hook heal skipped (${source})`, err);
     } finally {
       this.running = false;
       if (this.rerun) {

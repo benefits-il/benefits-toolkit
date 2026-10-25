@@ -23,6 +23,15 @@ export interface BenefitConfig {
     notificationSound: string;
     cleanupOnDeactivate: boolean;
   };
+  popup: {
+    enabled: boolean;
+    /** Pop up when the agent finishes a reply. */
+    onDone: boolean;
+    /** Pop up when the agent is waiting for you (permission, question). */
+    onWaiting: boolean;
+    /** How long the popup stays up (hovering pauses the countdown). */
+    seconds: number;
+  };
   chats: {
     enabled: boolean;
     scope: ChatsScope;
@@ -70,6 +79,12 @@ export function readConfig(): BenefitConfig {
       stopSound: readWith("sounds.stopSound", "stop-default.wav"),
       notificationSound: readWith("sounds.notificationSound", "notify-default.wav"),
       cleanupOnDeactivate: readWith("sounds.cleanupOnDeactivate", false),
+    },
+    popup: {
+      enabled: readWith("popup.enabled", true),
+      onDone: readWith("popup.onDone", true),
+      onWaiting: readWith("popup.onWaiting", true),
+      seconds: readWith("popup.seconds", 8),
     },
     chats: {
       enabled: readWith("chats.enabled", true),

@@ -30,7 +30,8 @@ async function copyAssets() {
   await mkdir(distAssets, { recursive: true });
 
   const featureAssets = [
-    ["features/sounds/assets", "sounds"],
+    ["features/alerts/assets/sounds", "sounds"],
+    ["features/alerts/assets/scripts", "alerts"],
     ["features/rtl/assets", "rtl"],
     ["features/chats/assets", "chats"],
   ];
