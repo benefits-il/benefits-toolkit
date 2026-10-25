@@ -7,7 +7,10 @@ import { ConversationRepository } from "../services/conversation-repository";
 import { atomicWriteText, ensureDir } from "../../../shared/fs-utils";
 import { extractBlocks, formatModelName, readLastUsage } from "../domain/blocks";
 import { isWebLink, parseFileLink, resolveCandidates, safeDecode } from "../services/link-resolver";
+import { openInMdHe } from "../services/md-he-launcher";
 import { logger } from "../../../core/logger";
+import { readConfig } from "../../../core/config-manager";
+import { brandBarCss, brandBarHtml } from "../../../shared/brand-bar";
 
 const VIEW_TYPE = "benefit.chatViewer";
 
@@ -41,6 +44,34 @@ md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
   token.attrSet("data-raw", raw);
   return defaultLinkOpen(tokens, idx, options, env, self);
 };
+
+// Every code block gets its own Copy button. It sits in a wrapper next to the
+// <pre> (not inside it) so it stays in the corner while the code scrolls
+// sideways; the click handler copies the <code> text, i.e. the raw block.
+const COPY_CODE_BUTTON =
+  '<button class="copy-button code-copy" type="button" data-action="copy-code" title="Copy code"><svg><use href="#icon-copy"/></svg></button>';
+for (const rule of ["fence", "code_block"] as const) {
+  const defaultRule =
+    md.renderer.rules[rule] ??
+    ((tokens, idx, options, _env, self) => self.renderToken(tokens, idx, options));
+  md.renderer.rules[rule] = (tokens, idx, options, env, self) =>
+    `<div class="code-wrap">${defaultRule(tokens, idx, options, env, self)}${COPY_CODE_BUTTON}</div>`;
+}
+
+/** Viewer buttons that can be switched off (benefit.chats.*). */
+interface ViewerFlags {
+  codeCopy: boolean;
+  mdHe: boolean;
+}
+
+function readViewerFlags(): ViewerFlags {
+  const cfg = readConfig().chats;
+  return { codeCopy: cfg.codeCopyButtons, mdHe: cfg.mdHeButton };
+}
+
+function bodyClassFor(flags: ViewerFlags): string {
+  return [flags.codeCopy ? "" : "no-code-copy", flags.mdHe ? "" : "no-mdhe"].filter(Boolean).join(" ");
+}
 
 export class ChatViewerService {
   private readonly panels = new Map<string, vscode.WebviewPanel>();
@@ -87,6 +118,9 @@ export class ChatViewerService {
       if (message?.command === "openLink" && typeof message.href === "string") {
         await this.handleOpenLink(panel, this.latestMeta.get(meta.filePath) ?? meta, message.href);
       }
+      if (message?.command === "openInMdHe" && typeof message.content === "string") {
+        await this.handleOpenInMdHe(panel, message.content);
+      }
     });
 
     await this.renderInto(panel, meta);
@@ -101,6 +135,14 @@ export class ChatViewerService {
   closeAll(): void {
     for (const p of this.panels.values()) p.dispose();
     this.panels.clear();
+  }
+
+  /** Push the current button switches to every open viewer, without a re-render. */
+  applyFlags(): void {
+    const flags = readViewerFlags();
+    for (const p of this.panels.values()) {
+      void p.webview.postMessage({ command: "flags", ...flags });
+    }
   }
 
   private async renderInto(panel: vscode.WebviewPanel, meta: ConversationMeta): Promise<void> {
@@ -190,6 +232,19 @@ export class ChatViewerService {
     await vscode.env.clipboard.writeText(href);
     void panel.webview.postMessage({ command: "showToast", text: "Path copied" });
   }
+
+  private async handleOpenInMdHe(panel: vscode.WebviewPanel, content: string): Promise<void> {
+    try {
+      const result = await openInMdHe(content);
+      const text = result === "clipboard"
+        ? "Message copied — press Paste in md-he"
+        : "Opening in md-he…";
+      void panel.webview.postMessage({ command: "showToast", text });
+    } catch (err) {
+      logger.error("chats", "openInMdHe failed", err);
+      vscode.window.showErrorMessage(`Benefit: opening in md-he failed — ${(err as Error).message}`);
+    }
+  }
 }
 
 interface ConversationStats {
@@ -213,20 +268,23 @@ function buildHtml(meta: ConversationMeta, records: RawJsonlRecord[]): string {
     .map((m, idx) => renderMessage(m, idx === 0))
     .join("\n");
 
+  // Function replacers throughout: a plain replacement string treats "$&",
+  // "$'" etc. as patterns, which mangled any message containing them.
   return TEMPLATE
     // {{TITLE}} appears twice (document <title> + visible header), so replace ALL.
-    .replaceAll("{{TITLE}}", escapeHtml(meta.title))
-    .replace("{{CTX_TOOLTIP}}", escapeHtml(stats.ctxTooltip))
-    .replace("{{CTX_WARN_HTML}}", stats.isEstimate
+    .replaceAll("{{TITLE}}", () => escapeHtml(meta.title))
+    .replace("{{BODY_CLASS}}", () => bodyClassFor(readViewerFlags()))
+    .replace("{{CTX_TOOLTIP}}", () => escapeHtml(stats.ctxTooltip))
+    .replace("{{CTX_WARN_HTML}}", () => stats.isEstimate
       ? '<span class="ctx-warn" title="No usage data in JSONL — showing rough chars/4 estimate">⚠</span>'
       : "")
-    .replace("{{CTX_TEXT}}", escapeHtml(stats.ctxText))
-    .replace("{{TIER_CLASS}}", stats.tierClass)
-    .replace("{{PCT}}", String(stats.pct))
-    .replace("{{MARKER_HTML}}", stats.windowSize === 1_000_000
+    .replace("{{CTX_TEXT}}", () => escapeHtml(stats.ctxText))
+    .replace("{{TIER_CLASS}}", () => stats.tierClass)
+    .replace("{{PCT}}", () => String(stats.pct))
+    .replace("{{MARKER_HTML}}", () => stats.windowSize === 1_000_000
       ? `<div class="context-bar-200k" style="left:${stats.marker200kPct}%" title="200K boundary"></div>`
       : "")
-    .replace("{{MESSAGES_HTML}}", messagesHtml || '<div class="empty-state">No messages in this conversation</div>');
+    .replace("{{MESSAGES_HTML}}", () => messagesHtml || '<div class="empty-state">No messages in this conversation</div>');
 }
 
 function isRealMessage(record: RawJsonlRecord): boolean {
@@ -329,11 +387,13 @@ function renderMessage(message: MessageRecord, expanded: boolean): string {
         <span class="chevron"></span>
         <span class="message-role ${role}">${escapeHtml(roleLabel)}</span>
         <span class="message-preview">${escapeHtml(previewText)}</span>
+        <button class="copy-button copy-collapsed mdhe-button" onclick="event.stopPropagation(); openInMdHe(this);" title="Open in md-he"><svg><use href="#icon-markdown"/></svg></button>
         <button class="copy-button copy-collapsed" onclick="event.stopPropagation(); copyMessage(this);" title="Copy message"><svg><use href="#icon-copy"/></svg></button>
       </div>
       <div class="message-content">
         <div class="message-text">${bodyHtml}</div>
         <div class="message-actions">
+          <button class="copy-button copy-expanded mdhe-button" onclick="openInMdHe(this)" title="Open in md-he"><svg><use href="#icon-markdown"/></svg></button>
           <button class="copy-button copy-expanded" onclick="copyMessage(this)" title="Copy message"><svg><use href="#icon-copy"/></svg></button>
         </div>
       </div>
@@ -486,6 +546,7 @@ const TEMPLATE = `<!DOCTYPE html>
     .message-actions {
       display: flex;
       justify-content: flex-end;
+      gap: 6px;
       margin-top: 12px;
       padding-top: 8px;
       border-top: 1px solid var(--vscode-editorWidget-border);
@@ -548,6 +609,10 @@ const TEMPLATE = `<!DOCTYPE html>
       color: var(--vscode-editor-background);
       border-color: var(--vscode-notebookStatusSuccessIcon-foreground);
     }
+    /* Only the first trailing header button takes the auto margin, so the
+       md-he and copy buttons stay together at the end of the row. */
+    .copy-button.copy-collapsed + .copy-button.copy-collapsed { margin-inline-start: 0; }
+    body.no-mdhe .mdhe-button { display: none; }
 
     .header-actions { display: flex; gap: 4px; flex-shrink: 0; align-items: center; }
 
@@ -783,6 +848,21 @@ const TEMPLATE = `<!DOCTYPE html>
       font-size: 0.9em;
       white-space: pre;
     }
+    .code-wrap { position: relative; margin: 0 0 12px; }
+    .content-block-text .code-wrap > pre { margin: 0; }
+    /* Physical right: the code itself is always LTR, so the corner is too. */
+    .code-copy {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      padding: 3px 6px;
+      opacity: 0;
+      transition: opacity 0.15s ease, background-color 0.15s ease;
+    }
+    .code-wrap:hover .code-copy,
+    .code-copy:focus-visible,
+    .code-copy.copied { opacity: 1; }
+    body.no-code-copy .code-copy { display: none; }
     .content-block-text a { color: var(--vscode-textLink-foreground); cursor: pointer; word-break: break-all; }
     .content-block-text a:hover { color: var(--vscode-textLink-activeForeground); }
     .toast {
@@ -843,9 +923,10 @@ const TEMPLATE = `<!DOCTYPE html>
     }
 
     .empty-state { text-align: center; padding: 48px 24px; color: var(--vscode-descriptionForeground); }
+${brandBarCss()}
   </style>
 </head>
-<body>
+<body class="{{BODY_CLASS}}">
   <svg style="display:none" aria-hidden="true">
     <symbol id="icon-copy" viewBox="0 0 24 24"><path d="M8 8m0 2a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2z"/><path d="M16 8v-2a2 2 0 0 0 -2 -2h-8a2 2 0 0 0 -2 2v8a2 2 0 0 0 2 2h2"/></symbol>
     <symbol id="icon-check" viewBox="0 0 24 24"><path d="M5 12l5 5l10 -10"/></symbol>
@@ -858,7 +939,10 @@ const TEMPLATE = `<!DOCTYPE html>
     <symbol id="icon-arrow-down" viewBox="0 0 24 24"><path d="M12 5l0 14"/><path d="M18 13l-6 6"/><path d="M6 13l6 6"/></symbol>
     <symbol id="icon-book" viewBox="0 0 24 24"><path d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0"/><path d="M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0"/><path d="M3 6l0 13"/><path d="M12 6l0 13"/><path d="M21 6l0 13"/></symbol>
     <symbol id="icon-brain" viewBox="0 0 24 24"><path d="M15.5 13a3.5 3.5 0 0 0 -3.5 3.5v1a3.5 3.5 0 0 0 7 0v-1.8"/><path d="M8.5 13a3.5 3.5 0 0 1 3.5 3.5v1a3.5 3.5 0 0 1 -7 0v-1.8"/><path d="M17.5 16a3.5 3.5 0 0 0 0 -7h-.5"/><path d="M19 9.3v-2.8a3.5 3.5 0 0 0 -7 0"/><path d="M6.5 16a3.5 3.5 0 0 1 0 -7h.5"/><path d="M5 9.3v-2.8a3.5 3.5 0 0 1 7 0v10"/></symbol>
+    <symbol id="icon-markdown" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"/><path d="M7 15v-6l2 2l2 -2v6"/><path d="M14 13l2 2l2 -2m-2 2v-6"/></symbol>
   </svg>
+
+  ${brandBarHtml("viewer")}
 
   <div class="header">
     <div class="header-title">
@@ -999,9 +1083,31 @@ const TEMPLATE = `<!DOCTYPE html>
       vscode.postMessage({ command: 'openLink', href: a.getAttribute('data-raw') || a.getAttribute('href') });
     });
 
+    // The Benefits brand bar links go out through the same host route.
+    document.addEventListener('click', function (e) {
+      const a = e.target && e.target.closest ? e.target.closest('a[data-brand-link]') : null;
+      if (!a) return;
+      e.preventDefault();
+      vscode.postMessage({ command: 'openLink', href: a.getAttribute('href') });
+    });
+
+    // Per-code-block Copy: copies the raw code, without markdown-it's trailing newline.
+    document.addEventListener('click', function (e) {
+      const btn = e.target && e.target.closest ? e.target.closest('[data-action="copy-code"]') : null;
+      if (!btn) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const code = btn.parentElement ? btn.parentElement.querySelector('pre code, pre') : null;
+      flashCopy(btn, code ? code.textContent.replace(/\\n$/, '') : '');
+    });
+
     window.addEventListener('message', function (ev) {
       const m = ev.data;
       if (m && m.command === 'showToast') showToast(m.text);
+      if (m && m.command === 'flags') {
+        document.body.classList.toggle('no-code-copy', !m.codeCopy);
+        document.body.classList.toggle('no-mdhe', !m.mdHe);
+      }
     });
 
     let toastTimer;
@@ -1094,6 +1200,27 @@ const TEMPLATE = `<!DOCTYPE html>
           text = fallbackEl ? fallbackEl.textContent : '';
         }
       }
+      flashCopy(btn, text);
+    }
+
+    // md-he gets the message's markdown only — thinking and tool output are
+    // working notes, not something you open to read comfortably.
+    function openInMdHe(btn) {
+      const messageEl = btn.closest('.message');
+      if (!messageEl) return;
+      const text = collectVisibleBlockTexts(messageEl)
+        .filter(function (p) { return p.kind === 'text'; })
+        .map(function (p) { return p.text; })
+        .join('\\n\\n')
+        .trim();
+      if (!text) {
+        showToast('No text in this message to open');
+        return;
+      }
+      vscode.postMessage({ command: 'openInMdHe', content: text });
+    }
+
+    function flashCopy(btn, text) {
       const originalHtml = btn.innerHTML;
       navigator.clipboard.writeText(text).then(function () {
         btn.innerHTML = '<svg><use href="#icon-check"/></svg>';

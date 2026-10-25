@@ -1,8 +1,8 @@
 {
   "name": "benefits-toolkit",
   "displayName": "Benefit's Toolkit",
-  "description": "Quality-of-life tools for Claude Code: RTL chat support, audio notifications, and conversation manager — all in one place.",
-  "version": "0.5.1",
+  "description": "Quality-of-life tools for Claude Code: RTL chat, sounds, a conversation manager and viewer, window colors and HTML in your browser. Part of Benefits, the course that teaches you to work right with AI (benefits-il.dev).",
+  "version": "0.6.0",
   "publisher": "benakiva",
   "author": {
     "name": "Ben Akiva"
@@ -32,6 +32,10 @@
     "sounds"
   ],
   "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#022C22",
+    "theme": "dark"
+  },
   "main": "./dist/extension.js",
   "activationEvents": [
     "onStartupFinished"
@@ -52,7 +56,8 @@
           "id": "benefit.chatsView",
           "name": "Claude Chats",
           "icon": "media/activity-icon.svg",
-          "contextualTitle": "Claude Chats"
+          "contextualTitle": "Claude Chats",
+          "when": "config.benefit.chats.enabled"
         },
         {
           "type": "webview",
@@ -66,7 +71,15 @@
           "id": "benefit.colorsView",
           "name": "Colors",
           "icon": "media/activity-icon.svg",
-          "contextualTitle": "Colors"
+          "contextualTitle": "Colors",
+          "when": "config.benefit.windowColor.enabled"
+        },
+        {
+          "type": "webview",
+          "id": "benefit.toolkitView",
+          "name": "Toolkit",
+          "icon": "media/activity-icon.svg",
+          "contextualTitle": "Toolkit"
         }
       ]
     },
@@ -121,14 +134,14 @@
       "editor/title": [
         {
           "command": "benefit.html.openInBrowser",
-          "when": "resourceExtname == .html || resourceExtname == .htm",
+          "when": "config.benefit.htmlOpen.enabled && (resourceExtname == .html || resourceExtname == .htm)",
           "group": "navigation@1"
         }
       ],
       "explorer/context": [
         {
           "command": "benefit.html.openInBrowser",
-          "when": "resourceExtname == .html || resourceExtname == .htm",
+          "when": "config.benefit.htmlOpen.enabled && (resourceExtname == .html || resourceExtname == .htm)",
           "group": "navigation@10"
         }
       ],
@@ -319,6 +332,16 @@
           "type": "boolean",
           "default": true,
           "description": "Show a status bar shortcut to rename the active conversation."
+        },
+        "benefit.chats.codeCopyButtons": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a Copy button on every code block in the conversation viewer."
+        },
+        "benefit.chats.mdHeButton": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show an \"Open in md-he\" button on every message in the conversation viewer (opens the message at benefits-il.dev/md-he for comfortable reading)."
         },
         "benefit.windowColor.enabled": {
           "type": "boolean",

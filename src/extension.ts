@@ -9,6 +9,7 @@ import { createWindowColorFeature } from "./features/window-color/window-color-f
 import { createHtmlOpenFeature } from "./features/html-open/html-open-feature";
 import { SoundsViewProvider } from "./features/sounds/ui/sounds-view-provider";
 import { ColorsViewProvider } from "./features/window-color/ui/colors-view-provider";
+import { ToolkitViewProvider } from "./features/toolkit-panel/ui/toolkit-view-provider";
 
 let registry: FeatureRegistry | undefined;
 
@@ -24,8 +25,13 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<void> {
 
   // The Sounds control panel is always available (even when sounds are off, so
   // the Enabled switch is reachable), so it lives outside the enabled-gated
-  // feature lifecycle.
+  // feature lifecycle. The Toolkit panel likewise: it is where every feature
+  // is turned back on.
   ctx.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      ToolkitViewProvider.viewType,
+      new ToolkitViewProvider(),
+    ),
     vscode.window.registerWebviewViewProvider(
       SoundsViewProvider.viewType,
       new SoundsViewProvider(ctx),

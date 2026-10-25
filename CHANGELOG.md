@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.0 — Copy code, read in md-he, switch anything off
+
+**A Copy button on every code block in the conversation viewer.** Claude Code's own chat has one; our viewer didn't, so copying a snippet meant dragging a selection across a scrolling block. Hover any code block (fenced or indented) and a Copy button appears in its corner; it copies the raw code, exactly as Claude wrote it. Switch: `benefit.chats.codeCopyButtons`.
+
+**"Open in md-he" on every message.** A new button next to Copy opens the message's markdown at [benefits-il.dev/md-he](https://benefits-il.dev/md-he/), the Hebrew-first Markdown reader, for comfortable reading. The message travels compressed in the URL's `#` fragment, so it never reaches a server, and it goes through a tiny local redirect page so long messages don't hit the OS shell's URL length limit. Only the message's text goes over; thinking and tool output stay behind. A message too large even for that is copied to the clipboard and md-he opens ready for Paste. Respects `benefit.htmlOpen.browserPath`. Switch: `benefit.chats.mdHeButton`.
+
+**The Toolkit panel: every feature has an off switch you can see.** A new panel at the bottom of the sidebar lists every feature (and the two viewer buttons) as a switch. A feature that is off now disappears from the UI instead of half-working: the Chats list and the Colors panel hide, and the "Open in External Browser" button leaves `.html` files. Turn it back on from the same panel.
+
+**Part of Benefits.** The conversation viewer and the Toolkit panel carry the Benefits brand bar (the same one as md-he), linking to the course at [benefits-il.dev](https://benefits-il.dev/). The README, the Marketplace description and the landing page say so too.
+
+*Fixed: messages containing `$&` or `$'` rendered wrong in the viewer.* The page was assembled with `String.replace` and a plain replacement string, where `$&` and friends are substitution patterns, so a message mentioning them came out mangled. Every placeholder now uses a function replacer.
+
 ## 0.5.1 — Open HTML files in your real browser
 
 **One click from an HTML file to Chrome.** A fifth feature. VS Code's built-in preview opens HTML in the integrated Simple Browser — a cramped iframe when what you usually want is your actual browser with its devtools. Every `.html`/`.htm` file now gets an "Open in External Browser" button in the editor title bar and an entry in the Explorer right-click menu. By default the file opens in the system default browser; set `benefit.htmlOpen.browserPath` to a browser executable (e.g. `chrome.exe`) to force a specific one — the file is handed over as a `file://` URL, so paths with spaces and relative assets (CSS/JS/images next to the file) just work. A wrong `browserPath` produces a clear error naming the setting instead of failing silently. Gated by `benefit.htmlOpen.enabled` like every other feature. Also available as a command: `Benefit: Open in External Browser`.

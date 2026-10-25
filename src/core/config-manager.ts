@@ -32,6 +32,10 @@ export interface BenefitConfig {
     hideEmpty: boolean;
     confirmDelete: boolean;
     showStatusBarRename: boolean;
+    /** Copy button on every code block in the conversation viewer. */
+    codeCopyButtons: boolean;
+    /** Per-message "Open in md-he" button in the conversation viewer. */
+    mdHeButton: boolean;
   };
   windowColor: {
     enabled: boolean;
@@ -76,6 +80,8 @@ export function readConfig(): BenefitConfig {
       hideEmpty: readWith("chats.hideEmpty", true),
       confirmDelete: readWith("chats.confirmDelete", true),
       showStatusBarRename: readWith("chats.showStatusBarRename", true),
+      codeCopyButtons: readWith("chats.codeCopyButtons", true),
+      mdHeButton: readWith("chats.mdHeButton", true),
     },
     windowColor: {
       enabled: readWith("windowColor.enabled", true),
@@ -85,6 +91,11 @@ export function readConfig(): BenefitConfig {
       browserPath: readWith("htmlOpen.browserPath", ""),
     },
   };
+}
+
+/** Read any boolean benefit.* setting by key, e.g. "chats.enabled". */
+export function readFlag(key: string, fallback = true): boolean {
+  return readWith(key, fallback);
 }
 
 export async function updateConfig(key: string, value: unknown, target = vscode.ConfigurationTarget.Global): Promise<void> {

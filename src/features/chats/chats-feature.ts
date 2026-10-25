@@ -76,6 +76,9 @@ export function createChatsFeature(ctx: vscode.ExtensionContext): Feature {
           if (affects(e, "chats.scope")) {
             void syncScopeContext();
           }
+          if (affects(e, "chats.codeCopyButtons") || affects(e, "chats.mdHeButton")) {
+            viewer?.applyFlags();
+          }
           if (
             affects(e, "chats.scope") ||
             affects(e, "chats.groupBy") ||
