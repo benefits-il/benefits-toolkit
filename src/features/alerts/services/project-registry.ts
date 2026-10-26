@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type { ResolvedTheme } from "../../../shared/theme-resolve";
 
 /**
  * What the alert dispatcher knows about an open project. Each editor window
@@ -12,6 +13,13 @@ export interface ProjectRecord {
   name: string;
   /** Window color (#rrggbb) from the Colors feature, if one is set. */
   color: string | null;
+  /**
+   * A readable text color on `color` (foregroundFor), worked out once here so
+   * the popup draws exactly what the title bar does. Missing in older records.
+   */
+  colorText?: string | null;
+  /** The toolkit's theme in that window (Appearance resolved); the popup's card follows it. */
+  theme?: ResolvedTheme;
   /** Per-project sound overrides (pool filenames); missing = global default. */
   sounds: { done?: string; waiting?: string };
   /** The editor's command-line launcher; "<cli> <folder>" focuses the window. */

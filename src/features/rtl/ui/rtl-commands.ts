@@ -3,7 +3,7 @@ import { RtlMode, readConfig } from "../../../core/config-manager";
 import { logger } from "../../../core/logger";
 import { ClaudeAssetLocator } from "../services/claude-asset-locator";
 import { RtlAssetPatcher } from "../services/css-injector";
-import { describeMode, setMode } from "../services/rtl-mode-state";
+import { describeMode, setMode, switchRtlOff, switchRtlOn } from "../services/rtl-mode-state";
 
 interface Deps {
   locator: ClaudeAssetLocator;
@@ -15,16 +15,22 @@ export function registerRtlCommands(ctx: vscode.ExtensionContext, deps: Deps): v
   const disposables: vscode.Disposable[] = [];
 
   async function setAndReconcile(mode: RtlMode): Promise<void> {
-    await setMode(mode);
+    if (mode === "off") await switchRtlOff(ctx.globalState);
+    else await setMode(mode, ctx.globalState);
     await deps.reconcile();
-    vscode.window.showInformationMessage(`Benefit: RTL ${describeMode(mode)}.`);
+    vscode.window.showInformationMessage(`Benefit: RTL ${describeMode(readConfig().rtl.mode)}.`);
   }
 
   disposables.push(
+    // Off, or back to the mode used last (the manual toggle the first time).
     vscode.commands.registerCommand("benefit.rtl.toggle", async () => {
-      const current = readConfig().rtl.mode;
-      const next: RtlMode = current === "off" ? "always" : "off";
-      await setAndReconcile(next);
+      if (readConfig().rtl.mode === "off") {
+        await switchRtlOn(ctx.globalState);
+        await deps.reconcile();
+        vscode.window.showInformationMessage(`Benefit: RTL ${describeMode(readConfig().rtl.mode)}.`);
+      } else {
+        await setAndReconcile("off");
+      }
     }),
 
     vscode.commands.registerCommand("benefit.rtl.enableActive", () => setAndReconcile("active")),
@@ -37,7 +43,7 @@ export function registerRtlCommands(ctx: vscode.ExtensionContext, deps: Deps): v
       const assets = await deps.locator.locate();
       if (!assets) {
         vscode.window.showWarningMessage("Benefit RTL: could not locate Claude Code installation.");
-        logger.warn("rtl", "Status check failed — Claude Code not found.");
+        logger.warn("rtl", "Status check failed: Claude Code not found.");
         return;
       }
       const applied = await deps.patcher.isApplied(assets);

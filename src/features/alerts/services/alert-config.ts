@@ -7,7 +7,8 @@ import type { BenefitConfig } from "../../../core/config-manager";
 export interface AlertConfigFile {
   version: 1;
   sounds: { enabled: boolean; done: string; waiting: string };
-  popup: { enabled: boolean; onDone: boolean; onWaiting: boolean; seconds: number };
+  /** stay: up until clicked. Dispatchers from before it read it as false. */
+  popup: { enabled: boolean; onDone: boolean; onWaiting: boolean; seconds: number; stay: boolean };
 }
 
 export const POPUP_SECONDS_MIN = 3;
@@ -27,6 +28,7 @@ export function buildAlertConfig(cfg: Pick<BenefitConfig, "sounds" | "popup">): 
       onDone: cfg.popup.onDone,
       onWaiting: cfg.popup.onWaiting,
       seconds: Math.min(POPUP_SECONDS_MAX, Math.max(POPUP_SECONDS_MIN, Math.round(seconds))),
+      stay: cfg.popup.stayUntilClicked === true,
     },
   };
 }

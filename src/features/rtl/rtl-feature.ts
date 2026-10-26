@@ -37,7 +37,7 @@ export function createRtlFeature(ctx: vscode.ExtensionContext): Feature {
     const assets = await locator.locate();
 
     if (!assets) {
-      logger.warn("rtl", "Claude Code not found — skipping RTL patch.");
+      logger.warn("rtl", "Claude Code not found; skipping the RTL patch.");
       statusBar?.render(cfg.mode, false);
       return;
     }

@@ -11,14 +11,11 @@ export class RtlStatusBar implements vscode.Disposable {
   }
 
   render(mode: RtlMode, applied: boolean): void {
-    const icon = applied ? "$(arrow-swap)" : "$(arrow-right)";
-    this.item.text = `${icon} RTL`;
+    // On is a normal state, not a warning: no colored background.
+    this.item.text = `${applied ? "$(arrow-swap)" : "$(arrow-right)"} RTL`;
     this.item.tooltip = applied
-      ? `Benefit RTL: ${describeMode(mode)} (click to disable). Close & reopen Claude Code chat to refresh.`
-      : `Benefit RTL: off (click to enable). Close & reopen Claude Code chat to apply.`;
-    this.item.backgroundColor = applied
-      ? new vscode.ThemeColor("statusBarItem.warningBackground")
-      : undefined;
+      ? `Benefit RTL: ${describeMode(mode)}. Click to turn it off. Reopen the Claude Code chat to apply.`
+      : "Benefit RTL: off. Click to turn it on. Reopen the Claude Code chat to apply.";
     this.item.show();
   }
 

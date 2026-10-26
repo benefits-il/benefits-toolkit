@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { isThemePreference, ThemePreference } from "../shared/theme-resolve";
 
 const ROOT_SECTION = "benefit";
 
@@ -8,6 +9,10 @@ export type ChatsSortOrder = "newest" | "oldest";
 export type ChatsScope = "currentWorkspace" | "all";
 
 export interface BenefitConfig {
+  appearance: {
+    /** Auto follows the editor; high contrast in the editor always wins. */
+    theme: ThemePreference;
+  };
   rtl: {
     enabled: boolean;
     mode: RtlMode;
@@ -22,6 +27,8 @@ export interface BenefitConfig {
     /** Filename (within the bundled sound pool) to play when Claude needs you. */
     notificationSound: string;
     cleanupOnDeactivate: boolean;
+    /** A new project gets a "finished" sound no other project uses. */
+    autoAssign: boolean;
   };
   popup: {
     enabled: boolean;
@@ -31,6 +38,8 @@ export interface BenefitConfig {
     onWaiting: boolean;
     /** How long the popup stays up (hovering pauses the countdown). */
     seconds: number;
+    /** Keep the popup up until it is clicked or closed; `seconds` is not used then. */
+    stayUntilClicked: boolean;
   };
   chats: {
     enabled: boolean;
@@ -48,11 +57,15 @@ export interface BenefitConfig {
   };
   windowColor: {
     enabled: boolean;
+    /** A new project gets a window color no other project uses. */
+    autoAssign: boolean;
   };
   htmlOpen: {
     enabled: boolean;
     /** Full path to a browser executable; empty = system default browser. */
     browserPath: string;
+    /** The Benefits button that opens a Markdown file in md-he. */
+    mdHe: boolean;
   };
 }
 
@@ -66,7 +79,11 @@ function readWith<T>(key: string, fallback: T): T {
 }
 
 export function readConfig(): BenefitConfig {
+  const theme = readWith<unknown>("appearance.theme", "auto");
   return {
+    appearance: {
+      theme: isThemePreference(theme) ? theme : "auto",
+    },
     rtl: {
       enabled: readWith("rtl.enabled", true),
       mode: readWith<RtlMode>("rtl.mode", "active"),
@@ -79,12 +96,14 @@ export function readConfig(): BenefitConfig {
       stopSound: readWith("sounds.stopSound", "stop-default.wav"),
       notificationSound: readWith("sounds.notificationSound", "notify-default.wav"),
       cleanupOnDeactivate: readWith("sounds.cleanupOnDeactivate", false),
+      autoAssign: readWith("sounds.autoAssign", true),
     },
     popup: {
       enabled: readWith("popup.enabled", true),
       onDone: readWith("popup.onDone", true),
       onWaiting: readWith("popup.onWaiting", true),
       seconds: readWith("popup.seconds", 8),
+      stayUntilClicked: readWith("popup.stayUntilClicked", false),
     },
     chats: {
       enabled: readWith("chats.enabled", true),
@@ -100,10 +119,12 @@ export function readConfig(): BenefitConfig {
     },
     windowColor: {
       enabled: readWith("windowColor.enabled", true),
+      autoAssign: readWith("windowColor.autoAssign", true),
     },
     htmlOpen: {
       enabled: readWith("htmlOpen.enabled", true),
       browserPath: readWith("htmlOpen.browserPath", ""),
+      mdHe: readWith("htmlOpen.mdHe", true),
     },
   };
 }

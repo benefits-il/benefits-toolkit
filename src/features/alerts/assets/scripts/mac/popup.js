@@ -1,30 +1,55 @@
 // Benefit's Toolkit popup (macOS, JavaScript for Automation + Cocoa).
 // Started detached by dispatch.js (or by the extension's "Test popup") with
-// the path of a JSON job file: { title, subtitle, color, cli, folder, seconds }
-// A small non-activating panel in the project's color, top-right under the
-// menu bar, stacked under popups already showing. It never takes focus by
-// itself; clicking it runs "<cli> <folder>", which brings that project's
-// editor window to the front. The x in the corner just closes it.
+// the path of a JSON job file:
+//   { title, subtitle, kind, color, text, theme, cli, folder, seconds, stay }
+// A small non-activating panel in the toolkit's theme, top-right under the
+// menu bar, stacked under popups already showing: a tile in the project's
+// color with a check (finished) or "!" (needs input), the project name, and
+// the status, framed in the project's color. It never takes focus by itself;
+// clicking it runs "<cli> <folder>", which brings that project's editor
+// window to the front. The x in the corner just closes it. With "stay" it
+// waits for one of the two.
 //
 // Written to run unchanged on Intel and Apple Silicon Macs, which disagree on
 // several low-level values: BOOL is a char on Intel and a bool on Apple
 // Silicon (so no ObjC.registerSubclass with BOOL methods: a type mismatch
-// throws before anything shows), NSTextAlignmentRight is 1 on one and 2 on
-// the other, and NSEventMaskAny (2^64-1) does not survive a JS number.
+// throws before anything shows), the right and center text alignments have
+// different numbers on each (so labels are placed by measuring, never by
+// alignment), and NSEventMaskAny (2^64-1) does not survive a JS number.
 // Clicks are therefore read straight off the event queue.
 // Failures are appended to state/dispatch.log, tagged [popup] as on Windows.
 ObjC.import('Cocoa');
 
-const W = 320;
+const W = 300;
 const H = 64;
 const GAP = 10;
 const EDGE = 12;
+const TILE = 34;
 const LEFT_MOUSE_DOWN = 1; // NSEventTypeLeftMouseDown
 const EVENT_MASK = 0xFFFFFFFF; // every event type below 32 (mouse, keys, app-defined)
 const ALIGN_NATURAL = 4; // NSTextAlignmentNatural, the same value on both architectures
 const WRITING_RTL = 1; // NSWritingDirectionRightToLeft
 const BOX_CUSTOM = 4; // NSBoxCustom
 const NO_TITLE = 0; // NSNoTitle
+const SEMIBOLD = 0.3; // NSFontWeightSemibold
+// Gentle entrance: fade in while sliding a few points in from the right, and
+// out the same way. Stepped by hand in the event loop (plain setAlphaValue /
+// setFrameOrigin, no animator proxies); with Reduce motion on it only fades.
+const INTRO_MS = 260;
+const OUTRO_MS = 160;
+const SLIDE_IN = 12;
+const SLIDE_OUT = 8;
+const FRAME = 1 / 60;
+
+// The card's colors: the toolkit's theme (Graphite dark gray, cream light, or
+// high contrast). Same tokens as the sidebar and popup.ps1. The frame takes
+// the project's color, except in high contrast.
+const THEMES = {
+  'dark': { bg: '#1F2120', line: '#363A38', text: '#F6F4EA', muted: '#A9B3AE', done: '#8FD3B3', waiting: '#FCD34D' },
+  'light': { bg: '#FFFDF6', line: '#E6D9AE', text: '#14231C', muted: '#55635C', done: '#047857', waiting: '#92400E' },
+  'hc-dark': { bg: '#000000', line: '#FFFFFF', text: '#FFFFFF', muted: '#FFFFFF', done: '#FFFFFF', waiting: '#FFFFFF' },
+  'hc-light': { bg: '#FFFFFF', line: '#000000', text: '#000000', muted: '#000000', done: '#000000', waiting: '#000000' },
+};
 
 function readText(path) {
   const s = $.NSString.stringWithContentsOfFileEncodingError(path, $.NSUTF8StringEncoding, null);
@@ -35,15 +60,36 @@ function writeText(path, text) {
 }
 function quote(s) { return "'" + String(s).replace(/'/g, "'\\''") + "'"; }
 
-function colorFromHex(hex) {
-  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || '') || [null, '04', '78', '57'];
-  const c = [m[1], m[2], m[3]].map((h) => parseInt(h, 16) / 255);
-  return { color: $.NSColor.colorWithSRGBRedGreenBlueAlpha(c[0], c[1], c[2], 1), luminance: 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2] };
+function rgb(hex, fallback) {
+  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || '') || /^#(..)(..)(..)$/.exec(fallback);
+  return [m[1], m[2], m[3]].map((h) => parseInt(h, 16) / 255);
+}
+function nsColor(hex, fallback) {
+  const c = rgb(hex, fallback || '#047857');
+  return $.NSColor.colorWithSRGBRedGreenBlueAlpha(c[0], c[1], c[2], 1);
+}
+// WCAG relative luminance; picks the tile's icon color when the job has none.
+function luminance(hex) {
+  const w = [0.2126, 0.7152, 0.0722];
+  return rgb(hex, '#047857').reduce((sum, c, i) => sum + w[i] * (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)), 0);
+}
+function readableOn(hex) {
+  const l = luminance(hex);
+  const white = 1.05 / (l + 0.05);
+  const dark = (l + 0.05) / (luminance('#15202B') + 0.05);
+  return white >= dark ? '#FFFFFF' : '#15202B';
 }
 
-function label(text, size, bold, color, frame, rtl) {
+function font(size, weight) {
+  if (weight) {
+    try { return $.NSFont.systemFontOfSizeWeight(size, weight); } catch (e) { return $.NSFont.boldSystemFontOfSize(size); }
+  }
+  return $.NSFont.systemFontOfSize(size);
+}
+
+function label(text, size, weight, color, frame, rtl) {
   const field = $.NSTextField.labelWithString(text);
-  field.setFont(bold ? $.NSFont.boldSystemFontOfSize(size) : $.NSFont.systemFontOfSize(size));
+  field.setFont(font(size, weight));
   field.setTextColor(color);
   field.setFrame(frame);
   field.setLineBreakMode(4); // NSLineBreakByTruncatingTail
@@ -54,6 +100,42 @@ function label(text, size, bold, color, frame, rtl) {
   }
   return field;
 }
+
+// A label centered in a box by measuring it: no alignment constants.
+function centered(text, size, weight, color, x, y, w, h) {
+  const field = $.NSTextField.labelWithString(text);
+  field.setFont(font(size, weight));
+  field.setTextColor(color);
+  field.sizeToFit;
+  const s = field.frame.size;
+  field.setFrameOrigin($.NSMakePoint(x + (w - s.width) / 2, y + (h - s.height) / 2));
+  return field;
+}
+
+function box(frame, fill, radius, line, lineWidth) {
+  const b = $.NSBox.alloc.initWithFrame(frame);
+  b.setBoxType(BOX_CUSTOM);
+  b.setTitlePosition(NO_TITLE);
+  b.setCornerRadius(radius);
+  b.setFillColor(fill);
+  b.setBorderWidth(line ? lineWidth || 1 : 0);
+  if (line) b.setBorderColor(line);
+  b.setContentViewMargins($.NSMakeSize(0, 0));
+  return b;
+}
+
+// BOOL comes back as true on Apple Silicon and as 1 on Intel; anything else
+// (or an error) means animate.
+function reduceMotion() {
+  try {
+    const v = $.NSWorkspace.sharedWorkspace.accessibilityDisplayShouldReduceMotion;
+    return v === true || v === 1;
+  } catch (e) {
+    return false;
+  }
+}
+
+function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
 
 function inside(p, r) {
   return p.x >= r.origin.x && p.x <= r.origin.x + r.size.width &&
@@ -78,10 +160,10 @@ function show(job, slotsDir, sh) {
     app.setActivationPolicy(1); // Accessory: no Dock icon, no menu bar
     app.finishLaunching;
 
-    const bg = colorFromHex(job.color);
-    const fg = bg.luminance > 0.45
-      ? $.NSColor.colorWithSRGBRedGreenBlueAlpha(0.08, 0.13, 0.17, 1)
-      : $.NSColor.whiteColor;
+    const theme = THEMES[job.theme] || THEMES.dark;
+    const waiting = job.kind === 'waiting';
+    const tileHex = /^#[0-9a-f]{6}$/i.test(job.color || '') ? job.color : '#047857';
+    const tileText = /^#[0-9a-f]{6}$/i.test(job.text || '') ? job.text : readableOn(tileHex);
     const rtl = new RegExp('[' + String.fromCharCode(0x0590) + '-' + String.fromCharCode(0x06FF) + ']').test(job.title || '');
 
     const vf = $.NSScreen.mainScreen.visibleFrame;
@@ -95,33 +177,47 @@ function show(job, slotsDir, sh) {
     panel.setHasShadow(true);
     panel.setCollectionBehavior(1 | 256); // all Spaces, over full-screen apps
 
-    // A custom NSBox draws the rounded card itself: plain AppKit, no layer
-    // or CGColor bridging.
-    const card = $.NSBox.alloc.initWithFrame($.NSMakeRect(0, 0, W, H));
-    card.setBoxType(BOX_CUSTOM);
-    card.setTitlePosition(NO_TITLE);
-    card.setBorderWidth(0);
-    card.setCornerRadius(12);
-    card.setFillColor(bg.color);
-    card.setContentViewMargins($.NSMakeSize(0, 0));
+    // Custom NSBoxes draw the rounded card and the tile: plain AppKit, no
+    // layer or CGColor bridging.
+    const highContrast = String(job.theme || '').indexOf('hc') === 0;
+    const card = box($.NSMakeRect(0, 0, W, H), nsColor(theme.bg), 10, highContrast ? nsColor(theme.line) : nsColor(tileHex), 2);
     panel.setContentView(card);
-
     const content = card.contentView;
-    const textW = W - 16 - 34;
-    content.addSubview(label(job.title || '', 14, true, fg, $.NSMakeRect(16, 32, textW, 20), rtl));
-    content.addSubview(label(job.subtitle || '', 12, false, fg, $.NSMakeRect(16, 12, textW, 18), rtl));
-    content.addSubview(label(String.fromCharCode(0xD7), 15, false, fg, $.NSMakeRect(W - 28, H - 28, 18, 20), false));
 
+    const tileY = (H - TILE) / 2;
+    content.addSubview(box($.NSMakeRect(12, tileY, TILE, TILE), nsColor(tileHex), 8, null));
+    const glyph = waiting ? '!' : String.fromCharCode(0x2713);
+    content.addSubview(centered(glyph, waiting ? 18 : 17, 0.6, nsColor(tileText), 12, tileY, TILE, TILE));
+
+    const textX = 12 + TILE + 10;
+    const textW = W - textX - 30;
+    content.addSubview(label(job.title || '', 13, SEMIBOLD, nsColor(theme.text), $.NSMakeRect(textX, 32, textW, 18), rtl));
+    content.addSubview(label(job.subtitle || '', 11, 0, nsColor(waiting ? theme.waiting : theme.done), $.NSMakeRect(textX, 15, textW, 16), rtl));
+    content.addSubview(centered(String.fromCharCode(0xD7), 15, 0, nsColor(theme.muted), W - 30, H - 30, 22, 22));
+
+    const slides = !reduceMotion();
+    let alpha = 0;
+    let offset = slides ? SLIDE_IN : 0;
+    const place = () => {
+      panel.setAlphaValue(alpha);
+      if (slides) panel.setFrameOrigin($.NSMakePoint(x + offset, y));
+    };
+    place();
     panel.orderFrontRegardless;
 
     // Event loop with a countdown that pauses while the mouse is over the panel.
     const mode = $.NSDefaultRunLoopMode || $('kCFRunLoopDefaultMode');
+    const nextEvent = (seconds) => app.nextEventMatchingMaskUntilDateInModeDequeue(
+      EVENT_MASK, $.NSDate.dateWithTimeIntervalSinceNow(seconds), mode, true);
+    // "stay" has no countdown: the panel waits for a click on it or on the x.
+    const stay = job.stay === true;
     let remaining = Number(job.seconds) > 0 ? Number(job.seconds) : 8;
     let clicked = null; // 'open' | 'close'
-    let last = Date.now();
-    while (remaining > 0 && !clicked) {
-      const event = app.nextEventMatchingMaskUntilDateInModeDequeue(
-        EVENT_MASK, $.NSDate.dateWithTimeIntervalSinceNow(0.1), mode, true);
+    const shownAt = Date.now();
+    let entering = true;
+    let last = shownAt;
+    while ((stay || remaining > 0) && !clicked) {
+      const event = nextEvent(entering ? FRAME : 0.1);
       if (!event.isNil()) {
         if (event.type === LEFT_MOUSE_DOWN && event.windowNumber === panel.windowNumber) {
           const p = event.locationInWindow;
@@ -130,12 +226,33 @@ function show(job, slotsDir, sh) {
         app.sendEvent(event);
       }
       const now = Date.now();
+      if (entering) {
+        const t = Math.min(1, (now - shownAt) / INTRO_MS);
+        alpha = easeOut(t);
+        if (slides) offset = SLIDE_IN * (1 - alpha);
+        place();
+        entering = t < 1;
+      }
       if (!inside($.NSEvent.mouseLocation, panel.frame)) remaining -= (now - last) / 1000;
       last = now;
     }
 
     if (clicked === 'open' && job.cli && job.folder) {
       sh.doShellScript(quote(job.cli) + ' ' + quote(job.folder) + ' > /dev/null 2>&1 &');
+    }
+    // Fade out from wherever the entrance got to.
+    const fromAlpha = alpha;
+    const fromOffset = offset;
+    const leftAt = Date.now();
+    for (let t = 0; t < 1;) {
+      t = Math.min(1, (Date.now() - leftAt) / OUTRO_MS);
+      alpha = fromAlpha * (1 - t * t);
+      if (slides) offset = fromOffset + (SLIDE_OUT - fromOffset) * t * t;
+      place();
+      if (t < 1) {
+        const event = nextEvent(FRAME);
+        if (!event.isNil()) app.sendEvent(event);
+      }
     }
     panel.orderOut(null);
   } finally {

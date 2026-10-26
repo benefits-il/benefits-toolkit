@@ -1,0 +1,651 @@
+import { relativeTime } from "../chats/services/chat-list";
+
+/**
+ * The sidebar's own CSS and page script, on top of the shared Graphite tokens
+ * (shared/webview-theme.ts). The markup is static (sidebar-html.ts); the
+ * script fills it from the state the extension posts, and sends back what the
+ * user does. It never writes a setting itself.
+ */
+
+export const SIDEBAR_CSS = `
+  body { background: var(--chrome); overflow: hidden; }
+  .side { display: flex; flex-direction: column; height: 100vh; }
+  .side-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px 12px; }
+  .tabs { padding: 3px; }
+  .tabs button { font: 500 13px var(--head); min-height: 28px; padding: 4px 16px; }
+  .side-body { flex: 1; min-height: 0; overflow: auto; padding: 0 12px 12px; scrollbar-width: thin; }
+
+  .brand {
+    flex: none; display: block; margin: 6px 12px 12px; padding: 12px; cursor: pointer; text-decoration: none;
+    border-radius: var(--card-r); background: var(--surface); border: 1px solid var(--line); color: var(--text);
+  }
+  .brand:hover { text-decoration: none; background: var(--hover); }
+  .brand .top { display: flex; align-items: center; gap: 8px; }
+  .brand .logo { width: 30px; height: 30px; flex: none; }
+  .brand .logo svg { width: 100%; height: 100%; display: block; }
+  .brand .lock { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
+  .brand strong { font: 700 16px var(--head); }
+  .brand .lock small { margin-top: 2px; font: 500 11.5px var(--head); color: var(--accent); }
+  .brand .top .ico { width: 14px; height: 14px; color: var(--accent); }
+  .brand p { margin-top: 8px; font: 11.5px/1.6 var(--body); color: var(--muted); }
+  .brand .benefits-dot { font-weight: 900; }
+
+  /* ---- Chats ---- */
+  .search {
+    display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 14px; margin-bottom: 10px;
+    border-radius: var(--pill); background: var(--input); border: 1px solid var(--line);
+  }
+  .search:focus-within { outline: 2px solid var(--focus); outline-offset: 1px; }
+  .search .ico { width: 15px; height: 15px; color: var(--muted); }
+  .search input { flex: 1; min-width: 0; border: 0; background: transparent; outline: none; font-size: 13px; }
+  .search input::placeholder { color: var(--muted); }
+  .search input::-webkit-search-cancel-button { display: none; }
+  .scope { display: grid; grid-template-columns: 1fr 1fr; width: 100%; margin-bottom: 12px; }
+  .list-tools { display: flex; align-items: center; gap: 2px; margin: 0 0 2px; color: var(--muted); font-size: 12px; }
+  .list-tools .name { flex: 1; min-width: 0; padding-inline-start: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .group-label { font: 500 12px var(--head); color: var(--accent); margin: 14px 8px 6px; letter-spacing: 0.01em; }
+  .group-label:first-child { margin-top: 6px; }
+  #chat-list { outline: none; }
+  .row { position: relative; padding: 7px 26px 7px 12px; margin-bottom: 3px; border-radius: var(--row-r); cursor: pointer; }
+  /* A hairline between two rows of a group; it hides next to a highlighted row. */
+  .row + .row::before {
+    content: ""; position: absolute; left: 12px; right: 12px; top: -2px; height: 1px; background: var(--line); pointer-events: none;
+  }
+  .row:hover::before, .row:hover + .row::before, .row.selected::before, .row.selected + .row::before { visibility: hidden; }
+  .row:hover { background: var(--hover); }
+  .row.selected { background: var(--selected); }
+  .row.selected::after {
+    content: ""; position: absolute; inset-inline-end: 11px; top: 50%; width: 6px; height: 6px; margin-top: -3px;
+    border-radius: 50%; background: var(--dot);
+  }
+  #chat-list:focus-visible .row.focused { outline: 2px solid var(--focus); outline-offset: -2px; }
+  .row-title { display: block; font: 500 13px/1.3 var(--head); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row.archived .row-title { color: var(--muted); }
+  .row-meta { display: flex; align-items: center; gap: 6px; margin-top: 3px; font-size: 11.5px; color: var(--muted); min-width: 0; }
+  .row-meta .what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ctx { flex: none; display: inline-flex; align-items: center; gap: 5px; font-variant-numeric: tabular-nums; }
+  .ctx .cbar { width: 34px; height: 4px; border-radius: 4px; background: var(--line); overflow: hidden; }
+  .ctx .cbar i { display: block; height: 100%; border-radius: 4px; background: var(--accent); }
+  .ctx .cbar i.warn { background: var(--warning); }
+  .ctx .cbar i.high { background: var(--danger); }
+  .row-meta time { margin-inline-start: auto; font-size: 11px; white-space: nowrap; unicode-bidi: isolate; }
+  .pdot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--c, transparent); border: 1.5px solid var(--c, var(--muted)); }
+  .skeleton { height: 54px; margin: 6px 0; border-radius: var(--row-r); background: var(--surface); animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: 0.55; } }
+
+  .empty { padding: 30px 8px; text-align: center; }
+  .empty > .ico { width: 28px; height: 28px; margin: 0 auto 12px; color: var(--muted); }
+  .empty h3 { font: 600 14px var(--head); margin-bottom: 6px; }
+  .empty p { color: var(--muted); font-size: 12px; margin-bottom: 14px; }
+  .empty .btn { margin: 3px; }
+
+  /* ---- Settings ---- */
+  .project-card { padding: 12px; margin-bottom: 8px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+  .project-card strong { display: flex; align-items: center; gap: 7px; margin-bottom: 2px; color: var(--text); font: 600 13px var(--head); min-width: 0; }
+  .project-card strong span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .feature-row {
+    display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 8px; cursor: pointer;
+    border: 0; border-radius: var(--row-r); background: transparent; text-align: start; color: var(--text);
+  }
+  .feature-row:hover { background: var(--hover); }
+  .tile { width: 32px; height: 32px; flex: none; display: grid; place-items: center; border-radius: 9px; }
+  .tile .ico { width: 16px; height: 16px; }
+  .feature-row .copy { flex: 1; min-width: 0; }
+  .feature-row strong { display: block; font: 500 13px var(--head); }
+  .feature-row small { display: block; margin-top: 2px; font-size: 11.5px; color: var(--muted); }
+  .off-chip { flex: none; font: 500 10.5px var(--head); color: var(--muted); border: 1px solid var(--line); border-radius: var(--pill); padding: 1px 8px; }
+  .feature-row > .ico { width: 16px; height: 16px; color: var(--muted); }
+
+  .back { display: inline-flex; align-items: center; gap: 2px; margin: 2px 0 10px; padding: 0; border: 0; background: none; cursor: pointer; color: var(--accent); font: 500 12px var(--head); }
+  .back .ico { width: 14px; height: 14px; }
+  .page h2 { font: 700 20px var(--head); letter-spacing: -0.3px; margin-bottom: 8px; }
+  fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+  fieldset:disabled { opacity: 0.5; }
+  .srow { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .srow strong { display: block; font: 400 13px var(--head); }
+  .srow.main strong { font-weight: 500; }
+  .srow small { display: block; margin-top: 2px; font-size: 11.5px; color: var(--muted); }
+  .frow { display: block; margin: 12px 0; font-size: 12px; color: var(--muted); }
+  .frow .field { margin-top: 6px; }
+  .flabel { display: block; }
+  .dd, .picker {
+    width: 100%; min-width: 0; min-height: 32px; display: flex; align-items: center; gap: 8px; padding: 4px 10px 4px 12px;
+    border-radius: 10px; background: var(--input); border: 1px solid var(--line); color: var(--text); cursor: pointer; text-align: start;
+    font: 400 12.5px var(--head);
+  }
+  .dd { margin-top: 6px; }
+  .dd:hover, .picker:hover { background: var(--hover); }
+  .dd[aria-expanded="true"], .picker[aria-expanded="true"] { border-color: var(--accent); }
+  .dd:disabled, .picker:disabled { cursor: not-allowed; background: var(--input); }
+  .dd .v, .picker .v { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dd > .ico, .picker > .ico { width: 14px; height: 14px; color: var(--muted); transition: transform 0.15s; }
+  .dd[aria-expanded="true"] > .ico, .picker[aria-expanded="true"] > .ico { transform: rotate(180deg); }
+  .dd-menu, .sound-menu { max-height: min(320px, calc(100vh - 24px)); overflow: auto; scrollbar-width: thin; }
+  .sound-menu button .sl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sound-menu button small { color: var(--muted); font-size: 11.5px; white-space: nowrap; }
+  .sound-menu button.playing > .ico:first-child { color: var(--accent); }
+  .section-label { margin: 18px 0 0; font: 500 12px var(--head); color: var(--accent); }
+  .hint { margin: 10px 0; font: 12px/1.6 var(--body); color: var(--muted); }
+  .off-note { margin: 10px 0; font-size: 12px; color: var(--muted); }
+  .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+
+  .current-color { display: flex; align-items: center; gap: 8px; margin: 10px 0 4px; font-size: 12px; color: var(--muted); }
+  .current-color i { width: 16px; height: 16px; flex: none; border-radius: 5px; background: var(--c); border: 1px solid var(--line); }
+  .swatches { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 5px; margin: 8px 0; }
+  .swatches.benefits { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+  .swatch {
+    aspect-ratio: 1; min-width: 0; padding: 0; cursor: pointer; display: grid; place-items: center;
+    border-radius: 6px; border: 1px solid rgba(0, 0, 0, 0.18); background: var(--sw); color: var(--sw-text);
+  }
+  .swatch .ico { width: 12px; height: 12px; display: none; }
+  .swatch[aria-checked="true"] { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .swatch[aria-checked="true"] .ico { display: block; }
+  .custom { display: flex; align-items: center; gap: 6px; margin: 10px 0; }
+  .custom input[type="color"] { width: 34px; height: 32px; flex: none; padding: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--input); cursor: pointer; }
+  .custom .field { flex: 1; font-family: var(--mono); }
+
+  .slot-label { margin: 12px 0 6px; font-size: 12px; color: var(--muted); }
+  .picker-row { display: flex; gap: 6px; }
+  .picker { flex: 1; }
+  .picker .m { color: var(--muted); }
+  .sound-scope { display: grid; grid-template-columns: 1fr 1fr; width: 100%; margin-top: 12px; }
+
+  .popup-preview {
+    display: flex; align-items: center; gap: 10px; width: 100%; max-width: 300px; height: 64px; padding: 11px; margin: 12px 0;
+    border-radius: 10px; background: var(--surface); border: 2px solid var(--c); box-shadow: var(--card-shadow);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+  :root[data-theme^="hc"] .popup-preview { border-color: var(--line); }
+  .popup-preview .ptile { width: 34px; height: 34px; flex: none; display: grid; place-items: center; border-radius: 8px; background: var(--c); color: var(--ct); }
+  .popup-preview .ptile .ico { width: 18px; height: 18px; }
+  .popup-preview .pcopy { flex: 1; min-width: 0; }
+  .popup-preview strong { display: block; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .popup-preview small { display: block; font-size: 11px; color: var(--accent); }
+  .popup-preview .px { align-self: flex-start; color: var(--muted); }
+  .popup-preview .px .ico { width: 14px; height: 14px; }
+
+  .status { display: flex; align-items: center; gap: 8px; margin: 6px 0; padding: 10px 12px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); font-size: 12.5px; }
+  .status i { width: 9px; height: 9px; flex: none; border-radius: 50%; background: var(--muted); }
+  .status.on i { background: var(--on); }
+
+  .menu .menu-label { padding: 6px 10px 2px; font: 500 11px var(--head); color: var(--accent); }
+  .menu button .check { margin-inline-start: auto; visibility: hidden; color: var(--accent); }
+  .menu button .check .ico { width: 14px; height: 14px; color: var(--accent); }
+  .menu button[aria-checked="true"] .check { visibility: visible; }
+`;
+
+export const SIDEBAR_SCRIPT = `
+  const relTime = ${relativeTime.toString()};
+  let state = null;
+  let chats = null;
+  let route = Object.assign({ tab: 'chats', page: null }, vscode.getState() || {});
+  let soundScope = 'default';
+  let query = '';
+  let focusIndex = -1;
+  let pendingReveal = null;
+  let revealSwitched = false;
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c]));
+
+  function toast(text) {
+    const t = $('toast');
+    t.textContent = text;
+    t.classList.add('visible');
+    clearTimeout(toast.timer);
+    toast.timer = setTimeout(() => t.classList.remove('visible'), 1600);
+  }
+
+  // ---- Where we are: a tab, and on Settings maybe a feature page. Kept across reloads.
+  function go(tab, page) {
+    route = { tab, page: tab === 'settings' ? (page || null) : route.page };
+    vscode.setState(route);
+    closeMenu(false);
+    renderRoute();
+    $('body').scrollTop = 0;
+  }
+  function renderRoute() {
+    const settings = route.tab === 'settings';
+    $('tab-chats').setAttribute('aria-selected', String(!settings));
+    $('tab-settings').setAttribute('aria-selected', String(settings));
+    $('screen-chats').hidden = settings;
+    $('screen-settings').hidden = !settings;
+    $('settings-home').hidden = !!route.page;
+    $$('.page').forEach((p) => { p.hidden = p.dataset.page !== route.page; });
+  }
+  $('tab-chats').onclick = () => go('chats');
+  $('tab-settings').onclick = () => go('settings', null);
+  $$('[data-open-page]').forEach((b) => { b.onclick = () => go('settings', b.dataset.openPage); });
+  $$('.back').forEach((b) => { b.onclick = () => go('settings', null); });
+  $('theme-btn').onclick = () => post({ type: 'toggleTheme' });
+  $('brand').onclick = (e) => { e.preventDefault(); post({ type: 'openBrand' }); };
+
+  // ---- Settings: every control names its setting in data-set; the extension checks and writes it.
+  document.addEventListener('change', (e) => {
+    const el = e.target;
+    if (!el || !el.dataset || !el.dataset.set) return;
+    const value = el.type === 'checkbox' ? el.checked : el.type === 'number' ? Number(el.value) : el.value;
+    post({ type: 'set', key: el.dataset.set, value });
+  });
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest && e.target.closest('[data-set-value]');
+    if (!b) return;
+    post({ type: 'set', key: b.dataset.setValue, value: b.dataset.value });
+    // A dropdown shows the choice at once and closes; the state that follows confirms it.
+    const menu = b.closest('.dd-menu');
+    if (menu) {
+      $$('[data-set-value]', menu).forEach((x) => x.setAttribute('aria-checked', String(x === b)));
+      renderDropdowns();
+      closeMenu(true);
+    }
+  });
+
+  // ---- Dropdowns: the button shows the current choice; its list opens under it.
+  function renderDropdowns() {
+    $$('.dd').forEach((b) => {
+      const menu = $(b.dataset.dd);
+      const on = menu.querySelector('[aria-checked="true"]');
+      const v = state ? value(menu.querySelector('[data-set-value]').dataset.setValue) : '';
+      // A value typed by hand before the lists existed still shows, marked custom.
+      b.querySelector('.v').textContent = on ? on.textContent.trim() : v ? v + ' (custom)' : '';
+    });
+  }
+  function openUnder(button, menu) {
+    const r = button.getBoundingClientRect();
+    menu.style.minWidth = Math.round(r.width) + 'px';
+    toggleMenu(button, menu, r.left, r.bottom + 4, false);
+  }
+  $$('.dd').forEach((b) => { b.onclick = (e) => { e.stopPropagation(); openUnder(b, $(b.dataset.dd)); }; });
+
+  function value(key) { return state ? state.values[key] : undefined; }
+
+  function render() {
+    if (!state) return;
+    document.documentElement.dataset.theme = state.theme;
+    const dark = state.theme === 'dark' || state.theme === 'hc-dark';
+    $('theme-btn').innerHTML = dark ? ICONS.sun : ICONS.moon;
+    $('theme-btn').setAttribute('aria-label', dark ? 'Switch to light theme' : 'Switch to dark theme');
+    $('theme-btn').title = dark ? 'Light theme' : 'Dark theme';
+
+    $$('[data-set]').forEach((el) => {
+      const v = value(el.dataset.set);
+      if (el.type === 'checkbox') el.checked = !!v;
+      else if (document.activeElement !== el) el.value = v === undefined || v === null ? '' : String(v);
+    });
+    $$('[data-set-value]').forEach((b) => b.setAttribute('aria-checked', String(value(b.dataset.setValue) === b.dataset.value)));
+    // Fonts this computer lacks stay out of the lists (the current one stays, so it can be seen).
+    $$('[data-font]').forEach((b) => { b.hidden = !state.fonts.includes(b.dataset.font) && b.getAttribute('aria-checked') !== 'true'; });
+    renderDropdowns();
+
+    PAGES.forEach((p) => {
+      if (!p.switchKey) return;
+      const on = !!value(p.switchKey);
+      $('fs-' + p.id).disabled = !on;
+      $('off-' + p.id).hidden = on;
+      $('chip-' + p.id).hidden = on;
+    });
+    $('hc-note').hidden = !state.theme.startsWith('hc');
+    renderProject();
+    renderColors();
+    renderSounds();
+    renderPopup();
+    renderHooks();
+  }
+
+  function renderProject() {
+    const pr = state.project;
+    $('project-card').hidden = !pr;
+    $('no-folder-note').hidden = !!pr;
+    if (!pr) return;
+    $('project-name').textContent = pr.folderName;
+    $('project-dot').style.setProperty('--c', pr.color ? pr.color.hex : '');
+    $('project-line').textContent = 'Popup name: ' + (pr.popupName || pr.folderName);
+    $('project-multi').hidden = pr.folderCount < 2;
+    $('project-multi').textContent = 'The first of ' + pr.folderCount + ' folders in this window.';
+  }
+
+  function renderColors() {
+    const pr = state.project;
+    $('color-no-folder').hidden = !!pr;
+    $('color-body').hidden = !pr;
+    if (!pr) { $('current-color').hidden = true; return; }
+    const hex = pr.color ? pr.color.hex : null;
+    $$('.swatch').forEach((s) => s.setAttribute('aria-checked', String(s.dataset.hex === hex)));
+    const shown = hex || pr.stashedColor;
+    $('current-color').hidden = !shown;
+    if (shown) {
+      const preset = PALETTE.find((p) => p.hex === shown);
+      $('current-swatch').style.setProperty('--c', shown);
+      $('current-text').textContent = (preset ? preset.name : 'Custom') + ' \\u00b7 ' + shown + (hex ? '' : ' \\u00b7 kept while off');
+    }
+    if (document.activeElement !== $('hex-input') && hex) $('color-native').value = hex;
+  }
+
+  function soundLabel(id) { return state.sounds.labels[id] || id; }
+  function renderSounds() {
+    const pr = state.project;
+    if (!pr && soundScope === 'project') soundScope = 'default';
+    $('scope-project').disabled = !pr;
+    $('scope-default').setAttribute('aria-pressed', String(soundScope === 'default'));
+    $('scope-project').setAttribute('aria-pressed', String(soundScope === 'project'));
+    $('sound-hint').textContent = soundScope === 'project' ? COPY.scopeProject : COPY.scopeAll;
+    ['stop', 'notification'].forEach((slot) => {
+      const btn = $('pick-' + slot);
+      const own = soundScope === 'project' ? state.sounds.overrides[slot] : state.sounds.defaults[slot];
+      btn.innerHTML = '<span class="v">' + (own ? esc(soundLabel(own)) : '<span class="m">Default \\u00b7 </span>' + esc(soundLabel(state.sounds.defaults[slot]))) + '</span>' + ICONS.chevronDown;
+    });
+  }
+  $('scope-default').onclick = () => { soundScope = 'default'; renderSounds(); };
+  $('scope-project').onclick = () => { soundScope = 'project'; renderSounds(); };
+
+  // The sound list: a click plays the sound and chooses it, and the list stays
+  // open, so the sounds can be heard one after another.
+  function soundItem(id, label, sub, checked) {
+    return '<button type="button" role="menuitemradio" aria-checked="' + checked + '" data-sound="' + esc(id) + '">' +
+      ICONS.play + '<span class="sl">' + esc(label) + '</span>' + (sub ? '<small>' + esc(sub) + '</small>' : '') +
+      '<span class="check">' + ICONS.check + '</span></button>';
+  }
+  function openSoundMenu(button) {
+    const slot = button.dataset.pick;
+    const project = soundScope === 'project';
+    const current = project ? (state.sounds.overrides[slot] || '') : state.sounds.defaults[slot];
+    const menu = $('sound-menu');
+    menu.dataset.slot = slot;
+    menu.dataset.scope = soundScope;
+    menu.innerHTML = (project ? soundItem('', 'Same as all projects', soundLabel(state.sounds.defaults[slot]), current === '') + '<hr />' : '') +
+      Object.keys(state.sounds.labels).map((id) => soundItem(id, soundLabel(id), '', id === current)).join('');
+    openUnder(button, menu);
+    const on = menu.querySelector('[aria-checked="true"]');
+    if (on) on.scrollIntoView({ block: 'nearest' });
+  }
+  $$('[data-pick]').forEach((b) => { b.onclick = (e) => { e.stopPropagation(); openSoundMenu(b); }; });
+  $('sound-menu').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-sound]');
+    if (!b) return;
+    const menu = $('sound-menu');
+    $$('[data-sound]', menu).forEach((x) => x.setAttribute('aria-checked', String(x === b)));
+    $$('.playing', menu).forEach((x) => x.classList.remove('playing'));
+    b.classList.add('playing');
+    clearTimeout(openSoundMenu.timer);
+    openSoundMenu.timer = setTimeout(() => b.classList.remove('playing'), 1500);
+    post({ type: 'setSound', scope: menu.dataset.scope, slot: menu.dataset.slot, id: b.dataset.sound });
+  });
+  $$('[data-play]').forEach((b) => { b.onclick = () => post({ type: 'previewSound', scope: soundScope, slot: b.dataset.play }); });
+  $('test-sounds').onclick = () => post({ type: 'testSounds' });
+
+  function renderPopup() {
+    const pr = state.project;
+    $('popup-unsupported').hidden = state.platform.popup;
+    $('popup-name-row').hidden = !pr;
+    const name = $('popup-name');
+    if (pr && document.activeElement !== name) name.value = pr.popupName || '';
+    if (pr) name.placeholder = pr.folderName;
+    const typed = document.activeElement === name ? name.value.trim() : (pr && pr.popupName) || '';
+    $('pv-title').textContent = typed || (pr ? pr.folderName : "Benefit's Toolkit");
+    // The preview card takes the project's color for its frame and tile, like the real one.
+    const card = $('pv-tile').parentElement;
+    card.style.setProperty('--c', pr && pr.color ? pr.color.hex : '#047857');
+    card.style.setProperty('--ct', pr && pr.color ? pr.color.text : '#ffffff');
+    $('popup-seconds').hidden = !!value('popup.stayUntilClicked');
+  }
+  $('popup-name').addEventListener('input', renderPopup);
+  $('popup-name').addEventListener('change', (e) => post({ type: 'setPopupName', value: e.target.value }));
+  $('test-popup').onclick = () => post({ type: 'testPopup' });
+
+  function renderHooks() {
+    const h = state.hooks;
+    const on = h.wanted && h.installed;
+    $('hooks-status').classList.toggle('on', on);
+    $('hooks-text').textContent = !state.platform.alerts ? 'Not available on this system'
+      : !h.wanted ? 'Sounds and popup are off' : h.installed ? 'Connected to Claude Code' : 'Not connected';
+    $('reconnect').disabled = !h.wanted;
+    $('disconnect').disabled = !h.installed;
+  }
+  $('reconnect').onclick = () => post({ type: 'reconnect' });
+  $('disconnect').onclick = () => post({ type: 'disconnect' });
+  $('show-log').onclick = () => post({ type: 'showLog' });
+
+  // ---- Window colors: a swatch applies at once; a typed hex on Apply or Enter.
+  $$('.swatch').forEach((s) => { s.onclick = () => post({ type: 'pickColor', hex: s.dataset.hex }); });
+  function applyHex() {
+    const input = $('hex-input');
+    const v = input.value.trim();
+    const ok = /^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(v);
+    input.classList.toggle('invalid', !ok);
+    if (!ok) return;
+    post({ type: 'pickColor', hex: v });
+    input.value = '';
+  }
+  $('hex-apply').onclick = applyHex;
+  $('hex-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') applyHex(); });
+  $('hex-input').addEventListener('input', () => $('hex-input').classList.remove('invalid'));
+  $('color-native').addEventListener('change', (e) => post({ type: 'pickColor', hex: e.target.value }));
+  $('clear-color').onclick = () => post({ type: 'clearColor' });
+
+  // ---- Chats: the list, its states, search, and the keyboard.
+  function visibleRows() { return $$('#chat-list .row'); }
+  // An empty state is not a list of options: the container's role follows what it holds.
+  function emptyState(icon, title, body, buttons) {
+    $('chat-list').setAttribute('role', 'group');
+    return '<div class="empty">' + ICONS[icon] + '<h3>' + esc(title) + '</h3><p>' + esc(body) + '</p>' +
+      buttons.map((b) => '<button class="btn' + (b.primary ? ' primary' : '') + '" type="button" data-empty-action="' + b.action + '">' + esc(b.label) + '</button>').join('') + '</div>';
+  }
+  function renderChats() {
+    const host = $('chat-list');
+    const enabled = state ? !!state.values['chats.enabled'] : true;
+    $('chat-tools').hidden = !enabled;
+    $('chat-list').setAttribute('aria-busy', String(enabled && !(chats && chats.list)));
+    if (!enabled) {
+      host.innerHTML = emptyState('messages', COPY.offTitle, COPY.offBody, [{ action: 'enable', label: 'Enable conversations', primary: true }]);
+      return;
+    }
+    if (!chats || !chats.list) {
+      host.innerHTML = '<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>';
+      return;
+    }
+    const list = chats.list;
+    const scope = list.scope;
+    $$('[data-scope]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.scope === scope)));
+    $('list-name').textContent = scope === 'all' ? 'All projects' : (chats.projectName || 'This project');
+    if (list.status === 'noFolder') {
+      host.innerHTML = emptyState('folder', COPY.noFolderTitle, COPY.noFolderBody, [{ action: 'all', label: 'Show all projects', primary: true }, { action: 'openFolder', label: 'Open folder' }]);
+      return;
+    }
+    if (list.status === 'error') {
+      host.innerHTML = emptyState('alertTriangle', COPY.errorTitle, COPY.errorBody, [{ action: 'refresh', label: 'Try again', primary: true }]);
+      return;
+    }
+    if (!list.total) {
+      host.innerHTML = emptyState('messages', COPY.emptyTitle, COPY.emptyBody, scope === 'all' ? [] : [{ action: 'all', label: 'Show all projects', primary: true }]);
+      return;
+    }
+    const q = query.toLowerCase();
+    let html = '';
+    let n = 0;
+    list.groups.forEach((g) => {
+      const rows = g.rows.filter((r) => !q || r.title.toLowerCase().includes(q) || r.project.toLowerCase().includes(q));
+      if (!rows.length) return;
+      if (g.label) html += '<h3 class="group-label">' + esc(g.label) + '</h3>';
+      rows.forEach((r) => {
+        const sel = chats.active === r.id;
+        html += '<div class="row' + (sel ? ' selected' : '') + (r.archived ? ' archived' : '') + '" role="option" id="row-' + n + '" data-id="' + esc(r.id) + '" aria-selected="' + sel + '">' +
+          '<span class="row-title" dir="auto" title="' + esc(r.title) + '">' + esc(r.title) + '</span>' +
+          '<span class="row-meta"><i class="pdot"' + (r.color ? ' style="--c:' + esc(r.color) + '"' : '') + '></i>' +
+          '<span class="what">' + [
+            scope === 'all' ? '<bdi>' + esc(r.project) + '</bdi>' : '',
+          ].filter(Boolean).join(' \\u00b7 ') + '</span>' + contextMeter(r.context) +
+          '<time datetime="' + esc(r.modified) + '" title="' + esc(new Date(r.modified).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })) + '">' + esc(relTime(r.modified)) + '</time></span></div>';
+        n++;
+      });
+    });
+    if (!n) {
+      host.innerHTML = emptyState('search', COPY.noMatchTitle, COPY.noMatchBody, scope === 'all' ? [] : [{ action: 'all', label: 'Search all projects', primary: true }]);
+      return;
+    }
+    host.setAttribute('role', 'listbox');
+    host.innerHTML = html;
+    if (focusIndex >= n) focusIndex = n - 1;
+    syncFocus(false);
+    if (pendingReveal) reveal(pendingReveal);
+  }
+
+  // How full the conversation's context window is: a small bar and the percent.
+  function contextMeter(pct) {
+    if (pct === null || pct === undefined) return '';
+    const tier = pct >= 80 ? ' class="high"' : pct >= 50 ? ' class="warn"' : '';
+    const shown = pct > 0 && pct < 1 ? '<1' : String(Math.round(pct));
+    return '<span class="ctx" title="Context window ' + shown + '% full"><span class="cbar"><i' + tier + ' style="width:' + Math.max(2, pct) + '%"></i></span>' + esc(shown) + '%</span>';
+  }
+
+  $('chat-list').addEventListener('click', (e) => {
+    const action = e.target.closest('[data-empty-action]');
+    if (action) {
+      const a = action.dataset.emptyAction;
+      if (a === 'enable') post({ type: 'set', key: 'chats.enabled', value: true });
+      if (a === 'all') post({ type: 'set', key: 'chats.scope', value: 'all' });
+      if (a === 'openFolder') post({ type: 'openFolder' });
+      if (a === 'refresh') post({ type: 'refreshChats' });
+      return;
+    }
+    const row = e.target.closest('.row');
+    if (!row) return;
+    focusIndex = visibleRows().indexOf(row);
+    syncFocus(false);
+    post({ type: 'chat', action: 'open', id: row.dataset.id });
+  });
+  $('chat-list').addEventListener('contextmenu', (e) => {
+    const row = e.target.closest('.row');
+    if (!row) return;
+    e.preventDefault();
+    focusIndex = visibleRows().indexOf(row);
+    syncFocus(false);
+    openRowMenu(row, e.clientX, e.clientY);
+  });
+  $('chat-list').addEventListener('keydown', (e) => {
+    const rows = visibleRows();
+    if (!rows.length) return;
+    const last = rows.length - 1;
+    const move = { ArrowDown: Math.min(last, focusIndex + 1), ArrowUp: Math.max(0, focusIndex - 1), Home: 0, End: last }[e.key];
+    if (move !== undefined) { e.preventDefault(); focusIndex = move; syncFocus(true); return; }
+    const row = rows[focusIndex];
+    if (!row) return;
+    if (e.key === 'Enter') { e.preventDefault(); post({ type: 'chat', action: 'open', id: row.dataset.id }); }
+    if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
+      e.preventDefault();
+      const r = row.getBoundingClientRect();
+      openRowMenu(row, r.left + 24, r.bottom - 6);
+    }
+    if (e.key === 'Delete') post({ type: 'chat', action: 'delete', id: row.dataset.id });
+    if (e.key === 'F2') post({ type: 'chat', action: 'rename', id: row.dataset.id });
+  });
+  $('chat-list').addEventListener('focus', () => { if (focusIndex < 0) { focusIndex = 0; syncFocus(true); } });
+  function syncFocus(scroll) {
+    const rows = visibleRows();
+    rows.forEach((r, i) => r.classList.toggle('focused', i === focusIndex));
+    const row = rows[focusIndex];
+    if (row) {
+      $('chat-list').setAttribute('aria-activedescendant', row.id);
+      if (scroll) row.scrollIntoView({ block: 'nearest' });
+    } else {
+      $('chat-list').removeAttribute('aria-activedescendant');
+    }
+  }
+  // Select a conversation in the list ("Show in list" from a viewer). One from
+  // another project switches the list to All projects first.
+  function reveal(id) {
+    const rows = visibleRows();
+    const row = rows.find((r) => r.dataset.id === id);
+    if (row) {
+      pendingReveal = null;
+      focusIndex = rows.indexOf(row);
+      syncFocus(true);
+      $('chat-list').focus();
+      return;
+    }
+    const scope = chats && chats.list ? chats.list.scope : null;
+    if (scope === 'currentWorkspace') {
+      pendingReveal = id;
+      if (!revealSwitched) { revealSwitched = true; post({ type: 'set', key: 'chats.scope', value: 'all' }); }
+      return;
+    }
+    // Still loading: keep waiting. Already all projects: it is not listed (archived, or empty).
+    pendingReveal = scope === 'all' ? null : id;
+  }
+
+  $('search').addEventListener('input', (e) => { query = e.target.value.trim(); focusIndex = -1; renderChats(); });
+  $('search').addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { e.target.value = ''; query = ''; renderChats(); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); focusIndex = 0; $('chat-list').focus(); syncFocus(true); }
+  });
+  $$('[data-scope]').forEach((b) => { b.onclick = () => post({ type: 'set', key: 'chats.scope', value: b.dataset.scope }); });
+  $('refresh').onclick = () => post({ type: 'refreshChats' });
+  $('list-options').onclick = (e) => {
+    e.stopPropagation();
+    const r = $('list-options').getBoundingClientRect();
+    toggleMenu($('list-options'), $('list-menu'), r.right, r.bottom + 6, true);
+  };
+
+  // ---- Menus: the row's right-click menu and List options.
+  let openMenu = null;
+  function closeMenu(focusBack) {
+    if (!openMenu) return;
+    openMenu.menu.hidden = true;
+    if (openMenu.button) openMenu.button.setAttribute('aria-expanded', 'false');
+    const back = openMenu.button || $('chat-list');
+    openMenu = null;
+    if (focusBack) back.focus();
+  }
+  function toggleMenu(button, menu, x, y, alignEnd) {
+    if (openMenu && openMenu.menu === menu && openMenu.button === button) return closeMenu(true);
+    closeMenu(false);
+    menu.hidden = false;
+    const w = menu.offsetWidth, h = menu.offsetHeight;
+    const left = alignEnd ? x - w : x;
+    menu.style.left = Math.round(Math.max(6, Math.min(window.innerWidth - w - 6, left))) + 'px';
+    menu.style.top = Math.round(Math.max(6, Math.min(window.innerHeight - h - 6, y))) + 'px';
+    if (button) button.setAttribute('aria-expanded', 'true');
+    openMenu = { button, menu };
+    const first = menu.querySelector('[aria-checked="true"]:not([hidden])') || menu.querySelector('button:not([hidden]), input');
+    if (first) first.focus({ preventScroll: true });
+  }
+  function openRowMenu(row, x, y) {
+    const archived = row.classList.contains('archived');
+    const item = (action, icon, label, cls) =>
+      '<button type="button" role="menuitem"' + (cls ? ' class="' + cls + '"' : '') + ' data-row-action="' + action + '">' + ICONS[icon] + label + '</button>';
+    const menu = $('row-menu');
+    menu.dataset.id = row.dataset.id;
+    menu.innerHTML = item('open', 'messages', 'Open') + item('rename', 'pencil', 'Rename') +
+      (archived ? item('restore', 'restore', 'Restore from archive') : item('archive', 'archive', 'Archive')) +
+      item('export', 'download', 'Save as Markdown') + '<hr />' + item('delete', 'trash', 'Delete', 'danger');
+    toggleMenu(null, menu, x, y, false);
+  }
+  $('row-menu').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-row-action]');
+    if (!b) return;
+    const id = $('row-menu').dataset.id;
+    closeMenu(true);
+    post({ type: 'chat', action: b.dataset.rowAction, id });
+  });
+  document.addEventListener('click', (e) => { if (openMenu && !openMenu.menu.contains(e.target)) closeMenu(false); });
+  // A list fixed under its button would drift away from it: scrolling the page closes it.
+  $('body').addEventListener('scroll', () => closeMenu(false), { passive: true });
+  document.addEventListener('keydown', (e) => {
+    if (!openMenu) return;
+    if (e.key === 'Escape') { e.preventDefault(); closeMenu(true); return; }
+    const items = $$('button:not([hidden]), input', openMenu.menu);
+    const at = items.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown') { e.preventDefault(); items[(at + 1) % items.length].focus(); }
+    if (e.key === 'ArrowUp') { e.preventDefault(); items[(at - 1 + items.length) % items.length].focus(); }
+  });
+
+  window.addEventListener('message', (e) => {
+    const m = e.data || {};
+    if (m.type === 'state') { state = m.state; render(); renderChats(); }
+    if (m.type === 'chats') { chats = m.chats; renderChats(); }
+    if (m.type === 'navigate') go(m.tab, m.page);
+    if (m.type === 'reveal') { go('chats'); query = ''; $('search').value = ''; revealSwitched = false; renderChats(); reveal(m.id); }
+    if (m.type === 'toast') toast(m.text);
+  });
+
+  renderRoute();
+  renderChats();
+  post({ type: 'ready' });
+`;

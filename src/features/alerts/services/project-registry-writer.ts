@@ -3,7 +3,9 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { toolkitProjectsDir } from "../../../core/paths";
 import { logger } from "../../../core/logger";
+import { currentTheme, onThemeChanged } from "../../../core/theme";
 import { atomicWriteText } from "../../../shared/fs-utils";
+import { foregroundFor, normalizeHex } from "../../window-color/services/color-utils";
 import { WindowColorService } from "../../window-color/services/window-color-service";
 import { findEditorCli } from "./editor-cli";
 import type { HookPlatform } from "./hook-command";
@@ -50,6 +52,8 @@ export class ProjectRegistryWriter implements vscode.Disposable {
         if (e.affectsConfiguration("workbench.colorCustomizations")) this.sync();
       }),
       onProjectPrefsChanged(() => this.sync()),
+      // The popup's card follows the toolkit's theme.
+      onThemeChanged(() => this.sync()),
     );
     this.sync();
   }
@@ -74,7 +78,10 @@ export class ProjectRegistryWriter implements vscode.Disposable {
 
   private async write(focused: boolean): Promise<void> {
     const dir = toolkitProjectsDir();
-    const color = this.colors.getCurrentColor() ?? null;
+    // A hand-edited color may not be #rrggbb: the popup falls back to green then.
+    const color = normalizeHex(this.colors.getCurrentColor() ?? "") ?? null;
+    const colorText = color ? foregroundFor(color) : null;
+    const theme = currentTheme();
     const keep = new Set<string>();
     for (const wf of vscode.workspace.workspaceFolders ?? []) {
       if (wf.uri.scheme !== "file") continue;
@@ -86,6 +93,8 @@ export class ProjectRegistryWriter implements vscode.Disposable {
         folder,
         name: this.prefs.displayName(folder, wf.name),
         color,
+        colorText,
+        theme,
         sounds: { done: own.stop, waiting: own.notification },
         cli: this.cli,
         editor: vscode.env.uriScheme,

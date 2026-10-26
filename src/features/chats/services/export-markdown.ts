@@ -31,7 +31,7 @@ export class MarkdownExporter {
 
     for (const m of messages) {
       const speaker = m.role === "user" ? "You" : "Claude";
-      lines.push(`## ${speaker} — ${formatTimestamp(m.timestamp)}`);
+      lines.push(`## ${speaker} · ${formatTimestamp(m.timestamp)}`);
       lines.push("");
       lines.push(m.text || "_(no text content)_");
       lines.push("");

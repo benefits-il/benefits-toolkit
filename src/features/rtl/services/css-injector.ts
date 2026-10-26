@@ -11,6 +11,7 @@ import {
 } from "../../../shared/fs-utils";
 import { RtlMode } from "../../../core/config-manager";
 import { logger } from "../../../core/logger";
+import { HEBREW_RANGE, LATIN_RANGE } from "../../../shared/webview-theme";
 import { ClaudeAssets } from "./claude-asset-locator";
 
 const CSS_MARKERS: SentinelBlock = {
@@ -34,6 +35,26 @@ const BIDI_OVERRIDE_RULE = "*{direction:ltr;unicode-bidi:bidi-override}";
 // source if a write ever truncates the live file.
 const BACKUP_SUFFIX = ".benefit-bak";
 
+/**
+ * The fonts the toolkit ships (media/fonts), copied next to Claude Code's
+ * stylesheet so the chat can use them whether or not they are installed.
+ * Claude Code's webview allows fonts from its own folder; a relative url()
+ * resolves there.
+ */
+const BUNDLED_FONTS = [
+  { family: "Rubik", file: "rubik-hebrew.woff2", range: HEBREW_RANGE, weight: "300 900" },
+  { family: "Rubik", file: "rubik-latin.woff2", range: LATIN_RANGE, weight: "300 900" },
+  { family: "Varela Round", file: "varela-round-hebrew.woff2", range: HEBREW_RANGE, weight: "400" },
+  { family: "Varela Round", file: "varela-round-latin.woff2", range: LATIN_RANGE, weight: "400" },
+];
+const FONT_PREFIX = "benefit-";
+
+function bundledFontFaces(): string {
+  return BUNDLED_FONTS.map(
+    (f) => `@font-face { font-family: '${f.family}'; font-style: normal; font-weight: ${f.weight}; font-display: swap; src: url('${FONT_PREFIX}${f.file}') format('woff2'); unicode-range: ${f.range}; }`,
+  ).join("\n");
+}
+
 export interface InjectOptions {
   mode: Exclude<RtlMode, "off">;
   textFont: string;
@@ -48,7 +69,29 @@ export class RtlAssetPatcher {
     // The JS shim is responsible for putting that class on <body> per mode — a
     // robust, class-driven path that doesn't depend on rewriting selectors.
     const file = path.join(this.ctx.extensionPath, "dist", "assets", "rtl", "rtl-overrides.css");
-    return fs.readFile(file, "utf8");
+    return (await fs.readFile(file, "utf8")) + "\n" + bundledFontFaces();
+  }
+
+  /** Put the bundled fonts next to Claude Code's stylesheet (once per Claude Code version). */
+  private async copyFonts(assets: ClaudeAssets): Promise<void> {
+    const dir = path.dirname(assets.cssFile);
+    for (const f of BUNDLED_FONTS) {
+      const dest = path.join(dir, FONT_PREFIX + f.file);
+      if (await pathExists(dest)) continue;
+      try {
+        await fs.copyFile(path.join(this.ctx.extensionPath, "media", "fonts", f.file), dest);
+      } catch (err) {
+        // The chat falls back to its own font; RTL itself still works.
+        logger.warn("rtl", `Could not copy ${f.file} next to Claude Code's stylesheet`, err);
+      }
+    }
+  }
+
+  private async removeFonts(assets: ClaudeAssets): Promise<void> {
+    const dir = path.dirname(assets.cssFile);
+    for (const f of BUNDLED_FONTS) {
+      await fs.rm(path.join(dir, FONT_PREFIX + f.file), { force: true }).catch(() => undefined);
+    }
   }
 
   private async jsBody(opts: InjectOptions): Promise<string> {
@@ -62,6 +105,7 @@ export class RtlAssetPatcher {
 
   /** Returns true if either asset file was actually changed by this apply. */
   async apply(assets: ClaudeAssets, opts: InjectOptions): Promise<boolean> {
+    await this.copyFonts(assets);
     const cssChanged = await patchFile(assets.cssFile, CSS_MARKERS, await this.cssBody(), { stripBidi: true });
 
     // The shim is injected in EVERY mode (including "always"): it adds the
@@ -78,6 +122,7 @@ export class RtlAssetPatcher {
 
   /** Returns true if either asset file was actually changed by this removal. */
   async remove(assets: ClaudeAssets): Promise<boolean> {
+    await this.removeFonts(assets);
     const cssChanged = await restoreOrStrip(assets.cssFile, CSS_MARKERS);
     const jsChanged = await restoreOrStrip(assets.jsFile, JS_MARKERS);
     if (cssChanged || jsChanged) {

@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   buildCustomizations,
+  contrastRatio,
+  DARK_FOREGROUND,
   foregroundFor,
+  LIGHT_FOREGROUND,
   MANAGED_KEYS,
   normalizeHex,
   PRESET_PALETTE,
@@ -23,11 +26,21 @@ test("normalizeHex rejects invalid input", () => {
 });
 
 test("foregroundFor picks white on dark and dark on light backgrounds", () => {
-  assert.equal(foregroundFor("#3c0366"), "#ffffff");
-  assert.equal(foregroundFor("#2e6fb0"), "#ffffff");
-  assert.equal(foregroundFor("#fcb700"), "#15202b");
-  assert.equal(foregroundFor("#ffffff"), "#15202b");
-  assert.equal(foregroundFor("#000000"), "#ffffff");
+  assert.equal(foregroundFor("#3c0366"), LIGHT_FOREGROUND);
+  assert.equal(foregroundFor("#2e6fb0"), LIGHT_FOREGROUND);
+  assert.equal(foregroundFor("#fcb700"), DARK_FOREGROUND);
+  assert.equal(foregroundFor("#ffffff"), DARK_FOREGROUND);
+  assert.equal(foregroundFor("#000000"), LIGHT_FOREGROUND);
+});
+
+test("the text color is always the one with more contrast (pastels no longer get white at 2:1)", () => {
+  for (const hex of [...PRESET_PALETTE.map((p) => p.hex), "#38bdf8", "#fb7185", "#a78bfa", "#ec4899", "#1f8a8a"]) {
+    const fg = foregroundFor(hex);
+    const other = fg === LIGHT_FOREGROUND ? DARK_FOREGROUND : LIGHT_FOREGROUND;
+    assert.ok(contrastRatio(hex, fg) >= contrastRatio(hex, other), `${hex} got the weaker text color`);
+  }
+  assert.equal(foregroundFor("#38bdf8"), DARK_FOREGROUND, "sky");
+  assert.equal(foregroundFor("#fb7185"), DARK_FOREGROUND, "coral");
 });
 
 test("buildCustomizations sets exactly the managed keys", () => {
@@ -39,8 +52,11 @@ test("buildCustomizations sets exactly the managed keys", () => {
   assert.equal(custom["activityBar.inactiveForeground"], `${custom["activityBar.foreground"]}66`);
 });
 
-test("every preset is a normalized hex", () => {
-  for (const preset of PRESET_PALETTE) {
-    assert.equal(normalizeHex(preset.hex), preset.hex, preset.name);
-  }
+test("the palette: 38 distinct, normalized presets; the original ten kept as Mid", () => {
+  assert.equal(PRESET_PALETTE.length, 38);
+  for (const preset of PRESET_PALETTE) assert.equal(normalizeHex(preset.hex), preset.hex, preset.name);
+  assert.equal(new Set(PRESET_PALETTE.map((p) => p.hex)).size, 38);
+  assert.equal(new Set(PRESET_PALETTE.map((p) => p.name)).size, 38);
+  const mid = PRESET_PALETTE.filter((p) => p.group === "mid").map((p) => p.hex);
+  assert.deepEqual(mid, ["#c24a4a", "#c9772b", "#b8860b", "#3e8c50", "#1f8a8a", "#2e6fb0", "#4b5aa7", "#7c4da0", "#b04a8c", "#55616e"]);
 });

@@ -1,209 +1,66 @@
 import * as vscode from "vscode";
 import { ChatsGroupBy, ChatsScope, ChatsSortOrder, readConfig, updateConfigEffective } from "../../../core/config-manager";
-import { logger } from "../../../core/logger";
-import { ConversationMeta } from "../domain/conversation";
-import { ArchiveService } from "../services/archive-service";
-import { ConversationRepository } from "../services/conversation-repository";
-import { MarkdownExporter } from "../services/export-markdown";
-import { RenameService } from "../services/rename-service";
-import { ChatTreeProvider } from "./chat-tree-provider";
-import { ConversationNode } from "./chat-tree-item";
-import { ChatViewerService } from "./chat-viewer-webview";
+import type { ChatsController } from "../chats-controller";
+import type { ConversationMeta } from "../domain/conversation";
 
-export interface ChatCommandDeps {
-  provider: ChatTreeProvider;
-  repo: ConversationRepository;
-  rename: RenameService;
-  archive: ArchiveService;
-  exporter: MarkdownExporter;
-  viewer: ChatViewerService;
-}
+/** What a command may be called with: a conversation, its file (the id), or nothing (then a Quick Pick asks). */
+type ConversationArg = ConversationMeta | string | undefined;
 
-export function registerChatCommands(ctx: vscode.ExtensionContext, deps: ChatCommandDeps): vscode.Disposable[] {
-  const out: vscode.Disposable[] = [];
+export function registerChatCommands(controller: ChatsController): vscode.Disposable[] {
+  /** The conversation a command is about; from the palette, the user picks one. */
+  async function resolve(arg: ConversationArg, placeHolder: string): Promise<ConversationMeta | undefined> {
+    if (typeof arg === "string") {
+      // The list may not have been read yet in this window.
+      if (!controller.find(arg)) await controller.list();
+      return controller.find(arg);
+    }
+    if (arg && typeof arg === "object" && typeof arg.filePath === "string") return arg;
+    return controller.pickConversation(placeHolder);
+  }
 
-  out.push(
-    vscode.commands.registerCommand("benefit.chats.refresh", () => {
-      deps.provider.refresh();
-    }),
+  function action(id: string, placeHolder: string, run: (meta: ConversationMeta) => Promise<void>): vscode.Disposable {
+    return vscode.commands.registerCommand(id, async (arg?: ConversationArg) => {
+      const meta = await resolve(arg, placeHolder);
+      if (meta) await run(meta);
+    });
+  }
 
-    vscode.commands.registerCommand("benefit.chats.view", async (node?: ConversationNode | ConversationMeta) => {
-      const meta = pickMeta(node);
-      if (!meta) return;
-      await deps.viewer.open(meta);
-    }),
+  return [
+    vscode.commands.registerCommand("benefit.chats.refresh", () => controller.refresh()),
+    action("benefit.chats.view", "Open a conversation", (m) => controller.open(m)),
+    action("benefit.chats.search", "Search conversations", (m) => controller.open(m)),
+    action("benefit.chats.rename", "Rename a conversation", (m) => controller.rename(m)),
+    action("benefit.chats.archive", "Archive a conversation", (m) => controller.archive(m)),
+    action("benefit.chats.restore", "Restore a conversation", (m) => controller.restore(m)),
+    action("benefit.chats.delete", "Delete a conversation", (m) => controller.delete(m)),
+    action("benefit.chats.export", "Save a conversation as Markdown", (m) => controller.exportFull(m)),
 
-    vscode.commands.registerCommand("benefit.chats.rename", async (node?: ConversationNode | ConversationMeta) => {
-      const meta = pickMeta(node);
-      if (!meta) return;
-      await runRename(deps, meta);
-    }),
-
+    // The conversation running in this window's project, never another
+    // project's, whatever the list's scope.
     vscode.commands.registerCommand("benefit.chats.statusBarRename", async () => {
-      const active = pickActiveConversation(deps.provider);
-      if (!active) {
-        vscode.window.showInformationMessage("Benefit: no active Claude Code conversation to rename right now.");
+      const live = await controller.liveConversation();
+      if (!live) {
+        vscode.window.showInformationMessage("Benefit: no Claude Code conversation in this project yet.");
         return;
       }
-      await runRename(deps, active);
-    }),
-
-    vscode.commands.registerCommand("benefit.chats.archive", async (node?: ConversationNode | ConversationMeta) => {
-      const meta = pickMeta(node);
-      if (!meta) return;
-      try {
-        await deps.archive.archive(meta);
-        deps.provider.refresh();
-      } catch (err) {
-        logger.error("chats", "archive failed", err);
-        vscode.window.showErrorMessage(`Archive failed: ${(err as Error).message}`);
-      }
-    }),
-
-    vscode.commands.registerCommand("benefit.chats.restore", async (node?: ConversationNode | ConversationMeta) => {
-      const meta = pickMeta(node);
-      if (!meta) return;
-      try {
-        await deps.archive.restore(meta);
-        deps.provider.refresh();
-      } catch (err) {
-        logger.error("chats", "restore failed", err);
-        vscode.window.showErrorMessage(`Restore failed: ${(err as Error).message}`);
-      }
-    }),
-
-    vscode.commands.registerCommand("benefit.chats.delete", async (node?: ConversationNode | ConversationMeta) => {
-      const meta = pickMeta(node);
-      if (!meta) return;
-      const cfg = readConfig().chats;
-      if (cfg.confirmDelete) {
-        const choice = await vscode.window.showWarningMessage(
-          `Delete conversation "${meta.title}"? This cannot be undone.`,
-          { modal: true },
-          "Delete",
-        );
-        if (choice !== "Delete") return;
-      }
-      try {
-        await deps.archive.delete(meta);
-        deps.provider.refresh();
-      } catch (err) {
-        logger.error("chats", "delete failed", err);
-        vscode.window.showErrorMessage(`Delete failed: ${(err as Error).message}`);
-      }
-    }),
-
-    vscode.commands.registerCommand("benefit.chats.export", async (node?: ConversationNode | ConversationMeta) => {
-      const meta = pickMeta(node);
-      if (!meta) return;
-      const dest = await deps.exporter.suggestDest(meta);
-      if (!dest) return;
-      try {
-        await deps.exporter.exportToFile(meta, dest.fsPath);
-        const open = await vscode.window.showInformationMessage(`Exported to ${dest.fsPath}`, "Open");
-        if (open === "Open") {
-          const doc = await vscode.workspace.openTextDocument(dest);
-          await vscode.window.showTextDocument(doc);
-        }
-      } catch (err) {
-        logger.error("chats", "export failed", err);
-        vscode.window.showErrorMessage(`Export failed: ${(err as Error).message}`);
-      }
-    }),
-
-    vscode.commands.registerCommand("benefit.chats.search", async () => {
-      const all = deps.provider.allConversations();
-      const items = all.map((m) => ({
-        label: m.title,
-        description: m.projectDisplayName,
-        detail: `${m.realMessageCount} message(s) · ${m.lastModifiedAt}`,
-        meta: m,
-      }));
-      const picked = await vscode.window.showQuickPick(items, {
-        placeHolder: "Search conversations",
-        matchOnDescription: true,
-        matchOnDetail: true,
-      });
-      if (picked) {
-        await deps.viewer.open(picked.meta);
-      }
+      await controller.rename(live);
     }),
 
     vscode.commands.registerCommand("benefit.chats.toggleSort", async () => {
-      const current = readConfig().chats.sortOrder;
-      const next: ChatsSortOrder = current === "newest" ? "oldest" : "newest";
+      const next: ChatsSortOrder = readConfig().chats.sortOrder === "newest" ? "oldest" : "newest";
       await updateConfigEffective("chats.sortOrder", next);
-      deps.provider.invalidate();
     }),
-
     vscode.commands.registerCommand("benefit.chats.toggleGroupBy", async () => {
       const order: ChatsGroupBy[] = ["date", "project", "flat"];
       const current = readConfig().chats.groupBy;
-      const next = order[(order.indexOf(current) + 1) % order.length];
-      await updateConfigEffective("chats.groupBy", next);
-      vscode.window.showInformationMessage(`Benefit Chats: group by ${next}.`);
-      deps.provider.invalidate();
+      await updateConfigEffective("chats.groupBy", order[(order.indexOf(current) + 1) % order.length]);
     }),
-
     vscode.commands.registerCommand("benefit.chats.toggleArchived", async () => {
-      const current = readConfig().chats.showArchived;
-      await updateConfigEffective("chats.showArchived", !current);
-      deps.provider.refresh();
+      await updateConfigEffective("chats.showArchived", !readConfig().chats.showArchived);
     }),
-
-    // One behaviour, three ids: VS Code cannot swap a single command's icon, so
-    // the title bar contributes two mutually-exclusive entries (each showing the
-    // current state) and the palette keeps the plain toggle.
-    ...["benefit.chats.toggleScope", "benefit.chats.scopeToAll", "benefit.chats.scopeToCurrent"].map((id) =>
-      vscode.commands.registerCommand(id, () => toggleScope(deps)),
-    ),
-  );
-
-  ctx.subscriptions.push(...out);
-  return out;
-}
-
-async function toggleScope(deps: ChatCommandDeps): Promise<void> {
-  const current = readConfig().chats.scope;
-  const next: ChatsScope = current === "currentWorkspace" ? "all" : "currentWorkspace";
-  await updateConfigEffective("chats.scope", next);
-  vscode.window.showInformationMessage(
-    next === "all"
-      ? "Benefit Chats: showing conversations from all projects."
-      : "Benefit Chats: showing only this project's conversations.",
-  );
-  deps.provider.refresh();
-}
-
-async function runRename(deps: ChatCommandDeps, meta: ConversationMeta): Promise<void> {
-  const next = await vscode.window.showInputBox({
-    title: "Rename conversation",
-    value: meta.title,
-    prompt: "New title",
-    valueSelection: [0, meta.title.length],
-  });
-  if (next === undefined || next.trim() === meta.title) return;
-  try {
-    await deps.rename.rename(meta.filePath, next);
-    deps.provider.refresh();
-    deps.viewer.refreshOpen(meta.filePath);
-  } catch (err) {
-    logger.error("chats", "rename failed", err);
-    vscode.window.showErrorMessage(`Rename failed: ${(err as Error).message}`);
-  }
-}
-
-function pickMeta(node?: ConversationNode | ConversationMeta): ConversationMeta | undefined {
-  if (!node) return undefined;
-  if ((node as ConversationNode).kind === "conversation") {
-    return (node as ConversationNode).meta;
-  }
-  return node as ConversationMeta;
-}
-
-function pickActiveConversation(provider: ChatTreeProvider): ConversationMeta | undefined {
-  const all = provider.allConversations();
-  if (all.length === 0) return undefined;
-  const sorted = all.slice().sort((a, b) => b.lastModifiedAt.localeCompare(a.lastModifiedAt));
-  return sorted[0];
+    vscode.commands.registerCommand("benefit.chats.toggleScope", async () => {
+      const next: ChatsScope = readConfig().chats.scope === "currentWorkspace" ? "all" : "currentWorkspace";
+      await updateConfigEffective("chats.scope", next);
+    }),
+  ];
 }

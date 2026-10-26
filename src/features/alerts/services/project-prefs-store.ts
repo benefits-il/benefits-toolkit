@@ -8,7 +8,7 @@ const NAMES_KEY = "alerts.projectNames";
 /** A project's own sounds; a missing slot falls back to the global default. */
 export type ProjectSoundOverrides = Partial<Record<SoundSlot, string>>;
 
-// Shared across instances: the Alerts panel writes, the registry writer
+// Shared across instances: Toolkit Settings writes, the registry writer
 // (inside the alerts feature) mirrors the change into the project's record.
 const changed = new vscode.EventEmitter<void>();
 export const onProjectPrefsChanged = changed.event;
@@ -38,6 +38,13 @@ export class ProjectPrefsStore {
 
   sounds(folder: string): ProjectSoundOverrides {
     return this.read<ProjectSoundOverrides>(SOUNDS_KEY)[projectKey(folder)] ?? {};
+  }
+
+  /** Every project's own "finished" sound, so a new project can get one nobody uses. */
+  allStopSounds(): string[] {
+    return Object.values(this.read<ProjectSoundOverrides>(SOUNDS_KEY))
+      .map((s) => s.stop)
+      .filter((id): id is string => typeof id === "string" && id.length > 0);
   }
 
   /** Set (or with undefined, clear) a project's sound for one slot. */

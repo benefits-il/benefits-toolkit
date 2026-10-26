@@ -1,12 +1,19 @@
 import * as vscode from "vscode";
 import { logger } from "../../../core/logger";
-import { normalizeHex, PRESET_PALETTE } from "../services/color-utils";
+import { normalizeHex, PresetGroup, PRESET_PALETTE } from "../services/color-utils";
 import { WindowColorService } from "../services/window-color-service";
 
 interface ColorPickItem extends vscode.QuickPickItem {
   action: "preset" | "custom" | "clear";
   hex?: string;
 }
+
+const GROUP_LABELS: Record<PresetGroup, string> = {
+  benefits: "Benefits colors",
+  deep: "Deep",
+  mid: "Mid",
+  soft: "Soft",
+};
 
 export function registerWindowColorCommands(
   ctx: vscode.ExtensionContext,
@@ -18,21 +25,30 @@ export function registerWindowColorCommands(
     vscode.commands.registerCommand("benefit.windowColor.pick", async () => {
       try {
         const current = service.getCurrentColor();
-        const items: ColorPickItem[] = PRESET_PALETTE.map((preset) => ({
-          action: "preset",
-          hex: preset.hex,
-          label: preset.name,
-          description: preset.hex === current ? `${preset.hex} (current)` : preset.hex,
-        }));
+        const items: ColorPickItem[] = [];
+        let group: PresetGroup | undefined;
+        for (const preset of PRESET_PALETTE) {
+          if (preset.group !== group) {
+            group = preset.group;
+            items.push({ action: "preset", label: GROUP_LABELS[group], kind: vscode.QuickPickItemKind.Separator });
+          }
+          items.push({
+            action: "preset",
+            hex: preset.hex,
+            label: preset.name,
+            description: preset.hex === current ? `${preset.hex} (current)` : preset.hex,
+          });
+        }
         items.push(
           { action: "custom", label: "", kind: vscode.QuickPickItemKind.Separator },
-          { action: "custom", label: "Custom…", description: "Enter a hex color" },
+          { action: "custom", label: "Custom color", description: "Enter a hex color" },
           { action: "clear", label: "Clear window color", description: "Remove the color from this workspace" },
         );
 
         const picked = await vscode.window.showQuickPick(items, {
           title: "Benefit: Window Color",
           placeHolder: "Pick a color for this window (title, activity and status bars)",
+          matchOnDescription: true,
         });
         if (!picked) return;
 
@@ -58,7 +74,7 @@ export function registerWindowColorCommands(
         await service.apply(hex);
       } catch (err) {
         logger.error("windowColor", "pick failed", err);
-        vscode.window.showErrorMessage(`Benefit: setting window color failed — ${(err as Error).message}`);
+        vscode.window.showErrorMessage(`Benefit: setting window color failed. ${(err as Error).message}`);
       }
     }),
 
@@ -67,7 +83,7 @@ export function registerWindowColorCommands(
         await service.clear();
       } catch (err) {
         logger.error("windowColor", "clear failed", err);
-        vscode.window.showErrorMessage(`Benefit: clearing window color failed — ${(err as Error).message}`);
+        vscode.window.showErrorMessage(`Benefit: clearing window color failed. ${(err as Error).message}`);
       }
     }),
   );

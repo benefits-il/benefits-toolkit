@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { readConfig } from "../../../core/config-manager";
 import { logger } from "../../../core/logger";
 import { pathExists } from "../../../shared/fs-utils";
+import { openInMdHe } from "../../chats/services/md-he-launcher";
 import { resolveBrowserLaunch, runDetached } from "../services/browser-launch";
 
 export function registerHtmlOpenCommands(ctx: vscode.ExtensionContext): vscode.Disposable[] {
@@ -24,7 +25,7 @@ export function registerHtmlOpenCommands(ctx: vscode.ExtensionContext): vscode.D
 
         if (!(await pathExists(browserPath))) {
           vscode.window.showErrorMessage(
-            `Benefit: browser not found at "${browserPath}" — fix benefit.htmlOpen.browserPath, or clear it to use the system default browser.`,
+            `Benefit: browser not found at "${browserPath}". Fix benefit.htmlOpen.browserPath, or clear it to use the system default browser.`,
           );
           return;
         }
@@ -33,7 +34,34 @@ export function registerHtmlOpenCommands(ctx: vscode.ExtensionContext): vscode.D
         await runDetached(cmd, args);
       } catch (err) {
         logger.error("htmlOpen", "openInBrowser failed", err);
-        vscode.window.showErrorMessage(`Benefit: opening in browser failed — ${(err as Error).message}`);
+        vscode.window.showErrorMessage(`Benefit: opening in browser failed. ${(err as Error).message}`);
+      }
+    }),
+  );
+
+  disposables.push(
+    // A Markdown file in md-he: the editor's text when it is open (unsaved
+    // changes included), else the file on disk.
+    vscode.commands.registerCommand("benefit.mdHe.openFile", async (uri?: vscode.Uri) => {
+      try {
+        const target = uri ?? vscode.window.activeTextEditor?.document.uri;
+        if (!target || target.scheme !== "file") {
+          vscode.window.showInformationMessage("Benefit: no Markdown file to open.");
+          return;
+        }
+        const open = vscode.workspace.textDocuments.find((d) => d.uri.toString() === target.toString());
+        const text = open ? open.getText() : new TextDecoder().decode(await vscode.workspace.fs.readFile(target));
+        if (!text.trim()) {
+          vscode.window.showInformationMessage("Benefit: this file is empty.");
+          return;
+        }
+        const result = await openInMdHe(text);
+        if (result === "clipboard") {
+          vscode.window.showInformationMessage("Benefit: the file is too long for a link. It is on the clipboard: press Paste in md-he.");
+        }
+      } catch (err) {
+        logger.error("htmlOpen", "openInMdHe failed", err);
+        vscode.window.showErrorMessage(`Benefit: opening in md-he failed. ${(err as Error).message}`);
       }
     }),
   );

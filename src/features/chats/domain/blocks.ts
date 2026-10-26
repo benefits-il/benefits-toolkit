@@ -70,6 +70,14 @@ export interface UsageSnapshot {
   model: string | undefined;
 }
 
+/**
+ * The context window every conversation is measured against. Claude Code does
+ * not record the window's size, and a guess per model was wrong as often as
+ * not, so the meters use one size.
+ */
+export const CONTEXT_WINDOW = 1_000_000;
+
+/** The usage of the last assistant reply. Replies with no usage at all (Claude Code's synthetic ones) are skipped. */
 export function readLastUsage(records: RawJsonlRecord[]): UsageSnapshot | undefined {
   for (let i = records.length - 1; i >= 0; i--) {
     const r = records[i];
@@ -79,7 +87,7 @@ export function readLastUsage(records: RawJsonlRecord[]): UsageSnapshot | undefi
     const usage = (msg as Record<string, unknown>)["usage"];
     if (!usage || typeof usage !== "object") continue;
     const u = usage as Record<string, unknown>;
-    return {
+    const snapshot: UsageSnapshot = {
       inputTokens: toNumber(u["input_tokens"]),
       cacheReadInputTokens: toNumber(u["cache_read_input_tokens"]),
       cacheCreationInputTokens: toNumber(u["cache_creation_input_tokens"]),
@@ -87,8 +95,14 @@ export function readLastUsage(records: RawJsonlRecord[]): UsageSnapshot | undefi
         ? ((msg as Record<string, unknown>)["model"] as string)
         : undefined,
     };
+    if (contextTokens(snapshot) > 0) return snapshot;
   }
   return undefined;
+}
+
+/** How much of the context window the reply had in front of it. */
+export function contextTokens(u: UsageSnapshot): number {
+  return u.inputTokens + u.cacheReadInputTokens + u.cacheCreationInputTokens;
 }
 
 function toNumber(value: unknown): number {

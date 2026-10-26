@@ -5,12 +5,11 @@ import { onConfigChanged } from "./core/config-manager";
 import { createRtlFeature } from "./features/rtl/rtl-feature";
 import { createAlertsFeature } from "./features/alerts/alerts-feature";
 import { createChatsFeature } from "./features/chats/chats-feature";
-import { createWindowColorFeature } from "./features/window-color/window-color-feature";
+import { createWindowColorFeature, stashWindowColorIfOff } from "./features/window-color/window-color-feature";
 import { createHtmlOpenFeature } from "./features/html-open/html-open-feature";
-import { AlertsViewProvider } from "./features/alerts/ui/alerts-view-provider";
-import { ColorsViewProvider } from "./features/window-color/ui/colors-view-provider";
-import { ToolkitViewProvider } from "./features/toolkit-panel/ui/toolkit-view-provider";
-import { BrandViewProvider } from "./features/brand/ui/brand-view-provider";
+import { ProjectDefaults } from "./features/project-defaults/project-defaults";
+import { SidebarViewProvider } from "./features/sidebar/sidebar-view-provider";
+import { registerSidebarCommands } from "./features/sidebar/sidebar-commands";
 
 let registry: FeatureRegistry | undefined;
 
@@ -24,30 +23,22 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<void> {
   registry.register(createWindowColorFeature(ctx));
   registry.register(createHtmlOpenFeature(ctx));
 
-  // The Alerts panel is always available (even when sounds and popup are off, so
-  // its switches are reachable), so it lives outside the enabled-gated
-  // feature lifecycle. The Toolkit panel likewise: it is where every feature
-  // is turned back on.
+  // The sidebar is always there, outside the enabled-gated feature
+  // lifecycle: its Settings tab is where every feature is turned back on.
+  const sidebar = new SidebarViewProvider(ctx);
   ctx.subscriptions.push(
-    vscode.window.registerWebviewViewProvider(
-      BrandViewProvider.viewType,
-      new BrandViewProvider(),
-    ),
-    vscode.window.registerWebviewViewProvider(
-      ToolkitViewProvider.viewType,
-      new ToolkitViewProvider(),
-    ),
-    vscode.window.registerWebviewViewProvider(
-      AlertsViewProvider.viewType,
-      new AlertsViewProvider(ctx),
-    ),
-    vscode.window.registerWebviewViewProvider(
-      ColorsViewProvider.viewType,
-      new ColorsViewProvider(ctx),
-    ),
+    // Kept alive while hidden: the list is there at once, and "Show in list" or
+    // "Toolkit Settings" never posts to a page that is still loading.
+    vscode.window.registerWebviewViewProvider(SidebarViewProvider.viewType, sidebar, {
+      webviewOptions: { retainContextWhenHidden: true },
+    }),
+    ...registerSidebarCommands(sidebar),
   );
 
   await registry.syncFromConfig();
+  await stashWindowColorIfOff(ctx);
+  // A new project's own color and sound; it checks its switches each time.
+  ctx.subscriptions.push(new ProjectDefaults(ctx));
 
   ctx.subscriptions.push(
     onConfigChanged(() => {

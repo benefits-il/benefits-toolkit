@@ -2,7 +2,7 @@
   "name": "benefits-toolkit",
   "displayName": "Benefit's Toolkit",
   "description": "Quality-of-life tools for Claude Code: RTL chat, sounds, a conversation manager and viewer, window colors and HTML in your browser. Part of Benefits, the course that teaches you to work right with AI (benefits-il.dev).",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "publisher": "benakiva",
   "author": {
     "name": "Ben Akiva"
@@ -54,55 +54,13 @@
       "benefit-sidebar": [
         {
           "type": "webview",
-          "id": "benefit.brandView",
-          "name": "Benefits",
+          "id": "benefit.sidebar",
+          "name": "Benefit's Toolkit",
           "icon": "media/activity-icon.svg",
-          "contextualTitle": "Benefits",
-          "initialSize": 10
-        },
-        {
-          "id": "benefit.chatsView",
-          "name": "Claude Chats",
-          "icon": "media/activity-icon.svg",
-          "contextualTitle": "Claude Chats",
-          "when": "config.benefit.chats.enabled"
-        },
-        {
-          "type": "webview",
-          "id": "benefit.soundsView",
-          "name": "Alerts",
-          "icon": "media/activity-icon.svg",
-          "contextualTitle": "Alerts"
-        },
-        {
-          "type": "webview",
-          "id": "benefit.colorsView",
-          "name": "Colors",
-          "icon": "media/activity-icon.svg",
-          "contextualTitle": "Colors",
-          "when": "config.benefit.windowColor.enabled"
-        },
-        {
-          "type": "webview",
-          "id": "benefit.toolkitView",
-          "name": "Toolkit",
-          "icon": "media/activity-icon.svg",
-          "contextualTitle": "Toolkit"
+          "contextualTitle": "Benefit's Toolkit"
         }
       ]
     },
-    "viewsWelcome": [
-      {
-        "view": "benefit.chatsView",
-        "when": "workbenchState == empty",
-        "contents": "No folder is open, so there is no project to scope to.\n[Show All Projects](command:benefit.chats.toggleScope)\n[Open Folder](command:workbench.action.files.openFolder)"
-      },
-      {
-        "view": "benefit.chatsView",
-        "when": "workbenchState != empty",
-        "contents": "No conversations for this project yet.\nThe list is scoped to the folder open in this window.\n[Show All Projects](command:benefit.chats.toggleScope)\n[Refresh](command:benefit.chats.refresh)"
-      }
-    ],
     "commands": [
       { "command": "benefit.rtl.toggle", "title": "RTL: Toggle", "category": "Benefit" },
       { "command": "benefit.rtl.enableActive", "title": "RTL: Enable (Active mode)", "category": "Benefit" },
@@ -113,15 +71,20 @@
 
       { "command": "benefit.sounds.install", "title": "Sounds: Install Hooks", "category": "Benefit" },
       { "command": "benefit.sounds.uninstall", "title": "Sounds: Uninstall Hooks", "category": "Benefit" },
-      { "command": "benefit.sounds.chooseSounds", "title": "Sounds: Choose Sound Variants", "category": "Benefit" },
+      { "command": "benefit.sounds.chooseSounds", "title": "Sounds: Choose Sounds", "category": "Benefit" },
       { "command": "benefit.sounds.test", "title": "Sounds: Test Playback", "category": "Benefit" },
       { "command": "benefit.sounds.status", "title": "Sounds: Show Status", "category": "Benefit" },
       { "command": "benefit.popup.test", "title": "Popup: Test", "category": "Benefit" },
 
+      { "command": "benefit.settings.open", "title": "Toolkit Settings", "category": "Benefit" },
+      { "command": "benefit.settings.close", "title": "Show Chats", "category": "Benefit" },
+      { "command": "benefit.appearance.chooseTheme", "title": "Theme", "category": "Benefit" },
+
       { "command": "benefit.windowColor.pick", "title": "Window Color: Pick", "category": "Benefit" },
       { "command": "benefit.windowColor.clear", "title": "Window Color: Clear", "category": "Benefit" },
 
-      { "command": "benefit.html.openInBrowser", "title": "Open in External Browser", "category": "Benefit", "icon": "$(link-external)" },
+      { "command": "benefit.html.openInBrowser", "title": "Benefits: Open in Browser", "icon": { "light": "media/benefits-mark-light.svg", "dark": "media/benefits-mark-dark.svg" } },
+      { "command": "benefit.mdHe.openFile", "title": "Benefits: Open in md-he", "icon": { "light": "media/benefits-mark-light.svg", "dark": "media/benefits-mark-dark.svg" } },
 
       { "command": "benefit.chats.refresh", "title": "Refresh", "category": "Benefit Chats", "icon": "$(refresh)" },
       { "command": "benefit.chats.rename", "title": "Rename", "category": "Benefit Chats", "icon": "$(edit)" },
@@ -134,16 +97,19 @@
       { "command": "benefit.chats.toggleSort", "title": "Toggle Sort Order", "category": "Benefit Chats", "icon": "$(sort-precedence)" },
       { "command": "benefit.chats.toggleGroupBy", "title": "Toggle Group By (Date / Project)", "category": "Benefit Chats" },
       { "command": "benefit.chats.toggleArchived", "title": "Show/Hide Archived", "category": "Benefit Chats", "icon": "$(eye)" },
-      { "command": "benefit.chats.toggleScope", "title": "Toggle Scope (Current Project / All)", "category": "Benefit Chats" },
-      { "command": "benefit.chats.scopeToAll", "title": "Scope: This Project — click for All Projects", "category": "Benefit Chats", "icon": "$(filter-filled)" },
-      { "command": "benefit.chats.scopeToCurrent", "title": "Scope: All Projects — click for This Project", "category": "Benefit Chats", "icon": "$(filter)" },
-      { "command": "benefit.chats.statusBarRename", "title": "Rename Active Conversation", "category": "Benefit Chats" }
+      { "command": "benefit.chats.toggleScope", "title": "Toggle Scope (This Project / All Projects)", "category": "Benefit Chats" },
+      { "command": "benefit.chats.statusBarRename", "title": "Rename This Project's Latest Conversation", "category": "Benefit Chats" }
     ],
     "menus": {
       "editor/title": [
         {
           "command": "benefit.html.openInBrowser",
           "when": "config.benefit.htmlOpen.enabled && (resourceExtname == .html || resourceExtname == .htm)",
+          "group": "navigation@1"
+        },
+        {
+          "command": "benefit.mdHe.openFile",
+          "when": "config.benefit.htmlOpen.enabled && config.benefit.htmlOpen.mdHe && (resourceExtname == .md || resourceExtname == .markdown)",
           "group": "navigation@1"
         }
       ],
@@ -152,29 +118,28 @@
           "command": "benefit.html.openInBrowser",
           "when": "config.benefit.htmlOpen.enabled && (resourceExtname == .html || resourceExtname == .htm)",
           "group": "navigation@10"
+        },
+        {
+          "command": "benefit.mdHe.openFile",
+          "when": "config.benefit.htmlOpen.enabled && config.benefit.htmlOpen.mdHe && (resourceExtname == .md || resourceExtname == .markdown)",
+          "group": "navigation@10"
         }
-      ],
-      "view/title": [
-        { "command": "benefit.chats.refresh", "when": "view == benefit.chatsView", "group": "navigation@1" },
-        { "command": "benefit.chats.search", "when": "view == benefit.chatsView", "group": "navigation@2" },
-        { "command": "benefit.chats.scopeToAll", "when": "view == benefit.chatsView && !benefit.chats.scopeAll", "group": "navigation@3" },
-        { "command": "benefit.chats.scopeToCurrent", "when": "view == benefit.chatsView && benefit.chats.scopeAll", "group": "navigation@3" },
-        { "command": "benefit.chats.toggleSort", "when": "view == benefit.chatsView", "group": "navigation@4" },
-        { "command": "benefit.chats.toggleArchived", "when": "view == benefit.chatsView", "group": "navigation@5" },
-        { "command": "benefit.chats.toggleGroupBy", "when": "view == benefit.chatsView", "group": "1_view" }
-      ],
-      "view/item/context": [
-        { "command": "benefit.chats.view", "when": "view == benefit.chatsView && viewItem == conversation", "group": "1_open@1" },
-        { "command": "benefit.chats.rename", "when": "view == benefit.chatsView && viewItem == conversation", "group": "2_edit@1" },
-        { "command": "benefit.chats.archive", "when": "view == benefit.chatsView && viewItem == conversation", "group": "2_edit@2" },
-        { "command": "benefit.chats.restore", "when": "view == benefit.chatsView && viewItem == archived-conversation", "group": "2_edit@1" },
-        { "command": "benefit.chats.export", "when": "view == benefit.chatsView && viewItem =~ /conversation/", "group": "3_actions@1" },
-        { "command": "benefit.chats.delete", "when": "view == benefit.chatsView && viewItem =~ /conversation/", "group": "9_destroy@1" }
       ]
     },
     "configuration": {
       "title": "Benefit's Toolkit",
       "properties": {
+        "benefit.appearance.theme": {
+          "type": "string",
+          "enum": ["auto", "light", "dark"],
+          "default": "auto",
+          "enumDescriptions": [
+            "Follow the editor's theme.",
+            "Light (cream).",
+            "Dark (Graphite)."
+          ],
+          "description": "Theme for the sidebar, the conversation viewer and the desktop popup. High contrast in the editor always wins."
+        },
         "benefit.rtl.enabled": {
           "type": "boolean",
           "default": true,
@@ -249,7 +214,7 @@
             "tile-reveal.wav"
           ],
           "default": "stop-default.wav",
-          "description": "Sound file (from the bundled pool) to play when Claude finishes a message. Pick visually in the Sounds panel."
+          "description": "Sound file (from the bundled pool) to play when Claude finishes a message. Pick one in Toolkit Settings, Sounds."
         },
         "benefit.sounds.notificationSound": {
           "type": "string",
@@ -288,12 +253,12 @@
             "tile-reveal.wav"
           ],
           "default": "notify-default.wav",
-          "description": "Sound file (from the bundled pool) to play when Claude needs your input. Pick visually in the Sounds panel."
+          "description": "Sound file (from the bundled pool) to play when Claude needs your input. Pick one in Toolkit Settings, Sounds."
         },
         "benefit.popup.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Show a small desktop popup, in the project's window color and name, when the agent finishes or needs you. Clicking it brings that project's window to the front. Never shown while that window is already focused."
+          "description": "Show a small desktop card with the project's name and color when the agent finishes or needs input. Clicking it brings that project's window to the front. Never shown while that window is already focused."
         },
         "benefit.popup.onDone": {
           "type": "boolean",
@@ -311,6 +276,21 @@
           "minimum": 3,
           "maximum": 60,
           "description": "How many seconds the popup stays up. Hovering over it pauses the countdown."
+        },
+        "benefit.sounds.autoAssign": {
+          "type": "boolean",
+          "default": true,
+          "description": "Give each new project a 'finished' sound no other project uses. A project is new the first time this window sees a Claude Code conversation in it."
+        },
+        "benefit.windowColor.autoAssign": {
+          "type": "boolean",
+          "default": true,
+          "description": "Give each new project a window color no other project uses. A project is new the first time this window sees a Claude Code conversation in it."
+        },
+        "benefit.popup.stayUntilClicked": {
+          "type": "boolean",
+          "default": false,
+          "description": "Keep the popup up until you click it or close it. The seconds setting is not used then."
         },
         "benefit.sounds.cleanupOnDeactivate": {
           "type": "boolean",
@@ -352,7 +332,7 @@
         "benefit.chats.hideEmpty": {
           "type": "boolean",
           "default": true,
-          "description": "Hide conversations that contain no real user/assistant messages."
+          "description": "Hide conversations that contain no real messages."
         },
         "benefit.chats.confirmDelete": {
           "type": "boolean",
@@ -377,12 +357,17 @@
         "benefit.windowColor.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Enable the Window Color feature (per-workspace title/activity/status bar colors)."
+          "description": "Color each window (title, activity and status bars) so projects are easy to tell apart. Off removes the color and keeps it for when it is turned back on."
         },
         "benefit.htmlOpen.enabled": {
           "type": "boolean",
           "default": true,
           "description": "Enable the Open HTML in External Browser feature."
+        },
+        "benefit.htmlOpen.mdHe": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the Benefits button that opens a Markdown file in md-he (benefits-il.dev/md-he), in the editor's title bar and the Explorer's right-click menu."
         },
         "benefit.htmlOpen.browserPath": {
           "type": "string",

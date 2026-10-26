@@ -90,13 +90,19 @@ try {
         $labels = @{ claude = "Claude"; cursor = "Cursor"; antigravity = "Antigravity" }
         $agentLabel = if ($labels.ContainsKey($Agent)) { $labels[$Agent] } else { $Agent }
         $name = if ($project -and $project.name) { [string]$project.name } elseif ($folder) { Split-Path -Leaf $folder } else { $agentLabel }
+        # The record carries the text color and the theme the extension worked
+        # out; older records lack them, and popup.ps1 falls back on its own.
         $job = [ordered]@{
             title    = $name
-            subtitle = if ($Kind -eq "waiting") { "$agentLabel needs you" } else { "$agentLabel finished" }
+            subtitle = if ($Kind -eq "waiting") { "$agentLabel needs input" } else { "$agentLabel finished" }
+            kind     = $Kind
             color    = if ($project -and $project.color) { [string]$project.color } else { "#047857" }
+            text     = if ($project -and $project.colorText) { [string]$project.colorText } else { $null }
+            theme    = if ($project -and $project.theme) { [string]$project.theme } else { "dark" }
             cli      = if ($project) { $project.cli } else { $null }
             folder   = if ($project) { [string]$project.folder } else { $folder }
             seconds  = $config.popup.seconds
+            stay     = ($config.popup.stay -eq $true)
         }
         $jobsDir = Join-Path $stateDir "popups"
         New-Item -ItemType Directory -Force -Path $jobsDir | Out-Null

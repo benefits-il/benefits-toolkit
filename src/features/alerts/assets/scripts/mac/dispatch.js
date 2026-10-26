@@ -112,13 +112,19 @@ function run(argv) {
     if (wantPopup && !focused) {
       const labels = { claude: 'Claude', cursor: 'Cursor', antigravity: 'Antigravity' };
       const agentLabel = labels[agent] || agent;
+      // The record carries the text color and the theme the extension worked
+      // out; older records lack them, and popup.js falls back on its own.
       const job = {
         title: (project && project.name) || (folder ? folder.replace(/\/+$/, '').split('/').pop() : agentLabel),
-        subtitle: kind === 'waiting' ? agentLabel + ' needs you' : agentLabel + ' finished',
+        subtitle: kind === 'waiting' ? agentLabel + ' needs input' : agentLabel + ' finished',
+        kind: kind,
         color: (project && project.color) || '#047857',
+        text: (project && project.colorText) || null,
+        theme: (project && project.theme) || 'dark',
         cli: project ? project.cli : null,
         folder: project ? project.folder : folder,
         seconds: config.popup.seconds,
+        stay: config.popup.stay === true,
       };
       const jobsDir = stateDir + '/popups';
       mkdirs(jobsDir);

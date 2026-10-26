@@ -35,6 +35,8 @@ export interface ConversationMeta {
   firstMessageAt: string | undefined;
   lastModifiedAt: string;
   realMessageCount: number;
+  /** Context the last reply used, from the usage near the end of the file; undefined without one. */
+  contextTokens: number | undefined;
   archived: boolean;
   sizeBytes: number;
 }

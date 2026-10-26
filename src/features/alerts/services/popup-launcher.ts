@@ -3,16 +3,29 @@ import { randomUUID } from "node:crypto";
 import * as path from "node:path";
 import { toolkitBinDir, toolkitHome } from "../../../core/paths";
 import { atomicWriteText } from "../../../shared/fs-utils";
+import type { ResolvedTheme } from "../../../shared/theme-resolve";
 import type { HookPlatform } from "./hook-command";
+
+/** The tile's color when a project has no window color: the Benefits green. */
+export const DEFAULT_POPUP_COLOR = "#047857";
 
 /** What popup.ps1 / popup.js show; same shape the dispatchers write. */
 export interface PopupJob {
   title: string;
   subtitle: string;
+  /** finished (check icon) or waiting (bell icon). */
+  kind: "done" | "waiting";
+  /** The project's color: the tile beside the name. */
   color: string;
+  /** A readable color on `color` (foregroundFor), for the tile's icon. */
+  text: string;
+  /** The card follows the toolkit's theme (Appearance). */
+  theme: ResolvedTheme;
   cli: string | null;
   folder: string | null;
   seconds: number;
+  /** Up until clicked or closed; `seconds` is not used then. */
+  stay: boolean;
 }
 
 /**

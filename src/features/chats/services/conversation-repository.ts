@@ -2,6 +2,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { claudeArchiveDir, claudeProjectsDir } from "../../../core/paths";
 import { atomicWriteText, pathExists } from "../../../shared/fs-utils";
+import { contextTokens, readLastUsage } from "../domain/blocks";
 import { ConversationMeta, MessageRecord, RawJsonlRecord, RenderedMessage } from "../domain/conversation";
 import { isAiTitle, isCustomTitle, isMessage, isRealMessage, isSummary, parseJsonlText } from "../domain/jsonl-parser";
 
@@ -138,12 +139,16 @@ export class ConversationRepository {
     }
 
     const conversationId = path.basename(filePath, ".jsonl");
+    // The last reply sits in the tail (or, for a short file, in the head).
+    const usage = readLastUsage(tailRecords.length ? tailRecords : records);
 
     return {
       filePath,
       fileName: path.basename(filePath),
       projectFolder,
-      projectDisplayName: humanizeProjectFolder(projectFolder),
+      // The folder Claude Code ran in names the project ("benefits-toolkit");
+      // the encoded folder name is a lossy fallback for files without a cwd.
+      projectDisplayName: (cwd && path.basename(cwd.replace(/[\\/]+$/, ""))) || humanizeProjectFolder(projectFolder),
       conversationId,
       cwd,
       title: customTitle ?? aiTitle ?? summary?.summary ?? deriveTitle(userTexts) ?? "(empty conversation)",
@@ -152,6 +157,7 @@ export class ConversationRepository {
       firstMessageAt,
       lastModifiedAt: stat.mtime.toISOString(),
       realMessageCount,
+      contextTokens: usage ? contextTokens(usage) : undefined,
       archived,
       sizeBytes: stat.size,
     };

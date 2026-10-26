@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.8.0 · One sidebar, a new look
+
+**One sidebar, two tabs.** The sidebar is a single page now, with **Chats** and **Settings** tabs at the top and a theme button beside them. The native chats tree and the separate settings view are gone.
+
+**Chats.** Search by title or project, a clear *This project* / *All projects* switch, and groups by date or by project. Each row shows how full the conversation's context window is, as a small bar and a percent (measured against 1M tokens). Right-click a conversation, or press Shift+F10, for Open, Rename, Archive, Save as Markdown and Delete. The arrow keys, Home, End and Enter work in the list. The dot on each row is that project's window color.
+
+**Settings, one page per feature.** Appearance, Window colors, Sounds, Desktop popup, Conversations, RTL in Claude Code, Open in browser and Troubleshooting. Each feature's on/off switch sits at the top of its page, with its options under it. Lists are dropdowns in the toolkit's own style.
+
+**The conversation viewer reads like a chat.**
+- Newest exchange on top. In each exchange, your message sits in a gray bubble on the right and Claude's answer in a bubble in the project's color on the left, each with its avatar: a person for you, Claude's mark for Claude.
+- Everything that is not the answer folds into one line between the two, like "12 updates, 31 tool calls · Read, Edit, Bash": Claude's running notes, tool calls, results and thinking. Click it to open them.
+- Text attached to your message (a pasted block, a system reminder, an open file) folds into a line inside your bubble; your own words stay.
+- Find in the conversation (Ctrl+F or Cmd+F) with a match counter and arrows. A match opens whatever holds it.
+- Text direction is Auto by default: every paragraph follows its own language, so Hebrew and English sit right in one message. LTR and RTL force one direction.
+- Display can hide Claude's work or its thinking, in every open viewer. More has Rename, Save full conversation, Save visible messages, Archive, Show in list and Delete.
+
+**A theme for everything: Auto, Light or Dark.** The new `benefit.appearance.theme` covers the sidebar, the viewer and the desktop popup. Auto follows the editor, and high contrast in the editor always wins. Dark is "Graphite", a dark gray close to the editor's own, with green only in the accents; Light is cream.
+
+**Sounds are chosen in a list that stays open.** Click a sound to hear it and choose it, then the next one. The list closes when you click outside it. No more Quick Pick at the top of the window.
+
+**New projects get their own color and sound.** The first time a window sees a Claude Code conversation in its folder, the project gets a window color and a "finished" sound no other project uses. "Needs input" stays one shared sound. A color you set or cleared yourself is kept. Switches: `benefit.windowColor.autoAssign` and `benefit.sounds.autoAssign`.
+
+**The popup, restyled.** A small card in the toolkit's theme, framed in the project's color: a tile in that color with a check when Claude finishes or a bell when it needs input, then the name and the status. New: `benefit.popup.stayUntilClicked` keeps it up until you click it or its x.
+
+**RTL fonts from a list.** The chat text and code fonts are picked from the fonts on this computer, plus Rubik and Varela Round, which come with the toolkit and are copied next to Claude Code's stylesheet. The Claude Code folder override left the sidebar; it stays in `settings.json`.
+
+**Markdown in md-he, from the file.** A Benefits button on `.md` files, in the editor's title bar and the Explorer's right-click menu, opens the file in md-he. The HTML button carries the same Benefits mark. Switch: `benefit.htmlOpen.mdHe`.
+
+**The Benefits card speaks English.** At the foot of the sidebar: the logo, "Benefits" with the course's slogan, *AI that finally fits · Ben Akiva*, and "This tool is part of Benefits · the course that teaches you to work right with AI".
+
+**38 window colors.** The eight Benefits colors, and ten hues in deep, mid and soft (the old ten are the mid row), plus any hex or a color picker.
+
+**Fixed**
+- The text on a window color is whichever of white or dark reads better. Pastels like sky or coral used to get white text at about 2:1, and the popup and the title bar could disagree.
+- Window colors off removes the color from the window and keeps it; turning it on brings it back. Clear forgets it, even while off.
+- Test sounds plays this project's own sounds, not only the defaults.
+- The status bar rename always renames this project's latest conversation, never another project's.
+- The RTL status bar item is no longer yellow when on, and turning RTL back on returns to the mode used last instead of Always.
+- "Yesterday" in the list was wrong on the day after the clocks changed.
+- Palette commands such as Rename or Delete, run with no conversation, ask which one instead of doing nothing.
+
 ## 0.7.1 — The popup on Intel Macs, and a name of your own on it
 
 **Fixed: no popup at all on Intel Macs.** The macOS popup script declared a mouse handler with a `bool` return type, which is right on Apple Silicon, but on Intel `BOOL` is a `char`. JavaScript for Automation refused the class before anything showed (`method types do not match the superclass method types`), and because the hooks send the script's output to `/dev/null`, it failed silently. The popup now reads clicks straight off its event queue instead, with no custom class. Two other values that differ between the two kinds of Mac were also changed: a Hebrew name was centered instead of right-aligned on Apple Silicon, and the "any event" mask didn't survive the trip through a JavaScript number on Intel. A failing popup now leaves a `[popup]` line in `~/.benefits-toolkit/state/dispatch.log`, and **Test popup** shows the error instead of nothing.

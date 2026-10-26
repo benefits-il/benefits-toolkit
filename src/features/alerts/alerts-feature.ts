@@ -8,7 +8,6 @@ import { HookInstaller } from "./services/hook-installer";
 import { HookHealer } from "./services/hook-healer";
 import { ProjectRegistryWriter } from "./services/project-registry-writer";
 import { ProjectPrefsStore } from "./services/project-prefs-store";
-import { SoundPicker } from "./services/variant-picker";
 import { registerAlertsCommands } from "./ui/alerts-commands";
 
 /**
@@ -52,14 +51,13 @@ export function createAlertsFeature(ctx: vscode.ExtensionContext): Feature {
             "Reload that window (Developer: Reload Window) to finish the upgrade; until then its old sound hooks stay silent.",
         );
       });
-      const picker = new SoundPicker(assets);
 
       // Continuous self-heal. The hooks live in ~/.claude/settings.json, which
       // Claude Code rewrites whenever a permission is approved — dropping our
       // hooks. The healer re-applies them now AND on every change to that file.
       const healer = new HookHealer(installer);
 
-      disposables = registerAlertsCommands(ctx, { installer, assets, picker, healer, prefs, platform });
+      disposables = registerAlertsCommands(ctx, { installer, assets, healer, prefs, platform });
       disposables.push(healer, registry);
 
       try {

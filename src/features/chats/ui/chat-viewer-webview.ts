@@ -1,67 +1,48 @@
 import * as vscode from "vscode";
-import * as path from "node:path";
 import * as fs from "node:fs";
-import MarkdownIt from "markdown-it";
-import { ConversationMeta, MessageRecord, RawJsonlRecord } from "../domain/conversation";
-import { ConversationRepository } from "../services/conversation-repository";
-import { atomicWriteText, ensureDir } from "../../../shared/fs-utils";
-import { extractBlocks, formatModelName, readLastUsage } from "../domain/blocks";
-import { isWebLink, parseFileLink, resolveCandidates, safeDecode } from "../services/link-resolver";
-import { openInMdHe } from "../services/md-he-launcher";
-import { logger } from "../../../core/logger";
+import * as os from "node:os";
+import * as path from "node:path";
 import { readConfig } from "../../../core/config-manager";
-import { brandBarCss, brandBarHtml } from "../../../shared/brand-bar";
+import { logger } from "../../../core/logger";
+import { currentTheme, onThemeChanged } from "../../../core/theme";
+import { atomicWriteText, ensureDir } from "../../../shared/fs-utils";
+import { brandFontUris, panelResourceRoots } from "../../../shared/webview-fonts";
+import { ConversationMeta } from "../domain/conversation";
+import { ConversationRepository } from "../services/conversation-repository";
+import { isWebLink, parseFileLink, resolveCandidates } from "../services/link-resolver";
+import { openInMdHe } from "../services/md-he-launcher";
+import { buildViewerHtml, cleanViewerPrefs, ViewerFlags, ViewerPrefs } from "./viewer/viewer-html";
 
 const VIEW_TYPE = "benefit.chatViewer";
+/** Reading direction and Display filters, shared by every viewer. */
+// v2: the bubbles changed the switches (Auto direction, Hide Claude's work); earlier builds' prefs are left behind.
+const PREFS_KEY = "chats.viewerPrefs.v2";
 
-// `html: false` escapes any raw HTML in the message instead of emitting it, so
-// this is XSS-safe without a sanitizer — which matters because this webview
-// deliberately has no CSP (a strict nonce CSP breaks acquireVsCodeApi here).
-// markdown-it's default validateLink already rejects javascript:/data: URLs.
-// `breaks: true` keeps plain-text chat messages readable now that the container
-// no longer uses white-space: pre-wrap.
-const md = new MarkdownIt({ html: false, linkify: true, breaks: true });
-
-// Fuzzy linkify treats bare filenames as domains — ".ts" and ".md" are real
-// country TLDs, so plain text like "extension.ts" became http://extension.ts
-// and clicking it tried to open a browser. Only explicit http(s)://, www. and
-// mailto: remain auto-linked; file paths are links only when Claude writes a
-// real markdown link.
-md.linkify.set({ fuzzyLink: false });
-
-// Every anchor gets the decoded destination as a tooltip (the visible text is
-// often just "file.ts:42") and as data-raw for the click handler. Decoding
-// happens once here — markdown-it percent-encodes destinations (spaces, "c:\"),
-// and re-decoding at click time would corrupt paths containing a literal "%".
-// renderToken HTML-escapes attribute values, so hostile destinations stay inert.
-const defaultLinkOpen =
-  md.renderer.rules.link_open ??
-  ((tokens, idx, options, _env, self) => self.renderToken(tokens, idx, options));
-md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
-  const token = tokens[idx];
-  const raw = safeDecode(token.attrGet("href") ?? "");
-  token.attrSet("title", raw);
-  token.attrSet("data-raw", raw);
-  return defaultLinkOpen(tokens, idx, options, env, self);
-};
-
-// Every code block gets its own Copy button. It sits in a wrapper next to the
-// <pre> (not inside it) so it stays in the corner while the code scrolls
-// sideways; the click handler copies the <code> text, i.e. the raw block.
-const COPY_CODE_BUTTON =
-  '<button class="copy-button code-copy" type="button" data-action="copy-code" title="Copy code"><svg><use href="#icon-copy"/></svg></button>';
-for (const rule of ["fence", "code_block"] as const) {
-  const defaultRule =
-    md.renderer.rules[rule] ??
-    ((tokens, idx, options, _env, self) => self.renderToken(tokens, idx, options));
-  md.renderer.rules[rule] = (tokens, idx, options, env, self) =>
-    `<div class="code-wrap">${defaultRule(tokens, idx, options, env, self)}${COPY_CODE_BUTTON}</div>`;
+/** What a viewer's More menu does; the conversations controller carries it out. */
+export interface ViewerActions {
+  rename(meta: ConversationMeta): Promise<void>;
+  archive(meta: ConversationMeta): Promise<void>;
+  restore(meta: ConversationMeta): Promise<void>;
+  delete(meta: ConversationMeta): Promise<void>;
+  exportFull(meta: ConversationMeta): Promise<void>;
+  revealInList(meta: ConversationMeta): Promise<void>;
+  projectColor(meta: ConversationMeta): Promise<string | null>;
 }
 
-/** Viewer buttons that can be switched off (benefit.chats.*). */
-interface ViewerFlags {
-  codeCopy: boolean;
-  mdHe: boolean;
+type ActionName = "rename" | "archive" | "restore" | "delete" | "exportFull" | "reveal";
+
+interface ViewerMessage {
+  type?: string;
+  action?: string;
+  content?: string;
+  href?: string;
+  prefs?: unknown;
+}
+
+interface OpenViewer {
+  panel: vscode.WebviewPanel;
+  /** The freshest meta: a rename or a move re-reads it. */
+  meta: ConversationMeta;
 }
 
 function readViewerFlags(): ViewerFlags {
@@ -69,137 +50,203 @@ function readViewerFlags(): ViewerFlags {
   return { codeCopy: cfg.codeCopyButtons, mdHe: cfg.mdHeButton };
 }
 
-function bodyClassFor(flags: ViewerFlags): string {
-  return [flags.codeCopy ? "" : "no-code-copy", flags.mdHe ? "" : "no-mdhe"].filter(Boolean).join(" ");
+function tabTitle(title: string): string {
+  return title.length <= 28 ? title : `${title.slice(0, 27)}…`;
 }
 
-export class ChatViewerService {
-  private readonly panels = new Map<string, vscode.WebviewPanel>();
-  // Freshest meta per open panel: the message handler closure captures the meta
-  // from open(), but refreshes re-read it — cwd (used for link resolution) must
-  // come from the latest read.
-  private readonly latestMeta = new Map<string, ConversationMeta>();
+/** The read-only conversation viewer: one editor tab per conversation. */
+export class ChatViewerService implements vscode.Disposable {
+  private readonly viewers = new Map<string, OpenViewer>();
+  private readonly activeChanged = new vscode.EventEmitter<string | undefined>();
+  /** The conversation in the focused viewer tab changed (or none is focused). */
+  readonly onDidChangeActive = this.activeChanged.event;
+  private active: string | undefined;
+  private readonly themeSub: vscode.Disposable;
 
   constructor(
-    _ctx: vscode.ExtensionContext,
+    private readonly ctx: vscode.ExtensionContext,
     private readonly repo: ConversationRepository,
+    private readonly actions: ViewerActions,
   ) {
-    void _ctx;
+    this.themeSub = onThemeChanged((theme) => this.broadcast({ type: "theme", theme }));
+  }
+
+  /** The conversation file in the viewer tab that has focus, if any. */
+  activePath(): string | undefined {
+    return this.active;
   }
 
   async open(meta: ConversationMeta): Promise<void> {
-    const existing = this.panels.get(meta.filePath);
+    const existing = this.viewers.get(meta.filePath);
     if (existing) {
-      existing.reveal();
-      await this.renderInto(existing, meta);
+      existing.panel.reveal();
       return;
     }
 
-    const panel = vscode.window.createWebviewPanel(
-      VIEW_TYPE,
-      `🕮 ${truncate(meta.title, 24)}`,
-      vscode.ViewColumn.Active,
-      {
-        enableScripts: true,
-        retainContextWhenHidden: true,
-      },
-    );
+    const panel = vscode.window.createWebviewPanel(VIEW_TYPE, tabTitle(meta.title), vscode.ViewColumn.Active, {
+      enableScripts: true,
+      retainContextWhenHidden: true,
+      localResourceRoots: panelResourceRoots(this.ctx.extensionUri),
+    });
     panel.iconPath = new vscode.ThemeIcon("comment-discussion");
-    this.panels.set(meta.filePath, panel);
+    const entry: OpenViewer = { panel, meta };
+    this.viewers.set(meta.filePath, entry);
+
+    panel.onDidChangeViewState(() => this.syncActive());
     panel.onDidDispose(() => {
-      this.panels.delete(meta.filePath);
-      this.latestMeta.delete(meta.filePath);
+      for (const [key, value] of this.viewers) if (value === entry) this.viewers.delete(key);
+      this.syncActive();
     });
+    panel.webview.onDidReceiveMessage((msg: ViewerMessage) => void this.onMessage(entry, msg));
 
-    panel.webview.onDidReceiveMessage(async (message: { command?: string; content?: string; href?: string }) => {
-      if (message?.command === "saveAsMarkdownPrepared" && typeof message.content === "string") {
-        await this.saveMarkdown(meta, message.content);
-      }
-      if (message?.command === "openLink" && typeof message.href === "string") {
-        await this.handleOpenLink(panel, this.latestMeta.get(meta.filePath) ?? meta, message.href);
-      }
-      if (message?.command === "openInMdHe" && typeof message.content === "string") {
-        await this.handleOpenInMdHe(panel, message.content);
-      }
-    });
-
-    await this.renderInto(panel, meta);
+    await this.render(entry);
+    this.syncActive();
   }
 
+  /** Re-read and re-render an open conversation (after a rename). */
   refreshOpen(filePath: string): void {
-    const panel = this.panels.get(filePath);
-    if (!panel) return;
-    void this.renderRefreshed(panel, filePath);
+    const entry = this.viewers.get(filePath);
+    if (!entry) return;
+    void (async () => {
+      const meta = await this.repo.readMeta(filePath, entry.meta.projectFolder, entry.meta.archived);
+      if (!meta) return;
+      entry.meta = meta;
+      await this.render(entry);
+    })();
+  }
+
+  /** The conversation file moved (archive, restore): keep its viewer on the new file. */
+  async retarget(oldPath: string, newPath: string): Promise<void> {
+    const entry = this.viewers.get(oldPath);
+    if (!entry || oldPath === newPath) return;
+    const meta = await this.repo.readMeta(newPath, entry.meta.projectFolder, !entry.meta.archived);
+    this.viewers.delete(oldPath);
+    if (!meta) {
+      entry.panel.dispose();
+      return;
+    }
+    entry.meta = meta;
+    this.viewers.set(newPath, entry);
+    await this.render(entry);
+    this.syncActive();
+  }
+
+  close(filePath: string): void {
+    this.viewers.get(filePath)?.panel.dispose();
   }
 
   closeAll(): void {
-    for (const p of this.panels.values()) p.dispose();
-    this.panels.clear();
+    for (const { panel } of [...this.viewers.values()]) panel.dispose();
+    this.viewers.clear();
   }
 
   /** Push the current button switches to every open viewer, without a re-render. */
   applyFlags(): void {
-    const flags = readViewerFlags();
-    for (const p of this.panels.values()) {
-      void p.webview.postMessage({ command: "flags", ...flags });
+    this.broadcast({ type: "flags", ...readViewerFlags() });
+  }
+
+  dispose(): void {
+    this.closeAll();
+    this.themeSub.dispose();
+    this.activeChanged.dispose();
+  }
+
+  private prefs(): ViewerPrefs {
+    return cleanViewerPrefs(this.ctx.globalState.get(PREFS_KEY));
+  }
+
+  private broadcast(message: unknown, except?: OpenViewer): void {
+    for (const entry of this.viewers.values()) {
+      if (entry !== except) void entry.panel.webview.postMessage(message);
     }
   }
 
-  private async renderInto(panel: vscode.WebviewPanel, meta: ConversationMeta): Promise<void> {
-    this.latestMeta.set(meta.filePath, meta);
+  private syncActive(): void {
+    let next: string | undefined;
+    for (const [key, { panel }] of this.viewers) if (panel.active) next = key;
+    if (next === this.active) return;
+    this.active = next;
+    this.activeChanged.fire(next);
+  }
+
+  private async render(entry: OpenViewer): Promise<void> {
+    const { panel, meta } = entry;
     const records = await this.repo.readAllRecords(meta.filePath);
-    panel.title = `🕮 ${truncate(meta.title, 24)}`;
-    panel.webview.html = buildHtml(meta, records);
-  }
-
-  private async renderRefreshed(panel: vscode.WebviewPanel, filePath: string): Promise<void> {
-    const meta = await this.repo.readMeta(filePath, "", false);
-    if (!meta) return;
-    await this.renderInto(panel, meta);
-  }
-
-  private async saveMarkdown(meta: ConversationMeta, content: string): Promise<void> {
-    const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri;
-    const safeName = sanitizeFileName(meta.title) || meta.conversationId;
-    const defaultUri = wsRoot
-      ? vscode.Uri.joinPath(wsRoot, `${safeName}.md`)
-      : vscode.Uri.file(path.join(require("os").homedir(), "Documents", `${safeName}.md`));
-
-    const uri = await vscode.window.showSaveDialog({
-      defaultUri,
-      filters: { Markdown: ["md"] },
-      saveLabel: "Save as Markdown",
+    panel.title = tabTitle(meta.title);
+    panel.webview.html = buildViewerHtml({
+      meta,
+      records,
+      theme: currentTheme(),
+      fonts: brandFontUris(panel.webview, this.ctx.extensionUri),
+      prefs: this.prefs(),
+      flags: readViewerFlags(),
+      projectColor: await this.actions.projectColor(meta).catch(() => null),
     });
-    if (!uri) return;
+  }
 
+  private async onMessage(entry: OpenViewer, msg: ViewerMessage): Promise<void> {
     try {
-      await ensureDir(path.dirname(uri.fsPath));
-      await atomicWriteText(uri.fsPath, content);
-      const open = await vscode.window.showInformationMessage(`Saved to ${uri.fsPath}`, "Open");
-      if (open === "Open") {
-        const doc = await vscode.workspace.openTextDocument(uri);
-        await vscode.window.showTextDocument(doc);
+      switch (msg.type) {
+        case "prefs": {
+          const prefs = cleanViewerPrefs(msg.prefs);
+          await this.ctx.globalState.update(PREFS_KEY, prefs);
+          this.broadcast({ type: "prefs", prefs }, entry);
+          return;
+        }
+        case "openLink":
+          if (typeof msg.href === "string") await this.openLink(entry, msg.href);
+          return;
+        case "mdhe":
+          if (typeof msg.content === "string") await this.openMdHe(entry, msg.content);
+          return;
+        case "exportVisible":
+          if (typeof msg.content === "string") await this.saveMarkdown(entry.meta, msg.content);
+          return;
+        case "action":
+          await this.runAction(entry.meta, msg.action as ActionName);
+          return;
       }
     } catch (err) {
-      logger.error("chats", "saveAsMarkdownPrepared failed", err);
-      vscode.window.showErrorMessage(`Save failed: ${(err as Error).message}`);
+      logger.error("chats", `Viewer action '${msg.type}' failed`, err);
+      vscode.window.showErrorMessage(`Benefit: ${(err as Error).message}`);
     }
   }
 
-  private async handleOpenLink(
-    panel: vscode.WebviewPanel,
-    meta: ConversationMeta,
-    href: string,
-  ): Promise<void> {
+  private async runAction(meta: ConversationMeta, action: ActionName): Promise<void> {
+    switch (action) {
+      case "rename": return this.actions.rename(meta);
+      case "archive": return this.actions.archive(meta);
+      case "restore": return this.actions.restore(meta);
+      case "delete": return this.actions.delete(meta);
+      case "exportFull": return this.actions.exportFull(meta);
+      case "reveal": return this.actions.revealInList(meta);
+    }
+  }
+
+  /** "Save visible messages": the page built the Markdown from what it shows. */
+  private async saveMarkdown(meta: ConversationMeta, content: string): Promise<void> {
+    const safeName = meta.title.replace(/[\\/:*?"<>|]+/g, " ").trim() || meta.conversationId;
+    const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri;
+    const defaultUri = wsRoot
+      ? vscode.Uri.joinPath(wsRoot, `${safeName}.md`)
+      : vscode.Uri.file(path.join(os.homedir(), "Documents", `${safeName}.md`));
+    const uri = await vscode.window.showSaveDialog({ defaultUri, filters: { Markdown: ["md"] }, saveLabel: "Save visible messages" });
+    if (!uri) return;
+    await ensureDir(path.dirname(uri.fsPath));
+    await atomicWriteText(uri.fsPath, content);
+    const open = await vscode.window.showInformationMessage(`Saved to ${uri.fsPath}`, "Open");
+    if (open === "Open") await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(uri));
+  }
+
+  private async openLink(entry: OpenViewer, href: string): Promise<void> {
     try {
       if (isWebLink(href)) {
         await vscode.env.openExternal(vscode.Uri.parse(href));
         return;
       }
-
       const { path: linkPath, startLine, endLine } = parseFileLink(href);
       const roots = (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath);
-      for (const candidate of resolveCandidates(linkPath, meta.cwd, roots)) {
+      for (const candidate of resolveCandidates(linkPath, entry.meta.cwd, roots)) {
         let stat: fs.Stats;
         try {
           stat = await fs.promises.stat(candidate);
@@ -218,1060 +265,27 @@ export class ChatViewerService {
           preview: true,
           viewColumn: vscode.ViewColumn.Beside,
           selection:
-            startLine !== undefined
-              ? new vscode.Range(new vscode.Position(start, 0), doc.lineAt(end).range.end)
-              : undefined,
+            startLine !== undefined ? new vscode.Range(new vscode.Position(start, 0), doc.lineAt(end).range.end) : undefined,
         });
         return;
       }
     } catch (err) {
       logger.warn("chats", `openLink failed for ${href}`, err);
     }
-    // Not resolvable (or opening failed): never a silent dead click — hand the
+    // Not resolvable (or opening failed): never a silent dead click. Hand the
     // user the raw path instead.
     await vscode.env.clipboard.writeText(href);
-    void panel.webview.postMessage({ command: "showToast", text: "Path copied" });
+    void entry.panel.webview.postMessage({ type: "toast", text: "Path copied" });
   }
 
-  private async handleOpenInMdHe(panel: vscode.WebviewPanel, content: string): Promise<void> {
+  private async openMdHe(entry: OpenViewer, content: string): Promise<void> {
     try {
       const result = await openInMdHe(content);
-      const text = result === "clipboard"
-        ? "Message copied — press Paste in md-he"
-        : "Opening in md-he…";
-      void panel.webview.postMessage({ command: "showToast", text });
+      const text = result === "clipboard" ? "Copied. Press Paste in md-he." : "Opening in md-he";
+      void entry.panel.webview.postMessage({ type: "toast", text });
     } catch (err) {
       logger.error("chats", "openInMdHe failed", err);
-      vscode.window.showErrorMessage(`Benefit: opening in md-he failed — ${(err as Error).message}`);
+      vscode.window.showErrorMessage(`Benefit: opening in md-he failed. ${(err as Error).message}`);
     }
   }
 }
-
-interface ConversationStats {
-  ctxText: string;
-  ctxTooltip: string;
-  tierClass: string;
-  pct: number;
-  marker200kPct: number;
-  isEstimate: boolean;
-  windowSize: number;
-}
-
-function buildHtml(meta: ConversationMeta, records: RawJsonlRecord[]): string {
-  const realMessages = records.filter(isRealMessage) as MessageRecord[];
-  // Stats read the chronological arrays; only the display order is reversed.
-  const stats = computeContextStats(records, realMessages);
-  // Newest first, newest expanded — the end of a conversation is what you open
-  // it for, and long transcripts made you scroll to reach it.
-  const displayMessages = realMessages.slice().reverse();
-  const messagesHtml = displayMessages
-    .map((m, idx) => renderMessage(m, idx === 0))
-    .join("\n");
-
-  // Function replacers throughout: a plain replacement string treats "$&",
-  // "$'" etc. as patterns, which mangled any message containing them.
-  return TEMPLATE
-    // {{TITLE}} appears twice (document <title> + visible header), so replace ALL.
-    .replaceAll("{{TITLE}}", () => escapeHtml(meta.title))
-    .replace("{{BODY_CLASS}}", () => bodyClassFor(readViewerFlags()))
-    .replace("{{CTX_TOOLTIP}}", () => escapeHtml(stats.ctxTooltip))
-    .replace("{{CTX_WARN_HTML}}", () => stats.isEstimate
-      ? '<span class="ctx-warn" title="No usage data in JSONL — showing rough chars/4 estimate">⚠</span>'
-      : "")
-    .replace("{{CTX_TEXT}}", () => escapeHtml(stats.ctxText))
-    .replace("{{TIER_CLASS}}", () => stats.tierClass)
-    .replace("{{PCT}}", () => String(stats.pct))
-    .replace("{{MARKER_HTML}}", () => stats.windowSize === 1_000_000
-      ? `<div class="context-bar-200k" style="left:${stats.marker200kPct}%" title="200K boundary"></div>`
-      : "")
-    .replace("{{MESSAGES_HTML}}", () => messagesHtml || '<div class="empty-state">No messages in this conversation</div>');
-}
-
-function isRealMessage(record: RawJsonlRecord): boolean {
-  if (record.type !== "user" && record.type !== "assistant") return false;
-  if ((record as Record<string, unknown>)["isSidechain"] === true) return false;
-  return typeof (record as Record<string, unknown>)["uuid"] === "string";
-}
-
-function computeContextStats(allRecords: RawJsonlRecord[], realMessages: MessageRecord[]): ConversationStats {
-  const usage = readLastUsage(allRecords);
-  let tokensUsed = 0;
-  let isEstimate = false;
-  let lastModel: string | undefined;
-
-  if (usage) {
-    tokensUsed = usage.inputTokens + usage.cacheReadInputTokens + usage.cacheCreationInputTokens;
-    lastModel = usage.model;
-  } else {
-    isEstimate = true;
-    const allText = realMessages.map((m) => joinedText(m)).join("\n");
-    tokensUsed = Math.round(allText.length / 4);
-  }
-
-  const windowSize = /haiku/i.test(lastModel ?? "") ? 200_000 : 1_000_000;
-  const pct = Math.min(100, (tokensUsed / windowSize) * 100);
-  const marker200kPct = (200_000 / windowSize) * 100;
-  const tierClass = pct >= 95 ? "tier-crit" : pct >= 80 ? "tier-high" : pct >= 50 ? "tier-warn" : "tier-ok";
-
-  const ctxText = `${isEstimate ? "~" : ""}${formatTokens(tokensUsed)} / ${formatTokens(windowSize)} (${pct.toFixed(1)}%)`;
-  const ctxTooltip = `${lastModel ?? "unknown model"} · used ${tokensUsed.toLocaleString()} tokens of ${windowSize.toLocaleString()} window${isEstimate ? " · estimate (no usage data in JSONL)" : ""}`;
-
-  return { ctxText, ctxTooltip, tierClass, pct, marker200kPct, isEstimate, windowSize };
-}
-
-function joinedText(message: MessageRecord): string {
-  const blocks = extractBlocks(message);
-  return blocks.map((b) => b.text).join("\n");
-}
-
-function formatTokens(n: number): string {
-  if (n === 1_000_000) return "1M";
-  if (n >= 10_000) return `${(n / 1000).toFixed(1)}K`;
-  return String(n);
-}
-
-function renderMessage(message: MessageRecord, expanded: boolean): string {
-  const role = message.type;
-  const blocks = extractBlocks(message);
-
-  const hasText = blocks.some((b) => b.kind === "text" && b.text.trim() !== "");
-  const hasThinking = blocks.some((b) => b.kind === "thinking");
-  const hasTool = blocks.some((b) => b.kind === "tool" && b.text.trim() !== "");
-  const isEmpty = !hasText && !hasThinking && !hasTool;
-  const isToolsOnly = !hasText && !hasThinking && hasTool;
-  const isThinkingOnly = !hasText && hasThinking && !hasTool;
-
-  let roleLabel: string;
-  if (role === "user") {
-    roleLabel = "User";
-  } else {
-    const modelRaw = (message.message as Record<string, unknown>)?.["model"];
-    const modelName = typeof modelRaw === "string" ? formatModelName(modelRaw) : undefined;
-    roleLabel = modelName ? `Claude · ${modelName}` : "Claude";
-  }
-
-  const visibleText = blocks.filter((b) => b.kind === "text").map((b) => b.text).join("\n\n");
-  const previewSource = visibleText.replace(/\s+/g, " ").trim();
-  const previewText = previewSource.length > 80 ? `${previewSource.slice(0, 80)}…` : previewSource;
-
-  const isNarration =
-    role === "assistant" &&
-    hasText &&
-    !hasTool &&
-    !hasThinking &&
-    visibleText.trim().length < 200;
-
-  const bodyHtml = blocks.map((b) => {
-    if (b.kind === "thinking") {
-      const filled = b.text && b.text.trim() !== "";
-      const textPart = filled
-        ? `<div class="thinking-text">${escapeHtml(b.text)}</div>`
-        : `<div class="thinking-text thinking-text-empty">(thinking content not stored — only the cryptographic signature is preserved in Claude Code logs)</div>`;
-      return `<div class="content-block content-block-thinking">
-        <div class="thinking-chip"><svg><use href="#icon-brain"/></svg><span>Thinking</span></div>
-        ${textPart}
-      </div>`;
-    }
-    if (b.kind === "tool") {
-      return `<div class="content-block content-block-tool">${escapeHtml(b.text)}</div>`;
-    }
-    // data-md keeps the markdown source around so copy / "Save as Markdown"
-    // export the original text, not the rendered plain text.
-    return `<div class="content-block content-block-text" data-md="${escapeHtml(b.text)}">${md.render(b.text)}</div>`;
-  }).join("");
-
-  const collapsedClass = expanded ? "" : " collapsed";
-  return `
-    <div class="message ${role}${collapsedClass}" data-empty="${isEmpty}" data-tools-only="${isToolsOnly}" data-thinking-only="${isThinkingOnly}" data-narration="${isNarration}">
-      <div class="message-header" onclick="toggleMessage(this)">
-        <span class="chevron"></span>
-        <span class="message-role ${role}">${escapeHtml(roleLabel)}</span>
-        <span class="message-preview">${escapeHtml(previewText)}</span>
-        <button class="copy-button copy-collapsed mdhe-button" onclick="event.stopPropagation(); openInMdHe(this);" title="Open in md-he"><svg><use href="#icon-markdown"/></svg></button>
-        <button class="copy-button copy-collapsed" onclick="event.stopPropagation(); copyMessage(this);" title="Copy message"><svg><use href="#icon-copy"/></svg></button>
-      </div>
-      <div class="message-content">
-        <div class="message-text">${bodyHtml}</div>
-        <div class="message-actions">
-          <button class="copy-button copy-expanded mdhe-button" onclick="openInMdHe(this)" title="Open in md-he"><svg><use href="#icon-markdown"/></svg></button>
-          <button class="copy-button copy-expanded" onclick="copyMessage(this)" title="Copy message"><svg><use href="#icon-copy"/></svg></button>
-        </div>
-      </div>
-    </div>`;
-}
-
-function truncate(s: string, maxLen: number): string {
-  if (s.length <= maxLen) return s;
-  return `${s.slice(0, maxLen - 1)}…`;
-}
-
-function sanitizeFileName(s: string): string {
-  return s.replace(/[\\/:*?"<>|]+/g, " ").trim();
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
-const TEMPLATE = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{TITLE}}</title>
-  <style>
-    :root {
-      --cc-radius-sm: 6px;
-      --cc-radius-md: 12px;
-      --cc-radius-lg: 20px;
-      --cc-radius-pill: 999px;
-      --cc-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(0, 0, 0, 0.06);
-      --cc-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.10);
-      --cc-shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.18);
-    }
-
-    body {
-      font-family: var(--vscode-font-family);
-      font-size: var(--vscode-font-size);
-      color: var(--vscode-foreground);
-      background-color: var(--vscode-editor-background);
-      padding: 0;
-      margin: 0;
-      line-height: 1.6;
-    }
-
-    .header {
-      position: sticky;
-      top: 0;
-      background-color: var(--vscode-editorGroupHeader-tabsBackground);
-      border-bottom: 1px solid var(--vscode-panel-border);
-      padding: 14px 24px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 16px;
-      flex-wrap: wrap;
-      z-index: 100;
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-    }
-
-    .header-title {
-      font-size: 16px;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex: 1;
-      min-width: 0;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    @media (max-width: 600px) {
-      .header { padding: 12px 16px; }
-      .header-title { font-size: 14px; flex-basis: 100%; }
-    }
-
-    .messages-container {
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 24px;
-    }
-
-    .message {
-      margin-bottom: 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .message-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      cursor: pointer;
-      padding: 4px 0;
-      user-select: none;
-    }
-
-    .message-header:hover {
-      background-color: var(--vscode-list-hoverBackground);
-      border-radius: var(--cc-radius-sm);
-    }
-
-    .chevron {
-      font-size: 10px;
-      width: 12px;
-      flex-shrink: 0;
-      color: var(--vscode-descriptionForeground);
-    }
-
-    .message.collapsed .chevron::before { content: '\\25B8'; }
-    .message:not(.collapsed) .chevron::before { content: '\\25BE'; }
-
-    .message-preview {
-      flex: 1;
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      color: var(--vscode-descriptionForeground);
-      font-size: 12px;
-      opacity: 0.75;
-    }
-    .message:not(.collapsed) .message-preview { display: none; }
-    .message.collapsed .message-content { display: none; }
-
-    .message-content {
-      background-color: var(--vscode-editorWidget-background);
-      border: 1px solid var(--vscode-editorWidget-border);
-      border-radius: var(--cc-radius-md);
-      padding: 18px 20px;
-      box-shadow: var(--cc-shadow-sm);
-    }
-    .message.user .message-content { border-inline-start: 4px solid var(--vscode-textLink-foreground); }
-    .message.assistant .message-content { border-inline-start: 4px solid #CC785C; }
-
-    /* No pre-wrap here: text blocks are rendered markdown now and manage their
-       own whitespace. Blocks that are still raw text re-add it themselves. */
-    .message-text { display: block; word-wrap: break-word; }
-
-    .message-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 6px;
-      margin-top: 12px;
-      padding-top: 8px;
-      border-top: 1px solid var(--vscode-editorWidget-border);
-    }
-
-    .message-role {
-      padding: 2px 10px;
-      border-radius: var(--cc-radius-pill);
-      background-color: var(--vscode-badge-background);
-      color: var(--vscode-badge-foreground);
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.03em;
-    }
-    .message-role.user {
-      background-color: color-mix(in srgb, var(--vscode-textLink-foreground) 18%, transparent);
-      color: var(--vscode-textLink-foreground);
-    }
-    .message-role.assistant {
-      background-color: color-mix(in srgb, #CC785C 20%, transparent);
-      color: #CC785C;
-    }
-
-    .copy-button {
-      background-color: var(--vscode-button-secondaryBackground, var(--vscode-button-background));
-      color: var(--vscode-button-secondaryForeground, var(--vscode-button-foreground));
-      border: 1px solid var(--vscode-editorWidget-border);
-      padding: 3px 8px;
-      border-radius: 3px;
-      cursor: pointer;
-      font-size: 11px;
-      font-family: var(--vscode-font-family);
-      transition: background-color 0.15s ease;
-    }
-    .copy-button.copy-collapsed {
-      margin-inline-start: auto;
-      flex-shrink: 0;
-      background: transparent;
-      border-color: transparent;
-      opacity: 0.6;
-      padding: 4px 6px;
-    }
-    .copy-button.copy-collapsed:hover {
-      opacity: 1;
-      background-color: var(--vscode-toolbar-hoverBackground, var(--vscode-button-hoverBackground));
-    }
-    .copy-button svg {
-      width: 14px;
-      height: 14px;
-      stroke: currentColor;
-      fill: none;
-      stroke-width: 1.75;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-      vertical-align: middle;
-    }
-    .copy-button:hover { background-color: var(--vscode-button-hoverBackground); }
-    .copy-button.copied {
-      background-color: var(--vscode-notebookStatusSuccessIcon-foreground);
-      color: var(--vscode-editor-background);
-      border-color: var(--vscode-notebookStatusSuccessIcon-foreground);
-    }
-    /* Only the first trailing header button takes the auto margin, so the
-       md-he and copy buttons stay together at the end of the row. */
-    .copy-button.copy-collapsed + .copy-button.copy-collapsed { margin-inline-start: 0; }
-    body.no-mdhe .mdhe-button { display: none; }
-
-    .header-actions { display: flex; gap: 4px; flex-shrink: 0; align-items: center; }
-
-    .icon-btn {
-      width: 32px;
-      height: 32px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      background: transparent;
-      color: var(--vscode-foreground);
-      border: 1px solid transparent;
-      border-radius: var(--cc-radius-pill);
-      cursor: pointer;
-      padding: 0;
-      transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
-    }
-    .icon-btn:hover { background-color: var(--vscode-toolbar-hoverBackground, var(--vscode-button-hoverBackground)); }
-    .icon-btn:active { transform: translateY(1px); }
-    .icon-btn.is-active {
-      background-color: var(--vscode-toolbar-activeBackground, var(--vscode-button-background));
-      border-color: var(--vscode-focusBorder);
-    }
-    .icon-btn svg {
-      width: 18px;
-      height: 18px;
-      stroke: currentColor;
-      fill: none;
-      stroke-width: 1.75;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-    }
-
-    .dropdown { position: relative; display: inline-flex; }
-    .dropdown-menu {
-      position: absolute;
-      top: calc(100% + 6px);
-      inset-inline-end: 0;
-      min-width: 220px;
-      background-color: var(--vscode-menu-background, var(--vscode-editorWidget-background));
-      color: var(--vscode-menu-foreground, var(--vscode-foreground));
-      border: 1px solid var(--vscode-menu-border, var(--vscode-editorWidget-border));
-      border-radius: var(--cc-radius-md);
-      padding: 6px;
-      box-shadow: var(--cc-shadow-pop);
-      z-index: 200;
-    }
-    .dropdown-menu[hidden] { display: none; }
-    .dropdown-menu label {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 8px 10px;
-      border-radius: var(--cc-radius-sm);
-      font-size: 12.5px;
-      cursor: pointer;
-      user-select: none;
-    }
-    .dropdown-menu label:hover { background-color: var(--vscode-list-hoverBackground); }
-    .dropdown-menu input[type="checkbox"] { accent-color: var(--vscode-focusBorder); cursor: pointer; }
-
-    body.hide-empty .message[data-empty="true"] { display: none; }
-    body.hide-tools .message[data-tools-only="true"] { display: none; }
-    body.hide-narration .message[data-narration="true"] { display: none; }
-    body.hide-thinking .content-block-thinking { display: none; }
-    body.hide-thinking .message[data-thinking-only="true"] { display: none; }
-
-    .context-indicator { display: flex; align-items: center; gap: 8px; font-size: 12px; flex-shrink: 0; }
-    .context-indicator .ctx-text { font-variant-numeric: tabular-nums; color: var(--vscode-descriptionForeground); }
-    .context-indicator .ctx-warn { color: #d29922; cursor: help; }
-
-    .context-bar {
-      position: relative;
-      width: 140px;
-      height: 7px;
-      background-color: color-mix(in srgb, var(--vscode-foreground) 16%, transparent);
-      border: 1px solid color-mix(in srgb, var(--vscode-foreground) 14%, transparent);
-      border-radius: var(--cc-radius-pill);
-      overflow: hidden;
-    }
-    .context-bar-fill { height: 100%; transition: width 0.3s ease; }
-    .context-bar-fill.tier-ok    { background-color: #3fb950; }
-    .context-bar-fill.tier-warn  { background-color: #d29922; }
-    .context-bar-fill.tier-high  { background-color: #db6d28; }
-    .context-bar-fill.tier-crit  { background-color: #f85149; }
-
-    .context-bar-200k {
-      position: absolute;
-      top: -2px;
-      bottom: -2px;
-      width: 1px;
-      background-color: var(--vscode-foreground);
-      opacity: 0.5;
-    }
-
-    .scroll-to-bottom {
-      position: fixed;
-      bottom: 24px;
-      inset-inline-end: 24px;
-      width: 42px;
-      height: 42px;
-      border-radius: 50%;
-      background-color: #CC785C;
-      color: #ffffff;
-      border: none;
-      cursor: pointer;
-      line-height: 1;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 4px 14px rgba(204, 120, 92, 0.45), 0 2px 6px rgba(0, 0, 0, 0.18);
-      z-index: 99;
-      transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
-    }
-    .scroll-to-bottom:hover { background-color: #b86a4f; }
-    .scroll-to-bottom:active { transform: translateY(1px); }
-    .scroll-to-bottom svg {
-      width: 20px;
-      height: 20px;
-      stroke: currentColor;
-      fill: none;
-      stroke-width: 2;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-    }
-    .scroll-to-bottom.visible { display: flex; }
-
-    .content-block { display: block; word-wrap: break-word; }
-    .content-block + .content-block { margin-top: 14px; }
-
-    .content-block-thinking {
-      border: 1.5px dashed var(--vscode-editorWidget-border);
-      background-color: color-mix(in srgb, var(--vscode-foreground) 4%, transparent);
-      border-radius: var(--cc-radius-md);
-      padding: 12px 14px;
-      font-style: italic;
-      color: var(--vscode-descriptionForeground);
-      opacity: 0.92;
-    }
-    .thinking-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 2px 10px 2px 8px;
-      border-radius: var(--cc-radius-pill);
-      background-color: color-mix(in srgb, var(--vscode-foreground) 8%, transparent);
-      color: var(--vscode-descriptionForeground);
-      font-size: 11px;
-      font-style: normal;
-      font-weight: 600;
-      letter-spacing: 0.03em;
-      margin-bottom: 8px;
-    }
-    .thinking-chip svg {
-      width: 13px; height: 13px;
-      stroke: currentColor; fill: none; stroke-width: 1.75;
-      stroke-linecap: round; stroke-linejoin: round;
-    }
-    .thinking-text { display: block; white-space: pre-wrap; word-wrap: break-word; }
-    .thinking-text-empty { font-size: 11.5px; opacity: 0.6; font-style: normal; }
-
-    .content-block-tool {
-      font-family: var(--vscode-editor-font-family, monospace);
-      font-size: 0.85em;
-      background-color: color-mix(in srgb, var(--vscode-foreground) 3%, transparent);
-      border: 1px solid var(--vscode-editorWidget-border);
-      border-radius: var(--cc-radius-sm);
-      padding: 10px 12px;
-      opacity: 0.85;
-      /* Tool output is raw text, so it keeps its own line breaks. */
-      white-space: pre-wrap;
-    }
-
-    /* ---- Rendered markdown (text blocks only) --------------------------- */
-    /* Logical properties throughout so the RTL toggle mirrors correctly. */
-    .content-block-text > :first-child { margin-top: 0; }
-    .content-block-text > :last-child { margin-bottom: 0; }
-    .content-block-text p { margin: 0 0 12px; }
-    .content-block-text h1,
-    .content-block-text h2,
-    .content-block-text h3,
-    .content-block-text h4,
-    .content-block-text h5,
-    .content-block-text h6 {
-      margin: 20px 0 10px;
-      line-height: 1.3;
-      font-weight: 600;
-    }
-    .content-block-text h1 { font-size: 1.5em; }
-    .content-block-text h2 { font-size: 1.3em; }
-    .content-block-text h3 { font-size: 1.15em; }
-    .content-block-text h4,
-    .content-block-text h5,
-    .content-block-text h6 { font-size: 1em; }
-    .content-block-text h1,
-    .content-block-text h2 {
-      padding-bottom: 6px;
-      border-bottom: 1px solid var(--vscode-editorWidget-border);
-    }
-    .content-block-text ul,
-    .content-block-text ol { margin: 0 0 12px; padding-inline-start: 1.6em; }
-    .content-block-text li { margin: 4px 0; }
-    .content-block-text li > ul,
-    .content-block-text li > ol { margin-bottom: 0; }
-    .content-block-text blockquote {
-      margin: 0 0 12px;
-      padding-block: 2px;
-      padding-inline: 14px 0;
-      border-inline-start: 3px solid var(--vscode-textBlockQuote-border, var(--vscode-editorWidget-border));
-      background-color: var(--vscode-textBlockQuote-background, transparent);
-      color: var(--vscode-descriptionForeground);
-    }
-    .content-block-text pre {
-      margin: 0 0 12px;
-      padding: 12px 14px;
-      overflow-x: auto;
-      background-color: var(--vscode-textCodeBlock-background);
-      border: 1px solid var(--vscode-editorWidget-border);
-      border-radius: var(--cc-radius-sm);
-      /* Code stays left-to-right even when the viewer is flipped to RTL. */
-      direction: ltr;
-      text-align: left;
-    }
-    .content-block-text code {
-      direction: ltr;
-      unicode-bidi: embed;
-    }
-    .content-block-text pre code {
-      display: block;
-      background: none;
-      border: none;
-      padding: 0;
-      font-size: 0.9em;
-      white-space: pre;
-    }
-    .code-wrap { position: relative; margin: 0 0 12px; }
-    .content-block-text .code-wrap > pre { margin: 0; }
-    /* Physical right: the code itself is always LTR, so the corner is too. */
-    .code-copy {
-      position: absolute;
-      top: 6px;
-      right: 6px;
-      padding: 3px 6px;
-      opacity: 0;
-      transition: opacity 0.15s ease, background-color 0.15s ease;
-    }
-    .code-wrap:hover .code-copy,
-    .code-copy:focus-visible,
-    .code-copy.copied { opacity: 1; }
-    body.no-code-copy .code-copy { display: none; }
-    .content-block-text a { color: var(--vscode-textLink-foreground); cursor: pointer; word-break: break-all; }
-    .content-block-text a:hover { color: var(--vscode-textLink-activeForeground); }
-    .toast {
-      position: fixed;
-      bottom: 24px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: var(--vscode-editorWidget-background);
-      color: var(--vscode-editorWidget-foreground);
-      border: 1px solid var(--vscode-editorWidget-border, var(--vscode-panel-border));
-      padding: 6px 14px;
-      border-radius: 4px;
-      font-size: 12px;
-      opacity: 0;
-      transition: opacity .15s ease;
-      pointer-events: none;
-      z-index: 200;
-    }
-    .toast.visible { opacity: 1; }
-    .content-block-text img { max-width: 100%; height: auto; border-radius: var(--cc-radius-sm); }
-    .content-block-text hr {
-      border: none;
-      border-top: 1px solid var(--vscode-editorWidget-border);
-      margin: 18px 0;
-    }
-    .content-block-text table {
-      border-collapse: collapse;
-      margin: 0 0 12px;
-      display: block;
-      overflow-x: auto;
-      max-width: 100%;
-    }
-    .content-block-text th,
-    .content-block-text td {
-      border: 1px solid var(--vscode-editorWidget-border);
-      padding: 6px 10px;
-      text-align: start;
-    }
-    .content-block-text th {
-      background-color: color-mix(in srgb, var(--vscode-foreground) 6%, transparent);
-      font-weight: 600;
-    }
-
-    .title-icon {
-      width: 18px; height: 18px;
-      stroke: currentColor; fill: none; stroke-width: 1.75;
-      stroke-linecap: round; stroke-linejoin: round;
-      flex-shrink: 0; opacity: 0.85;
-    }
-
-    code {
-      background-color: var(--vscode-textCodeBlock-background);
-      border: 1px solid var(--vscode-editorWidget-border);
-      border-radius: 3px;
-      padding: 2px 4px;
-      font-family: var(--vscode-editor-font-family);
-      font-size: 0.9em;
-    }
-
-    .empty-state { text-align: center; padding: 48px 24px; color: var(--vscode-descriptionForeground); }
-${brandBarCss()}
-  </style>
-</head>
-<body class="{{BODY_CLASS}}">
-  <svg style="display:none" aria-hidden="true">
-    <symbol id="icon-copy" viewBox="0 0 24 24"><path d="M8 8m0 2a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2z"/><path d="M16 8v-2a2 2 0 0 0 -2 -2h-8a2 2 0 0 0 -2 2v8a2 2 0 0 0 2 2h2"/></symbol>
-    <symbol id="icon-check" viewBox="0 0 24 24"><path d="M5 12l5 5l10 -10"/></symbol>
-    <symbol id="icon-x" viewBox="0 0 24 24"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></symbol>
-    <symbol id="icon-chevrons-down" viewBox="0 0 24 24"><path d="M7 7l5 5l5 -5"/><path d="M7 13l5 5l5 -5"/></symbol>
-    <symbol id="icon-chevrons-up" viewBox="0 0 24 24"><path d="M7 11l5 -5l5 5"/><path d="M7 17l5 -5l5 5"/></symbol>
-    <symbol id="icon-download" viewBox="0 0 24 24"><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2"/><path d="M7 11l5 5l5 -5"/><path d="M12 4l0 12"/></symbol>
-    <symbol id="icon-settings" viewBox="0 0 24 24"><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z"/><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/></symbol>
-    <symbol id="icon-language" viewBox="0 0 24 24"><path d="M4 5h7"/><path d="M9 3v2c0 4.418 -2.239 8 -5 8"/><path d="M5 9c0 2.144 2.952 3.908 6.7 4"/><path d="M12 20l4 -9l4 9"/><path d="M19.1 18h-6.2"/></symbol>
-    <symbol id="icon-arrow-down" viewBox="0 0 24 24"><path d="M12 5l0 14"/><path d="M18 13l-6 6"/><path d="M6 13l6 6"/></symbol>
-    <symbol id="icon-book" viewBox="0 0 24 24"><path d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0"/><path d="M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0"/><path d="M3 6l0 13"/><path d="M12 6l0 13"/><path d="M21 6l0 13"/></symbol>
-    <symbol id="icon-brain" viewBox="0 0 24 24"><path d="M15.5 13a3.5 3.5 0 0 0 -3.5 3.5v1a3.5 3.5 0 0 0 7 0v-1.8"/><path d="M8.5 13a3.5 3.5 0 0 1 3.5 3.5v1a3.5 3.5 0 0 1 -7 0v-1.8"/><path d="M17.5 16a3.5 3.5 0 0 0 0 -7h-.5"/><path d="M19 9.3v-2.8a3.5 3.5 0 0 0 -7 0"/><path d="M6.5 16a3.5 3.5 0 0 1 0 -7h.5"/><path d="M5 9.3v-2.8a3.5 3.5 0 0 1 7 0v10"/></symbol>
-    <symbol id="icon-markdown" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"/><path d="M7 15v-6l2 2l2 -2v6"/><path d="M14 13l2 2l2 -2m-2 2v-6"/></symbol>
-  </svg>
-
-  ${brandBarHtml("viewer")}
-
-  <div class="header">
-    <div class="header-title">
-      <svg class="title-icon" aria-hidden="true"><use href="#icon-book"/></svg>
-      <span>{{TITLE}}</span>
-    </div>
-    <div class="context-indicator" title="{{CTX_TOOLTIP}}">
-      {{CTX_WARN_HTML}}
-      <span class="ctx-text">{{CTX_TEXT}}</span>
-      <div class="context-bar">
-        <div class="context-bar-fill {{TIER_CLASS}}" style="width:{{PCT}}%"></div>
-        {{MARKER_HTML}}
-      </div>
-    </div>
-    <div class="header-actions">
-      <div class="dropdown">
-        <button class="icon-btn" id="settings-btn" type="button" onclick="toggleSettings(event)" title="View settings" aria-haspopup="true">
-          <svg><use href="#icon-settings"/></svg>
-        </button>
-        <div class="dropdown-menu" id="settings-menu" hidden>
-          <label><input type="checkbox" id="opt-hide-empty" onchange="onSettingChange()"><span>Hide empty messages</span></label>
-          <label><input type="checkbox" id="opt-hide-tools" onchange="onSettingChange()"><span>Hide tool-only messages</span></label>
-          <label><input type="checkbox" id="opt-hide-narration" onchange="onSettingChange()"><span>Hide short narration texts</span></label>
-          <label><input type="checkbox" id="opt-hide-thinking" onchange="onSettingChange()"><span>Hide thinking blocks</span></label>
-        </div>
-      </div>
-      <button class="icon-btn" id="rtl-btn" type="button" onclick="toggleRtl()" title="Toggle RTL/LTR direction">
-        <svg><use href="#icon-language"/></svg>
-      </button>
-      <button class="icon-btn" id="collapse-all-btn" type="button" onclick="toggleCollapseAll()" title="Collapse all">
-        <svg><use href="#icon-chevrons-up"/></svg>
-      </button>
-      <button class="icon-btn" type="button" onclick="saveAsMarkdown()" title="Save as Markdown">
-        <svg><use href="#icon-download"/></svg>
-      </button>
-    </div>
-  </div>
-
-  <div class="messages-container">
-    {{MESSAGES_HTML}}
-  </div>
-
-  <button class="scroll-to-bottom" id="scroll-bottom-btn" onclick="scrollToBottom()" title="Scroll to end (oldest)">
-    <svg><use href="#icon-arrow-down"/></svg>
-  </button>
-
-  <div id="toast" class="toast" role="status"></div>
-
-  <script>
-    const vscode = acquireVsCodeApi();
-    const VIEWER_STATE_KEY = 'benefit-chats-viewer-state';
-
-    function loadViewerState() {
-      const defaults = { rtl: false, hideEmpty: false, hideTools: false, hideNarration: false, hideThinking: false };
-      try {
-        const raw = localStorage.getItem(VIEWER_STATE_KEY);
-        if (!raw) return defaults;
-        const parsed = JSON.parse(raw);
-        return {
-          rtl: !!parsed.rtl,
-          hideEmpty: !!parsed.hideEmpty,
-          hideTools: !!parsed.hideTools,
-          hideNarration: !!parsed.hideNarration,
-          hideThinking: !!parsed.hideThinking
-        };
-      } catch (e) {
-        return defaults;
-      }
-    }
-
-    function saveViewerState(state) {
-      try { localStorage.setItem(VIEWER_STATE_KEY, JSON.stringify(state)); }
-      catch (e) { /* ignore quota errors */ }
-    }
-
-    function applyViewerState(state) {
-      document.body.dir = state.rtl ? 'rtl' : 'ltr';
-      document.body.classList.toggle('hide-empty', state.hideEmpty);
-      document.body.classList.toggle('hide-tools', state.hideTools);
-      document.body.classList.toggle('hide-narration', state.hideNarration);
-      document.body.classList.toggle('hide-thinking', state.hideThinking);
-      const rtlBtn = document.getElementById('rtl-btn');
-      if (rtlBtn) rtlBtn.classList.toggle('is-active', state.rtl);
-      const optEmpty = document.getElementById('opt-hide-empty');
-      const optTools = document.getElementById('opt-hide-tools');
-      const optNarration = document.getElementById('opt-hide-narration');
-      const optThinking = document.getElementById('opt-hide-thinking');
-      if (optEmpty) optEmpty.checked = state.hideEmpty;
-      if (optTools) optTools.checked = state.hideTools;
-      if (optNarration) optNarration.checked = state.hideNarration;
-      if (optThinking) optThinking.checked = state.hideThinking;
-    }
-
-    let viewerState = loadViewerState();
-
-    function onSettingChange() {
-      const optEmpty = document.getElementById('opt-hide-empty');
-      const optTools = document.getElementById('opt-hide-tools');
-      const optNarration = document.getElementById('opt-hide-narration');
-      const optThinking = document.getElementById('opt-hide-thinking');
-      viewerState.hideEmpty = !!(optEmpty && optEmpty.checked);
-      viewerState.hideTools = !!(optTools && optTools.checked);
-      viewerState.hideNarration = !!(optNarration && optNarration.checked);
-      viewerState.hideThinking = !!(optThinking && optThinking.checked);
-      saveViewerState(viewerState);
-      applyViewerState(viewerState);
-    }
-
-    function toggleRtl() {
-      viewerState.rtl = !viewerState.rtl;
-      saveViewerState(viewerState);
-      applyViewerState(viewerState);
-    }
-
-    function toggleSettings(event) {
-      if (event) event.stopPropagation();
-      const menu = document.getElementById('settings-menu');
-      if (!menu) return;
-      menu.hidden = !menu.hidden;
-    }
-
-    document.addEventListener('click', function (e) {
-      const menu = document.getElementById('settings-menu');
-      const btn = document.getElementById('settings-btn');
-      if (!menu || menu.hidden) return;
-      if (menu.contains(e.target) || (btn && btn.contains(e.target))) return;
-      menu.hidden = true;
-    });
-
-    // Webviews swallow anchor navigation, so links are dead without this: route
-    // every content link through the extension host, which opens files/URLs (or
-    // copies an unresolvable path). data-raw carries the decoded destination.
-    document.addEventListener('click', function (e) {
-      const a = e.target && e.target.closest ? e.target.closest('.content-block-text a[href]') : null;
-      if (!a) return;
-      e.preventDefault();
-      e.stopPropagation();
-      vscode.postMessage({ command: 'openLink', href: a.getAttribute('data-raw') || a.getAttribute('href') });
-    });
-
-    // The Benefits brand bar links go out through the same host route.
-    document.addEventListener('click', function (e) {
-      const a = e.target && e.target.closest ? e.target.closest('a[data-brand-link]') : null;
-      if (!a) return;
-      e.preventDefault();
-      vscode.postMessage({ command: 'openLink', href: a.getAttribute('href') });
-    });
-
-    // Per-code-block Copy: copies the raw code, without markdown-it's trailing newline.
-    document.addEventListener('click', function (e) {
-      const btn = e.target && e.target.closest ? e.target.closest('[data-action="copy-code"]') : null;
-      if (!btn) return;
-      e.preventDefault();
-      e.stopPropagation();
-      const code = btn.parentElement ? btn.parentElement.querySelector('pre code, pre') : null;
-      flashCopy(btn, code ? code.textContent.replace(/\\n$/, '') : '');
-    });
-
-    window.addEventListener('message', function (ev) {
-      const m = ev.data;
-      if (m && m.command === 'showToast') showToast(m.text);
-      if (m && m.command === 'flags') {
-        document.body.classList.toggle('no-code-copy', !m.codeCopy);
-        document.body.classList.toggle('no-mdhe', !m.mdHe);
-      }
-    });
-
-    let toastTimer;
-    function showToast(text) {
-      const t = document.getElementById('toast');
-      if (!t) return;
-      t.textContent = text;
-      t.classList.add('visible');
-      clearTimeout(toastTimer);
-      toastTimer = setTimeout(function () { t.classList.remove('visible'); }, 1500);
-    }
-
-    function isElementVisible(el) {
-      return el && window.getComputedStyle(el).display !== 'none';
-    }
-
-    function collectVisibleBlockTexts(messageEl) {
-      const blocks = messageEl.querySelectorAll('.content-block');
-      const parts = [];
-      blocks.forEach(function (block) {
-        if (!isElementVisible(block)) return;
-        if (block.classList.contains('content-block-thinking')) {
-          const txt = block.querySelector('.thinking-text');
-          if (txt) parts.push({ kind: 'thinking', text: txt.textContent });
-        } else if (block.classList.contains('content-block-tool')) {
-          parts.push({ kind: 'tool', text: block.textContent });
-        } else {
-          // Text blocks are rendered markdown; data-md holds the original
-          // source so copy and export emit markdown, not flattened text.
-          var src = block.dataset ? block.dataset.md : undefined;
-          parts.push({ kind: 'text', text: typeof src === 'string' ? src : block.textContent });
-        }
-      });
-      return parts;
-    }
-
-    function buildMarkdown() {
-      const titleEl = document.querySelector('.header-title span');
-      const docTitle = titleEl ? titleEl.textContent.trim() : 'Conversation';
-      const lines = ['# ' + docTitle, ''];
-      // The page shows newest first; the exported file stays chronological.
-      const messages = Array.from(document.querySelectorAll('.message')).reverse();
-      messages.forEach(function (msg) {
-        if (!isElementVisible(msg)) return;
-        const roleEl = msg.querySelector('.message-role');
-        const role = roleEl ? roleEl.textContent.trim() : '';
-        const parts = collectVisibleBlockTexts(msg);
-        if (parts.length === 0) return;
-        lines.push('## ' + role, '');
-        parts.forEach(function (part) {
-          if (part.kind === 'thinking') {
-            lines.push('> **💭 Thinking**');
-            lines.push('>');
-            part.text.split('\\n').forEach(function (l) { lines.push('> ' + l); });
-            lines.push('');
-          } else if (part.kind === 'tool') {
-            lines.push('\\u0060\\u0060\\u0060');
-            lines.push(part.text);
-            lines.push('\\u0060\\u0060\\u0060');
-            lines.push('');
-          } else {
-            lines.push(part.text);
-            lines.push('');
-          }
-        });
-      });
-      return lines.join('\\n');
-    }
-
-    function saveAsMarkdown() {
-      const content = buildMarkdown();
-      vscode.postMessage({ command: 'saveAsMarkdownPrepared', content: content });
-    }
-
-    function toggleMessage(headerEl) {
-      headerEl.parentElement.classList.toggle('collapsed');
-      syncCollapseAllLabel();
-    }
-
-    function copyMessage(btn) {
-      const messageEl = btn.closest('.message');
-      let text = '';
-      if (messageEl) {
-        const parts = collectVisibleBlockTexts(messageEl);
-        text = parts.map(function (p) {
-          return p.kind === 'thinking' ? '[Thinking]\\n' + p.text : p.text;
-        }).join('\\n\\n');
-        if (!text) {
-          const fallbackEl = messageEl.querySelector('.message-text');
-          text = fallbackEl ? fallbackEl.textContent : '';
-        }
-      }
-      flashCopy(btn, text);
-    }
-
-    // md-he gets the message's markdown only — thinking and tool output are
-    // working notes, not something you open to read comfortably.
-    function openInMdHe(btn) {
-      const messageEl = btn.closest('.message');
-      if (!messageEl) return;
-      const text = collectVisibleBlockTexts(messageEl)
-        .filter(function (p) { return p.kind === 'text'; })
-        .map(function (p) { return p.text; })
-        .join('\\n\\n')
-        .trim();
-      if (!text) {
-        showToast('No text in this message to open');
-        return;
-      }
-      vscode.postMessage({ command: 'openInMdHe', content: text });
-    }
-
-    function flashCopy(btn, text) {
-      const originalHtml = btn.innerHTML;
-      navigator.clipboard.writeText(text).then(function () {
-        btn.innerHTML = '<svg><use href="#icon-check"/></svg>';
-        btn.classList.add('copied');
-        setTimeout(function () {
-          btn.innerHTML = originalHtml;
-          btn.classList.remove('copied');
-        }, 1500);
-      }).catch(function (err) {
-        console.error('Copy failed:', err);
-        btn.innerHTML = '<svg><use href="#icon-x"/></svg>';
-        setTimeout(function () { btn.innerHTML = originalHtml; }, 1500);
-      });
-    }
-
-    function toggleCollapseAll() {
-      const messages = document.querySelectorAll('.message');
-      const anyExpanded = Array.from(messages).some(function (m) { return !m.classList.contains('collapsed'); });
-      messages.forEach(function (m) {
-        if (anyExpanded) m.classList.add('collapsed');
-        else m.classList.remove('collapsed');
-      });
-      syncCollapseAllLabel();
-    }
-
-    function syncCollapseAllLabel() {
-      const btn = document.getElementById('collapse-all-btn');
-      if (!btn) return;
-      const messages = document.querySelectorAll('.message');
-      const anyExpanded = Array.from(messages).some(function (m) { return !m.classList.contains('collapsed'); });
-      const iconId = anyExpanded ? '#icon-chevrons-up' : '#icon-chevrons-down';
-      btn.innerHTML = '<svg><use href="' + iconId + '"/></svg>';
-      btn.title = anyExpanded ? 'Collapse all' : 'Expand all';
-    }
-
-    function scrollToBottom() {
-      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-    }
-
-    const scrollBtn = document.getElementById('scroll-bottom-btn');
-    function updateScrollBtn() {
-      if (!scrollBtn) return;
-      const nearBottom = window.innerHeight + window.scrollY >= document.body.offsetHeight - 100;
-      scrollBtn.classList.toggle('visible', !nearBottom);
-    }
-    window.addEventListener('scroll', updateScrollBtn, { passive: true });
-    window.addEventListener('resize', updateScrollBtn);
-
-    applyViewerState(viewerState);
-    updateScrollBtn();
-    syncCollapseAllLabel();
-  </script>
-</body>
-</html>`;
