@@ -5,6 +5,7 @@
  *   __BENEFIT_RTL_MODE__   -> "active" | "always" | "auto"
  *   __BENEFIT_RTL_TEXT__   -> custom text font (or empty)
  *   __BENEFIT_RTL_CODE__   -> custom code font (or empty)
+ * and GLYPHS below becomes the two letters of the switch, from shared/direction-glyphs.ts.
  */
 (function () {
   if (window.__benefitRtlBooted) return;
@@ -17,6 +18,8 @@
   var BTN_ID = "benefit-rtl-btn";
   var WRAP_ID = "benefit-rtl-btn-wrap";
   var STORAGE_KEY = "benefit.rtl.activeOn";
+  var GLYPHS = __BENEFIT_RTL_GLYPHS__;
+  var SVG_NS = "http://www.w3.org/2000/svg";
 
   var RTL_REGEX = /[֐-׿؀-ۿݐ-ݿﭐ-﷿ﹰ-﻿]/;
 
@@ -69,24 +72,58 @@
     }
   }
 
+  // Built node by node, not from markup, so the chat's security policy has nothing to object to.
+  function makeGlyph(glyph) {
+    var svg = document.createElementNS(SVG_NS, "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("fill", "currentColor");
+    svg.setAttribute("aria-hidden", "true");
+    var parent = svg;
+    if (glyph.transform) {
+      parent = document.createElementNS(SVG_NS, "g");
+      parent.setAttribute("transform", glyph.transform);
+      svg.appendChild(parent);
+    }
+    for (var i = 0; i < glyph.paths.length; i++) {
+      var path = document.createElementNS(SVG_NS, "path");
+      path.setAttribute("fill-rule", "evenodd");
+      path.setAttribute("d", glyph.paths[i]);
+      parent.appendChild(path);
+    }
+    return svg;
+  }
+
+  function makeSide(cls, glyph) {
+    var side = document.createElement("span");
+    side.className = cls;
+    side.appendChild(makeGlyph(glyph));
+    return side;
+  }
+
+  // A two-letter switch, B | bet: the lit letter is the current direction, a click anywhere flips it.
+  function showState(btn, on) {
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+    btn.title = on
+      ? "Right to left. Click for left to right · Benefit's Toolkit"
+      : "Left to right. Click for right to left · Benefit's Toolkit";
+  }
+
   function makeButton() {
     var btn = document.createElement("button");
     btn.id = BTN_ID;
     btn.type = "button";
-    btn.textContent = "⇄";
-    btn.title = "Toggle RTL (Benefit's Toolkit)";
-    btn.setAttribute("aria-label", "Toggle RTL");
+    btn.setAttribute("aria-label", "Right to left");
+    btn.appendChild(makeSide("benefit-rtl-b", GLYPHS.b));
+    btn.appendChild(makeSide("benefit-rtl-bet", GLYPHS.bet));
     btn.addEventListener("click", function (e) {
       e.preventDefault();
       e.stopPropagation();
       var nextOn = !document.body.classList.contains(SCOPE_CLASS);
       applyScope(nextOn);
-      btn.classList.toggle("is-on", nextOn);
+      showState(btn, nextOn);
       writeActiveStored(nextOn);
     });
-    if (document.body.classList.contains(SCOPE_CLASS)) {
-      btn.classList.add("is-on");
-    }
+    showState(btn, document.body.classList.contains(SCOPE_CLASS));
     return btn;
   }
 

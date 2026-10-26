@@ -197,6 +197,8 @@ export const BASE_CSS = `
     background: transparent; border: 1.5px solid transparent; color: var(--text);
     font: 500 12px var(--head);
   }
+  .seg button.glyph { padding: 3px 9px; }
+  .seg button.glyph .ico { width: 15px; height: 15px; }
   .seg button[aria-pressed="true"], .seg button[aria-selected="true"] {
     background: var(--stamp-bg); color: var(--stamp-text); border-color: var(--stamp-line);
     box-shadow: var(--stamp-shadow); font-weight: 600;

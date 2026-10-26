@@ -425,8 +425,8 @@ export function buildViewerHtml(input: ViewerInput): string {
       </div>
       <div class="seg" role="group" aria-label="Text direction">
         <button type="button" data-dir="auto" aria-pressed="true" title="Each paragraph follows its own language">Auto</button>
-        <button type="button" data-dir="ltr" aria-pressed="false">LTR</button>
-        <button type="button" data-dir="rtl" aria-pressed="false">RTL</button>
+        <button class="glyph" type="button" data-dir="ltr" aria-pressed="false" title="Left to right" aria-label="Left to right">${icon("letterB")}</button>
+        <button class="glyph" type="button" data-dir="rtl" aria-pressed="false" title="Right to left" aria-label="Right to left">${icon("letterBet")}</button>
       </div>
       <button class="btn" type="button" id="display" aria-haspopup="true" aria-expanded="false">${icon("adjustments")}<span>Display</span></button>
       <button class="btn" type="button" id="collapse">${icon("chevronsUp")}<span>Collapse all</span></button>

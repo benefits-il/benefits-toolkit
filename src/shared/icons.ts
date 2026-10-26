@@ -4,6 +4,8 @@
  * currentColor, so they follow whatever text color they sit in.
  */
 
+import { glyphMarkup, LETTER_B, LETTER_BET } from "./direction-glyphs";
+
 const OUTLINE = {
   volume:
     '<path d="M15 8a5 5 0 0 1 0 8"/><path d="M17.7 5a9 9 0 0 1 0 14"/><path d="M6 15h-2a1 1 0 0 1 -1 -1v-4a1 1 0 0 1 1 -1h2l3.5 -4.5a.8 .8 0 0 1 1.5 .5v14a.8 .8 0 0 1 -1.5 .5l-3.5 -4.5"/>',
@@ -17,8 +19,6 @@ const OUTLINE = {
   contrast: '<path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M12 17a5 5 0 0 0 0 -10v10"/>',
   browser: '<path d="M4 4m0 1a1 1 0 0 1 1 -1h14a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-14a1 1 0 0 1 -1 -1z"/><path d="M4 8h16"/><path d="M8 4v4"/>',
   plug: '<path d="M9.785 6l8.215 8.215l-2.054 2.054a5.81 5.81 0 1 1 -8.215 -8.215l2.054 -2.054z"/><path d="M4 20l3.5 -3.5"/><path d="M15 4l-3.5 3.5"/><path d="M20 9l-3.5 3.5"/>',
-  textDirectionRtl:
-    '<path d="M16 4h-6.5a3.5 3.5 0 0 0 0 7h.5"/><path d="M14 15v-11"/><path d="M10 15v-11"/><path d="M5 19h14"/><path d="M7 21l-2 -2l2 -2"/>',
   sun: '<path d="M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"/><path d="M3 12h1m8 -9v1m8 8h1m-9 8v1m-6.4 -15.4l.7 .7m12.1 -.7l-.7 .7m0 11.4l.7 .7m-12.1 -.7l-.7 .7"/>',
   moon: '<path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z"/>',
   search: '<path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"/><path d="M21 21l-6 -6"/>',
@@ -58,8 +58,11 @@ const OUTLINE = {
     '<path d="M3 7a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"/><path d="M7 15v-6l2 2l2 -2v6"/><path d="M14 13l2 2l2 -2m-2 2v-6"/>',
 } as const;
 
+// The two direction letters are ours, not Tabler's (see direction-glyphs.ts).
 const FILLED = {
   play: '<path d="M6 4v16a1 1 0 0 0 1.524 .852l13 -8a1 1 0 0 0 0 -1.704l-13 -8a1 1 0 0 0 -1.524 .852z"/>',
+  letterB: glyphMarkup(LETTER_B),
+  letterBet: glyphMarkup(LETTER_BET),
 } as const;
 
 export type IconName = keyof typeof OUTLINE | keyof typeof FILLED;

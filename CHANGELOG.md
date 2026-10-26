@@ -13,7 +13,7 @@
 - Everything that is not the answer folds into one line between the two, like "12 updates, 31 tool calls · Read, Edit, Bash": Claude's running notes, tool calls, results and thinking. Click it to open them.
 - Text attached to your message (a pasted block, a system reminder, an open file) folds into a line inside your bubble; your own words stay.
 - Find in the conversation (Ctrl+F or Cmd+F) with a match counter and arrows. A match opens whatever holds it.
-- Text direction is Auto by default: every paragraph follows its own language, so Hebrew and English sit right in one message. LTR and RTL force one direction.
+- Text direction is Auto by default: every paragraph follows its own language, so Hebrew and English sit right in one message. ב forces right to left and B forces left to right.
 - Display can hide Claude's work or its thinking, in every open viewer. More has Rename, Save full conversation, Save visible messages, Archive, Show in list and Delete.
 
 **A theme for everything: Auto, Light or Dark.** The new `benefit.appearance.theme` covers the sidebar, the viewer and the desktop popup. Auto follows the editor, and high contrast in the editor always wins. Dark is "Graphite", a dark gray close to the editor's own, with green only in the accents; Light is cream.
@@ -23,6 +23,8 @@
 **New projects get their own color and sound.** The first time a window sees a Claude Code conversation in its folder, the project gets a window color and a "finished" sound no other project uses. "Needs input" stays one shared sound. A color you set or cleared yourself is kept. Switches: `benefit.windowColor.autoAssign` and `benefit.sounds.autoAssign`.
 
 **The popup, restyled.** A small card in the toolkit's theme, framed in the project's color: a tile in that color with a check when Claude finishes or a bell when it needs input, then the name and the status. New: `benefit.popup.stayUntilClicked` keeps it up until you click it or its x.
+
+**The RTL button is the Benefits B.** In the Claude Code chat header, a small switch with B on the left and ב on the right replaces the ⇄ button. The ב is a Hebrew bet drawn in the same double line as the logo. The lit letter is the current direction, and a click anywhere on the switch flips it. The same two letters set the direction in the conversation viewer, and the ב is the RTL page's icon in Settings.
 
 **RTL fonts from a list.** The chat text and code fonts are picked from the fonts on this computer, plus Rubik and Varela Round, which come with the toolkit and are copied next to Claude Code's stylesheet. The Claude Code folder override left the sidebar; it stays in `settings.json`.
 

@@ -11,6 +11,7 @@ import {
 } from "../../../shared/fs-utils";
 import { RtlMode } from "../../../core/config-manager";
 import { logger } from "../../../core/logger";
+import { LETTER_B, LETTER_BET } from "../../../shared/direction-glyphs";
 import { HEBREW_RANGE, LATIN_RANGE } from "../../../shared/webview-theme";
 import { ClaudeAssets } from "./claude-asset-locator";
 
@@ -100,7 +101,8 @@ export class RtlAssetPatcher {
     return template
       .replace(/__BENEFIT_RTL_MODE__/g, opts.mode)
       .replace(/__BENEFIT_RTL_TEXT__/g, sanitizeFont(opts.textFont))
-      .replace(/__BENEFIT_RTL_CODE__/g, sanitizeFont(opts.codeFont));
+      .replace(/__BENEFIT_RTL_CODE__/g, sanitizeFont(opts.codeFont))
+      .replace(/__BENEFIT_RTL_GLYPHS__/g, () => JSON.stringify({ b: LETTER_B, bet: LETTER_BET }));
   }
 
   /** Returns true if either asset file was actually changed by this apply. */

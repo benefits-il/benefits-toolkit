@@ -21,7 +21,7 @@ export const SETTINGS_PAGES: readonly SettingsPage[] = [
   { id: "sounds", title: "Sounds", summary: "When Claude finishes or waits", icon: "volume", switchKey: "sounds.enabled", switchLabel: "Enable sounds" },
   { id: "popup", title: "Desktop popup", summary: "Desktop alert with project name", icon: "bell", switchKey: "popup.enabled", switchLabel: "Enable desktop popup" },
   { id: "chats", title: "Conversations", summary: "Chat list and viewer", icon: "messages", switchKey: "chats.enabled", switchLabel: "Enable conversations" },
-  { id: "rtl", title: "RTL in Claude Code", summary: "Right-to-left in the Claude chat", icon: "textDirectionRtl", switchKey: "rtl.enabled", switchLabel: "Enable RTL" },
+  { id: "rtl", title: "RTL in Claude Code", summary: "Right-to-left in the Claude chat", icon: "letterBet", switchKey: "rtl.enabled", switchLabel: "Enable RTL" },
   { id: "htmlOpen", title: "Open in browser", summary: "HTML files, and Markdown in md-he", icon: "browser", switchKey: "htmlOpen.enabled", switchLabel: "Enable Open in browser" },
   { id: "diagnostics", title: "Troubleshooting", summary: "Hooks and connection", icon: "plug" },
 ];
