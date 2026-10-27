@@ -61,5 +61,8 @@ test("the row's time is short and relative", () => {
   assert.equal(relativeTime("2026-10-26T11:18:00Z", now), "42m");
   assert.equal(relativeTime("2026-10-26T09:00:00Z", now), "3h");
   assert.equal(relativeTime("2026-10-24T12:00:00Z", now), "2d");
-  assert.equal(relativeTime("2026-08-01T12:00:00Z", now), "Aug 1");
+  assert.equal(relativeTime("2026-09-25T12:00:00Z", now), "1mo");
+  assert.equal(relativeTime("2026-08-01T12:00:00Z", now), "2mo");
+  assert.equal(relativeTime("2025-11-30T12:00:00Z", now), "10mo");
+  assert.equal(relativeTime("2024-09-01T12:00:00Z", now), "2y");
 });

@@ -95,17 +95,21 @@ function startOfDay(d: Date): number {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 }
 
-/** "now", "42m", "3h", "2d", or a short date: the time column of a row. */
+/**
+ * "now", "42m", "3h", "2d", "2mo", "1y": the time column of a row, at most
+ * four characters wide (the row shows the exact date on hover). It runs inside
+ * the sidebar's page too, so it uses nothing from outside.
+ */
 export function relativeTime(iso: string, now: Date = new Date()): string {
-  const date = new Date(iso);
-  const minutes = Math.floor((now.getTime() - date.getTime()) / 60000);
+  const minutes = Math.floor((now.getTime() - new Date(iso).getTime()) / 60000);
   if (minutes < 1) return "now";
   if (minutes < 60) return `${minutes}m`;
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h`;
   const days = Math.floor(hours / 24);
   if (days < 30) return `${days}d`;
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: date.getFullYear() === now.getFullYear() ? undefined : "numeric" });
+  const months = Math.floor(days / 30.44);
+  return months < 12 ? `${Math.max(1, months)}mo` : `${Math.floor(months / 12)}y`;
 }
 
 /** How full the conversation's context window is, 0 to 100, one decimal; null without usage. */

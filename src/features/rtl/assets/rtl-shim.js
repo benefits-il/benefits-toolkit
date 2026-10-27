@@ -44,7 +44,36 @@
     if (CODE_FONT) {
       rules.push('pre, code, [class*="codeBlockWrapper_"] { font-family: "' + CODE_FONT + '", monospace; }');
     }
+    if (TEXT_FONT) {
+      rules.push('html .' + SCOPE_CLASS + ' pre[data-benefit-text], html .' + SCOPE_CLASS + ' pre[data-benefit-text] code { font-family: "' + TEXT_FONT + '", sans-serif; }');
+    }
     style.textContent = rules.join("\n");
+  }
+
+  // A code block of Hebrew text (a prompt, a message to copy) is not code: the
+  // CSS sets it right to left with wrapped lines. Real code that only carries a
+  // Hebrew string stays code. Same rule as src/shared/text-blocks.ts.
+  var TEXT_LANGUAGES = ["", "text", "txt", "plain", "plaintext", "markdown", "md", "prompt"];
+  function isHebrewTextBlock(content, language) {
+    var hebrew = (content.match(/[א-ת]/g) || []).length;
+    if (!hebrew) return false;
+    var latin = (content.match(/[A-Za-z]/g) || []).length;
+    var lang = String(language || "").trim().split(/\s+/)[0].toLowerCase();
+    return hebrew / (hebrew + latin) >= (TEXT_LANGUAGES.indexOf(lang) >= 0 ? 0.3 : 0.6);
+  }
+
+  function markTextBlocks() {
+    var blocks = document.querySelectorAll("pre");
+    for (var i = 0; i < blocks.length; i++) {
+      var pre = blocks[i];
+      var text = pre.textContent || "";
+      if (pre.__benefitChecked === text.length) continue; // unchanged since the last look
+      pre.__benefitChecked = text.length;
+      var code = pre.querySelector("code") || pre;
+      var lang = /(?:^|\s)(?:language|lang)-(\S+)/.exec(String(code.className || ""));
+      if (isHebrewTextBlock(text, lang ? lang[1] : "")) pre.setAttribute("data-benefit-text", "");
+      else pre.removeAttribute("data-benefit-text");
+    }
   }
 
   function detectAndMarkBubbles() {
@@ -168,6 +197,7 @@
 
   function boot() {
     applyFonts();
+    markTextBlocks();
     if (MODE === "always") {
       applyScope(true);
     } else if (MODE === "active") {
@@ -180,11 +210,20 @@
   }
 
   function startObserver() {
+    // Code blocks are checked once per frame at most: a streaming reply changes the page constantly.
+    var blocksPending = false;
     var observer = new MutationObserver(function () {
       if (MODE === "active") {
         tryInsertButton();
       } else if (MODE === "auto") {
         detectAndMarkBubbles();
+      }
+      if (!blocksPending) {
+        blocksPending = true;
+        requestAnimationFrame(function () {
+          blocksPending = false;
+          markTextBlocks();
+        });
       }
     });
     observer.observe(document.body, { childList: true, subtree: true });

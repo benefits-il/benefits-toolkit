@@ -22,8 +22,8 @@ test("New chat goes to the editor's own agent, or to Claude Code when chosen", (
 test("the header has New chat with the editor's mark; only Cursor shows Cursor's own-alert row", () => {
   const vscodeHtml = sidebarHtml(null, "dark");
   const cursorHtml = sidebarHtml(null, "dark", "cursor");
-  assert.ok(/id="new-chat" hidden><i class="mark mark-claude"/.test(vscodeHtml));
-  assert.ok(/id="new-chat" hidden><i class="mark mark-cursor"/.test(cursorHtml));
+  assert.ok(/id="new-chat" aria-label="New chat" hidden><i class="mark mark-claude"/.test(vscodeHtml));
+  assert.ok(/id="new-chat" aria-label="New chat" hidden><i class="mark mark-cursor"/.test(cursorHtml));
   assert.ok(cursorHtml.includes('<div class="own-row"><label'), "Cursor's row is shown in Cursor");
   assert.ok(vscodeHtml.includes('<div class="own-row" hidden><label'), "and hidden elsewhere");
   // The button sits inside the row block, before the row's line.

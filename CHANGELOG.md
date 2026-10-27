@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.10.0 · Room for titles, and a sidebar that narrows
+
+**More room for titles.** Each row starts with the project's dot, then the agent's mark and the title. At the far end sit the time and a small ring for how full the context is: green, then yellow from 50% and red from 80%, with the percent on hover. Times are short (now, 5m, 3h, 2d, 3mo, 1y), with the exact date on hover, and line up from row to row. What every row shares is left out: no Claude marks when all the conversations are Claude's, and no project dots when they all belong to one project, as in This project.
+
+**A narrow sidebar.** When the words no longer fit, they turn into icons: New chat becomes a plus, Chats and Settings become a chat icon and a gear, and This project and All projects become one folder and several folders. Search becomes a magnifier on the same line; a click opens the field, and Escape or its X closes it. The Benefits card drops its line, then its slogan, and its word shrinks with the sidebar; only when the word would be too small to read does the card keep just the B.
+
+**On Open VSX.** Cursor and Antigravity install the toolkit from their own Extensions view; it comes from Open VSX (`benakiva.benefits-toolkit`). The README and the site have a "Works in" table: every feature works in all three editors, and the table says which agents each one serves.
+
+**Hebrew text in a code block.** A code block that holds Hebrew text, such as a prompt to copy, reads right to left and wraps its lines: in the viewer when it is set to ב, and in Claude Code's chat when RTL is on. Code that only carries a Hebrew string or comment stays code.
+
 ## 0.9.0 · Cursor and Antigravity
 
 **Their own agents, alongside Claude Code.** The agent built into Cursor and the one built into Antigravity now get the toolkit's alerts and appear in the chat list. Each is on by default and has its own switch on the new **Cursor and Antigravity** page in Settings (`benefit.agents.cursor`, `benefit.agents.antigravity`). A switch does nothing on a computer without that editor.

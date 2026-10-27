@@ -2,6 +2,7 @@ import MarkdownIt from "markdown-it";
 import { AgentId, AGENT_NAMES, agentMark, agentMarkCss } from "../../../../shared/agents";
 import { BENEFITS_URL } from "../../../../shared/brand-bar";
 import { icon } from "../../../../shared/icons";
+import { isHebrewTextBlock } from "../../../../shared/text-blocks";
 import type { ResolvedTheme } from "../../../../shared/theme-resolve";
 import { BrandFonts, escapeHtml, renderWebviewPage } from "../../../../shared/webview-theme";
 import { CONTEXT_WINDOW, ContentBlock, contextTokens, extractBlocks, formatModelName, readLastUsage } from "../../domain/blocks";
@@ -79,13 +80,17 @@ md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
   return defaultLinkOpen(tokens, idx, options, env, self);
 };
 
-// Every code block gets a Copy button under the code, inside the block.
+// Every code block gets a Copy button under the code, inside the block. A
+// block of Hebrew text (a prompt, a message) is not code: it takes the
+// conversation's direction and wraps its lines.
 const COPY_CODE = `<button class="mini code-copy" type="button" data-act="code">${icon("copy")}<span>Copy code</span></button>`;
 for (const rule of ["fence", "code_block"] as const) {
   const defaultRule =
     md.renderer.rules[rule] ?? ((tokens, idx, options, _env, self) => self.renderToken(tokens, idx, options));
-  md.renderer.rules[rule] = (tokens, idx, options, env, self) =>
-    `<div class="code-wrap">${defaultRule(tokens, idx, options, env, self)}${COPY_CODE}</div>`;
+  md.renderer.rules[rule] = (tokens, idx, options, env, self) => {
+    const text = isHebrewTextBlock(tokens[idx].content, tokens[idx].info) ? " text" : "";
+    return `<div class="code-wrap${text}">${defaultRule(tokens, idx, options, env, self)}${COPY_CODE}</div>`;
+  };
 }
 
 const MONTH_DAY = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" });

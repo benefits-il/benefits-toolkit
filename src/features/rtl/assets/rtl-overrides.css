@@ -112,6 +112,18 @@
   text-align: left !important;
 }
 
+/* A code block of Hebrew text (a prompt, a message to copy), marked by the shim:
+   right to left, wrapped lines, the text font. Real code stays as above. */
+.benefit-rtl-on pre[data-benefit-text],
+.benefit-rtl-on pre[data-benefit-text] code {
+  direction: rtl !important;
+  unicode-bidi: plaintext !important;
+  text-align: right !important;
+  white-space: pre-wrap !important;
+  overflow-wrap: anywhere !important;
+  font-family: var(--vscode-font-family, system-ui, sans-serif);
+}
+
 /* Tool containers — LTR + alignment */
 .benefit-rtl-on [class*="toolUse_"],
 .benefit-rtl-on [class*="toolSummary_"],

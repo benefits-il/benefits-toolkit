@@ -141,6 +141,10 @@ export const VIEWER_CSS = `
   .code-wrap { margin: 0 0 12px; padding: 12px 14px; border-radius: 10px; background: var(--code); color: var(--code-text); direction: ltr; text-align: left; }
   .code-wrap pre { margin: 0; overflow-x: auto; }
   .code-wrap pre code { display: block; background: none; padding: 0; font: 12.5px/1.6 var(--mono); white-space: pre; }
+  /* Hebrew text in a code block: the conversation's direction, wrapped lines, the reading font. */
+  .code-wrap.text, .code-wrap.text pre, .code-wrap.text pre code { direction: inherit; text-align: start; }
+  .code-wrap.text pre { overflow: visible; }
+  .code-wrap.text pre code { unicode-bidi: isolate; white-space: pre-wrap; overflow-wrap: anywhere; font: 13px/1.75 var(--read-font); }
   .code-copy { margin-top: 10px; }
   body.no-code-copy .code-copy { display: none; }
 

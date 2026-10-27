@@ -3,23 +3,45 @@
 **Part of [Benefits](https://benefits-il.dev/)** **·** the course that teaches you to work right with AI.
 <br>*AI that finally fits · Ben Akiva*
 
-Quality-of-life tools for [Claude Code](https://github.com/anthropics/claude-code) inside VS Code, bundled into a single extension.
+Quality-of-life tools for [Claude Code](https://github.com/anthropics/claude-code) and for the agents built into Cursor and Antigravity, bundled into a single extension that runs in VS Code, Cursor and Antigravity.
 
 Five features in one place:
 
-- **RTL** — Right-to-left support in the Claude Code chat (Active / Always / Auto modes), for Hebrew, Arabic, Persian.
-- **Alerts** — Know when Claude is done without watching it:
-  - **Sounds** when Claude finishes a message or asks for your input. Pick any sound from a shared library for each event, hearing each one as you click it, as a default for all projects or just for this one. A new project gets a "finished" sound no other project uses, so each window sounds different.
+- **RTL** — Right-to-left support in the Claude Code chat (Active / Always / Auto modes), for Hebrew, Arabic, Persian. A code block of Hebrew text, such as a prompt to copy, reads right to left and wraps its lines; real code stays left to right.
+- **Alerts** — Know when the agent is done without watching it:
+  - **Sounds** when Claude finishes a message or asks for your input, and when Cursor's or Antigravity's agent finishes. Pick any sound from a shared library for each event, hearing each one as you click it, as a default for all projects or just for this one. A new project gets a "finished" sound no other project uses, so each window sounds different.
   - **Popup** (Windows and macOS): a small card framed in the project's window color, with its name (the folder's, or one you type in Settings). Click it to jump straight back to that window. It never shows while you're already in that window, and it can stay up until you click it.
-- **Chats**: a sidebar list of your past Claude Code conversations, with how full each one's context is. Rename, archive, restore, search, export to Markdown, and a viewer that reads like a closed thread: every message in a card marked by its speaker, closed to its first lines until you open it, with only the latest answer open, and Claude's tool calls and notes folded into one line. It has find in the conversation, a left-to-right or right-to-left switch for Hebrew, file links that open the file right in VS Code, a Copy button on every code block, and an "Open in md-he" button that opens any message at [benefits-il.dev/md-he](https://benefits-il.dev/md-he/) for comfortable reading.
-- **Colors**: give each VS Code window its own color (title, activity and status bars), so five open projects stop looking identical. A new project gets a color no other project uses; pick another of the 38 in Settings, or type a hex.
+- **Chats**: a sidebar list of your past conversations with Claude Code, Cursor's agent and Antigravity's agent, each with its time and a small ring for how full its context is. Rename, archive, restore, search, export to Markdown, and a viewer that reads like a closed thread: every message in a card marked by its speaker, closed to its first lines until you open it, with only the latest answer open, and Claude's tool calls and notes folded into one line. It has find in the conversation, a left-to-right or right-to-left switch for Hebrew, file links that open the file right in the editor, a Copy button on every code block, and an "Open in md-he" button that opens any message at [benefits-il.dev/md-he](https://benefits-il.dev/md-he/) for comfortable reading.
+- **Colors**: give each editor window its own color (title, activity and status bars), so five open projects stop looking identical. A new project gets a color no other project uses; pick another of the 38 in Settings, or type a hex.
 - **Open in browser**: a Benefits button on HTML files, in the editor title bar and the Explorer's right-click menu, opens them in your browser. The same button on Markdown files opens them in [md-he](https://benefits-il.dev/md-he/). Uses the system default browser, or set `benefit.htmlOpen.browserPath` to force a specific one (e.g. Chrome).
 
-The sidebar has two tabs: **Chats**, your conversations, and **Settings**, one page per feature. Every feature can be switched off (and back on) in Settings, including the popup and each of its two triggers. The sidebar, the viewer and the popup follow one theme: Auto (the editor's), Light or Dark.
+The sidebar has two tabs: **Chats**, your conversations, and **Settings**, one page per feature. Every feature can be switched off (and back on) in Settings, including the popup and each of its two triggers. The sidebar, the viewer and the popup follow one theme: Auto (the editor's), Light or Dark. In a narrow sidebar the words turn into icons.
+
+## Works in
+
+Every feature works in all three editors. What changes is which agent it serves.
+
+| Feature | VS Code | Cursor | Antigravity | Agents |
+|---|:-:|:-:|:-:|---|
+| Conversation list and viewer | ✓ | ✓ | ✓ | All three agents |
+| Sound and popup when the agent finishes | ✓ | ✓ | ✓ | All three agents |
+| New chat button | ✓ | ✓ | ✓ | The editor's agent, or Claude Code |
+| Window colors | ✓ | ✓ | ✓ | Any agent |
+| Open in browser and md-he | ✓ | ✓ | ✓ | Any agent |
+| Right-to-left chat | ✓ | ✓ | ✓ | Claude Code |
+| Alert when the agent needs input | ✓ | ✓ | ✓ | Claude Code |
+
+- Cursor and Antigravity conversations open for reading, and you can save them as Markdown.
+- Right-to-left works in Claude Code's chat, in each of the editors. Cursor's and Antigravity's agents don't get it in their own chat; their conversations read right to left in the toolkit's viewer.
+- In Cursor and Antigravity you can also turn off the editor's own alerts, so only the Benefits alert remains.
+- Claude Code features need the Claude Code extension in that editor.
 
 ## Install
 
-From the [VS Marketplace](https://marketplace.visualstudio.com/items?itemName=benakiva.benefits-toolkit) — search for "Benefit's Toolkit" in the Extensions view, or:
+- **VS Code**: from the [VS Marketplace](https://marketplace.visualstudio.com/items?itemName=benakiva.benefits-toolkit). Search for "Benefit's Toolkit" in the Extensions view.
+- **Cursor and Antigravity**: from [Open VSX](https://open-vsx.org/extension/benakiva/benefits-toolkit). Search for "Benefit's Toolkit" in the Extensions view.
+
+Or from the terminal (in Cursor, use `cursor` instead of `code`):
 
 ```
 code --install-extension benakiva.benefits-toolkit

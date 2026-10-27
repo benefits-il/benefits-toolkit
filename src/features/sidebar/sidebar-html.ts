@@ -253,18 +253,21 @@ function body(agent: AgentId): string {
 <div class="side">
   <div class="side-head">
     <div class="seg tabs" role="tablist" aria-label="Benefit's Toolkit">
-      <button type="button" role="tab" id="tab-chats" aria-selected="true" aria-controls="screen-chats">Chats</button>
-      <button type="button" role="tab" id="tab-settings" aria-selected="false" aria-controls="screen-settings">Settings</button>
+      <button type="button" role="tab" id="tab-chats" aria-selected="true" aria-controls="screen-chats" aria-label="Chats" title="Chats">${icon("messages")}<span class="lbl">Chats</span></button>
+      <button type="button" role="tab" id="tab-settings" aria-selected="false" aria-controls="screen-settings" aria-label="Settings" title="Settings">${icon("settings")}<span class="lbl">Settings</span></button>
     </div>
-    <button class="head-new" type="button" id="new-chat" hidden>${agentMark(agent)}<span>New chat</span></button>
+    <button class="head-new" type="button" id="new-chat" aria-label="New chat" hidden>${agentMark(agent)}<span>New chat</span>${icon("plus")}</button>
   </div>
   <div class="side-body" id="body">
     <section id="screen-chats" role="tabpanel" aria-labelledby="tab-chats">
       <div id="chat-tools">
-        <div class="search">${icon("search")}<input id="search" type="search" placeholder="Search conversations" aria-label="Search conversations" spellcheck="false" autocomplete="off" /></div>
-        <div class="seg scope" role="group" aria-label="Which conversations">
-          <button type="button" data-scope="currentWorkspace" aria-pressed="true">This project</button>
-          <button type="button" data-scope="all" aria-pressed="false">All projects</button>
+        <div class="tools-row" id="tools-row">
+          <div class="search">${icon("search")}<input id="search" type="search" placeholder="Search conversations" aria-label="Search conversations" spellcheck="false" autocomplete="off" /><button class="search-close" type="button" id="search-close" aria-label="Close search" title="Close search">${icon("x")}</button></div>
+          <button class="search-open" type="button" id="search-open" aria-label="Search conversations" title="Search conversations">${icon("search")}</button>
+          <div class="seg scope" role="group" aria-label="Which conversations">
+            <button type="button" data-scope="currentWorkspace" aria-pressed="true" aria-label="This project" title="This project">${icon("folder")}<span class="lbl">This project</span></button>
+            <button type="button" data-scope="all" aria-pressed="false" aria-label="All projects" title="All projects">${icon("folders")}<span class="lbl">All projects</span></button>
+          </div>
         </div>
         <div class="list-tools">
           <span class="name" id="list-name"></span>

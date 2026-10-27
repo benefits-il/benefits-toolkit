@@ -20,6 +20,9 @@ export const SIDEBAR_CSS = `
   .head-new:hover { background: var(--hover); }
   .head-new .mark { width: 15px; height: 15px; }
   .tabs button { font: 500 13px var(--head); min-height: 28px; padding: 4px 16px; }
+  /* Each button carries its word and its icon; a narrow sidebar shows the icon (see the end). */
+  .tabs button, .scope button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+  .tabs .ico, .scope .ico, .head-new > .ico { display: none; width: 17px; height: 17px; }
   .side-body { flex: 1; min-height: 0; overflow: auto; padding: 0 12px 12px; scrollbar-width: thin; }
 
   .brand {
@@ -29,10 +32,11 @@ export const SIDEBAR_CSS = `
   .brand-link { display: block; padding: 12px 40px 12px 12px; border-radius: inherit; color: var(--text); text-decoration: none; }
   .brand-link:hover { text-decoration: none; background: var(--hover); }
   .brand .top { display: flex; align-items: center; gap: 8px; }
-  .brand .logo { width: 30px; height: 30px; flex: none; }
+  /* The logo and the word shrink with the sidebar (16px at 320 px wide, 10px at 160). */
+  .brand .logo { width: clamp(22px, calc(10px + 6.25vw), 30px); height: clamp(22px, calc(10px + 6.25vw), 30px); flex: none; }
   .brand .logo svg { width: 100%; height: 100%; display: block; }
   .brand .lock { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
-  .brand strong { font: 700 16px var(--head); }
+  .brand strong { font: 700 clamp(10px, calc(4px + 3.75vw), 16px) var(--head); }
   .brand .lock small { margin-top: 2px; font: 500 11.5px var(--head); color: var(--accent); }
   .brand p { margin-top: 8px; font: 11.5px/1.6 var(--body); color: var(--muted); }
   .brand .benefits-dot { font-weight: 900; }
@@ -44,9 +48,9 @@ export const SIDEBAR_CSS = `
   .brand .fold .ico { width: 15px; height: 15px; }
   /* Folded: one line, about a third of the open card. */
   .brand.folded .brand-link { padding: 7px 40px 7px 10px; }
-  .brand.folded .logo { width: 22px; height: 22px; }
+  .brand.folded .logo { width: clamp(18px, calc(10px + 3.75vw), 22px); height: clamp(18px, calc(10px + 3.75vw), 22px); }
   .brand.folded .lock { flex-direction: row; align-items: baseline; gap: 7px; white-space: nowrap; overflow: hidden; }
-  .brand.folded strong { font-size: 13.5px; }
+  .brand.folded strong { font-size: clamp(10px, calc(4px + 2.95vw), 13.5px); }
   .brand.folded .lock small { margin: 0; font-size: 11px; overflow: hidden; text-overflow: ellipsis; }
   .brand.folded .by, .brand.folded p { display: none; }
   .brand.folded .fold { top: 50%; margin-top: -12px; }
@@ -61,23 +65,35 @@ export const SIDEBAR_CSS = `
   .search input { flex: 1; min-width: 0; border: 0; background: transparent; outline: none; font-size: 13px; }
   .search input::placeholder { color: var(--muted); }
   .search input::-webkit-search-cancel-button { display: none; }
-  .scope { display: grid; grid-template-columns: 1fr 1fr; width: 100%; margin-bottom: 12px; }
+  .search-close { display: none; place-items: center; flex: none; padding: 0; border: 0; background: transparent; color: var(--muted); cursor: pointer; }
+  .search-close:hover { color: var(--text); }
+  .search-close .ico { width: 15px; height: 15px; }
+  .search-open {
+    display: none; place-items: center; flex: none; width: 34px; height: 34px; padding: 0; cursor: pointer;
+    border-radius: var(--pill); border: 1px solid var(--line); background: var(--input); color: var(--muted);
+  }
+  .search-open:hover { color: var(--text); }
+  .search-open .ico { width: 16px; height: 16px; }
+  /* Search above the scope; a narrow sidebar puts them on one line as icons. */
+  .tools-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 8px; margin-bottom: 12px; }
+  .tools-row .search { flex: 1 1 100%; min-width: 0; margin-bottom: 0; }
+  .scope { display: grid; grid-template-columns: 1fr 1fr; flex: 1 1 100%; }
   .list-tools { display: flex; align-items: center; gap: 2px; margin: 0 0 2px; color: var(--muted); font-size: 12px; }
   .list-tools .name { flex: 1; min-width: 0; padding-inline-start: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .group-label { font: 500 12px var(--head); color: var(--accent); margin: 14px 8px 6px; letter-spacing: 0.01em; }
   .group-label:first-child { margin-top: 6px; }
   #chat-list { outline: none; }
-  /* One line per conversation, like Claude Code's list: the agent's mark, the
-     title in a softer gray, then the project's dot, the context bar and the time. */
+  /* One line per conversation, in columns: the project's dot, the agent's mark,
+     the title in a softer gray, then the time and the context ring at the far end. */
   :root { --row-text: #CDD1CC; }
   :root[data-theme="light"] { --row-text: #2E3A33; }
   :root[data-theme^="hc"] { --row-text: var(--text); }
   .row {
-    position: relative; display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 10px 0 32px;
+    position: relative; display: flex; align-items: center; gap: 7px; height: 28px; padding: 0 10px;
     margin-bottom: 2px; border-radius: var(--row-r); cursor: pointer;
   }
   /* The agent's mark: Claude, Cursor or Antigravity, at a glance. */
-  .row > .mark { position: absolute; left: 10px; top: 50%; width: 15px; height: 15px; margin-top: -7.5px; }
+  .row > .mark { width: 15px; height: 15px; }
   .agent-copy { display: flex; align-items: center; gap: 12px; min-width: 0; }
   .agent-copy .mark { width: 20px; height: 20px; }
   /* A "Benefits alert only" row: its button sits under its text, above the row's line. */
@@ -94,17 +110,26 @@ export const SIDEBAR_CSS = `
   .row:hover { background: var(--hover); }
   .row.selected { background: var(--selected); }
   #chat-list:focus-visible .row.focused { outline: 2px solid var(--focus); outline-offset: -2px; }
-  .row-title { flex: 1; min-width: 0; font: 400 13px/1.3 var(--head); color: var(--row-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* A Hebrew title reads right to left but starts beside the mark, like the rest. */
+  .row-title { flex: 1; min-width: 0; text-align: left; font: 400 13px/1.3 var(--head); color: var(--row-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .row.selected .row-title { color: var(--text); font-weight: 500; }
   .row.archived .row-title { color: var(--muted); }
-  .row-meta { flex: none; display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--muted); }
-  .ctx { flex: none; display: inline-flex; align-items: center; gap: 5px; font-variant-numeric: tabular-nums; }
-  .ctx .cbar { width: 22px; height: 4px; border-radius: 4px; background: var(--line); overflow: hidden; }
-  .ctx .cbar i { display: block; height: 100%; border-radius: 4px; background: var(--accent); }
-  .ctx .cbar i.warn { background: var(--warning); }
-  .ctx .cbar i.high { background: var(--danger); }
-  .row-meta time { font-size: 11px; white-space: nowrap; unicode-bidi: isolate; }
+  /* The far end: the time against the ring. Both keep their width in every row
+     (a row without a ring keeps the space), so the times line up. */
+  .row-end { flex: none; display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+  .row-end time { width: 26px; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; unicode-bidi: isolate; }
+  .row-ctx { flex: none; width: 14px; display: flex; justify-content: center; }
+  /* The context ring fills with the window: green, yellow from 50%, red from 80%. */
+  .ring {
+    width: 13px; height: 13px; flex: none; border-radius: 50%;
+    background: conic-gradient(var(--fill) calc(var(--p) * 1%), var(--line) 0);
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.6px), #000 calc(100% - 2.4px));
+    mask: radial-gradient(farthest-side, transparent calc(100% - 2.6px), #000 calc(100% - 2.4px));
+  }
   .pdot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--c, transparent); border: 1.5px solid var(--c, var(--muted)); }
+  /* What every row shares tells nothing, so it makes room for the titles: no
+     marks when all the conversations are Claude's, no dots when all are one project's. */
+  #chat-list.claude-only .row > .mark, #chat-list.one-project .row > .pdot { display: none; }
   .skeleton { height: 28px; margin: 2px 0; border-radius: var(--row-r); background: var(--surface); animation: pulse 1.4s ease-in-out infinite; }
   @keyframes pulse { 50% { opacity: 0.55; } }
 
@@ -113,6 +138,37 @@ export const SIDEBAR_CSS = `
   .empty h3 { font: 600 14px var(--head); margin-bottom: 6px; }
   .empty p { color: var(--muted); font-size: 12px; margin-bottom: 14px; }
   .empty .btn { margin: 3px; }
+
+  /* ---- A narrow sidebar: each word turns into its icon once it no longer fits
+     (the widths are where the English words stop fitting). */
+  @media (max-width: 304px) {
+    .head-new { width: 34px; padding: 0; justify-content: center; }
+    .head-new > span, .head-new > .mark { display: none; }
+    .head-new > .ico { display: block; }
+  }
+  @media (max-width: 300px) { .brand p { display: none; } }
+  @media (max-width: 280px) { .brand .lock small { display: none; } }
+  /* Tabs, search and scope as icons; search is a magnifier on the scope's line
+     that opens the field (and stays open while it holds a search). */
+  @media (max-width: 244px) {
+    .tabs button, .scope button { padding: 4px 12px; }
+    .tabs .lbl, .scope .lbl { display: none; }
+    .tabs .ico, .scope .ico { display: block; }
+    .tools-row { flex-wrap: nowrap; }
+    .tools-row .search { display: none; flex: 1 1 auto; }
+    .search-open { display: grid; }
+    .scope { display: inline-flex; flex: none; margin-left: auto; }
+    .tools-row.searching .search, .tools-row:has(#search:not(:placeholder-shown)) .search { display: flex; }
+    .tools-row.searching .search-close, .tools-row:has(#search:not(:placeholder-shown)) .search-close { display: grid; }
+    .tools-row.searching .search-open, .tools-row:has(#search:not(:placeholder-shown)) .search-open,
+    .tools-row.searching .scope, .tools-row:has(#search:not(:placeholder-shown)) .scope { display: none; }
+  }
+  /* Only when the word would be too small to read: the B alone. */
+  @media (max-width: 159px) {
+    .brand .lock, .brand .fold { display: none; }
+    .brand-link, .brand.folded .brand-link { padding: 8px; display: grid; place-items: center; }
+    .brand .top { justify-content: center; }
+  }
 
   /* ---- Settings ---- */
   .project-card { padding: 12px; margin-bottom: 8px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); font-size: 12px; color: var(--muted); }
@@ -524,6 +580,10 @@ export const SIDEBAR_SCRIPT = `
       host.innerHTML = emptyState('messages', COPY.emptyTitle, COPY.emptyBody, scope === 'all' ? [] : [{ action: 'all', label: 'Show all projects', primary: true }]);
       return;
     }
+    // Decided on the whole list, not the search's matches, so typing never shifts the rows.
+    const all = list.groups.flatMap((g) => g.rows);
+    host.classList.toggle('claude-only', all.every((r) => r.agent === 'claude'));
+    host.classList.toggle('one-project', new Set(all.map((r) => r.project)).size <= 1);
     const q = query.toLowerCase();
     let html = '';
     let n = 0;
@@ -534,12 +594,12 @@ export const SIDEBAR_SCRIPT = `
       rows.forEach((r) => {
         const sel = chats.active === r.id;
         html += '<div class="row' + (sel ? ' selected' : '') + (r.archived ? ' archived' : '') + '" role="option" id="row-' + n + '" data-id="' + esc(r.id) + '"' + (r.readOnly ? ' data-read-only="1"' : '') + ' aria-selected="' + sel + '">' +
+          // The project is the dot's color, and its name on hover.
+          '<i class="pdot" role="img" aria-label="' + esc(r.project) + '" title="' + esc(r.project) + '"' + (r.color ? ' style="--c:' + esc(r.color) + '"' : '') + '></i>' +
           '<i class="mark mark-' + esc(r.agent) + '" role="img" aria-label="' + esc(AGENT_NAMES[r.agent]) + '" title="' + esc(AGENT_NAMES[r.agent]) + '"></i>' +
           '<span class="row-title" dir="auto" title="' + esc(r.title) + '">' + esc(r.title) + '</span>' +
-          // One line: the project is the dot's color, and its name on hover.
-          '<span class="row-meta"><i class="pdot" role="img" aria-label="' + esc(r.project) + '" title="' + esc(r.project) + '"' + (r.color ? ' style="--c:' + esc(r.color) + '"' : '') + '></i>' +
-          contextMeter(r.context) +
-          '<time datetime="' + esc(r.modified) + '" title="' + esc(new Date(r.modified).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })) + '">' + esc(relTime(r.modified)) + '</time></span></div>';
+          '<span class="row-end"><time datetime="' + esc(r.modified) + '" title="' + esc(new Date(r.modified).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })) + '">' + esc(relTime(r.modified)) + '</time>' +
+          '<span class="row-ctx">' + contextMeter(r.context) + '</span></span></div>';
         n++;
       });
     });
@@ -554,12 +614,12 @@ export const SIDEBAR_SCRIPT = `
     if (pendingReveal) reveal(pendingReveal);
   }
 
-  // How full the conversation's context window is: a small bar, the percent on hover.
+  // How full the conversation's context window is: a small ring, the percent on hover.
   function contextMeter(pct) {
     if (pct === null || pct === undefined) return '';
-    const tier = pct >= 80 ? ' class="high"' : pct >= 50 ? ' class="warn"' : '';
+    const fill = pct >= 80 ? 'var(--danger)' : pct >= 50 ? 'var(--warning)' : 'var(--accent)';
     const shown = pct > 0 && pct < 1 ? '<1' : String(Math.round(pct));
-    return '<span class="ctx" role="img" aria-label="Context window ' + shown + '% full" title="Context window ' + shown + '% full"><span class="cbar"><i' + tier + ' style="width:' + Math.max(2, pct) + '%"></i></span></span>';
+    return '<span class="ring" role="img" aria-label="Context window ' + shown + '% full" title="Context window ' + shown + '% full" style="--p:' + Math.max(3, pct) + ';--fill:' + fill + '"></span>';
   }
 
   $('chat-list').addEventListener('click', (e) => {
@@ -640,9 +700,19 @@ export const SIDEBAR_SCRIPT = `
 
   $('search').addEventListener('input', (e) => { query = e.target.value.trim(); focusIndex = -1; renderChats(); });
   $('search').addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { e.target.value = ''; query = ''; renderChats(); }
+    if (e.key === 'Escape') { e.target.value = ''; query = ''; renderChats(); closeSearch(); }
     if (e.key === 'ArrowDown') { e.preventDefault(); focusIndex = 0; $('chat-list').focus(); syncFocus(true); }
   });
+  // A narrow sidebar shows search as a magnifier: it opens the field in the
+  // scope's place, and the field folds back once it is empty and left.
+  function closeSearch() {
+    if (!$('tools-row').classList.contains('searching')) return;
+    $('tools-row').classList.remove('searching');
+    $('search-open').focus();
+  }
+  $('search-open').onclick = () => { $('tools-row').classList.add('searching'); $('search').focus(); };
+  $('search-close').onclick = () => { $('search').value = ''; query = ''; renderChats(); closeSearch(); };
+  $('search').addEventListener('blur', () => { if (!$('search').value) $('tools-row').classList.remove('searching'); });
   $$('[data-scope]').forEach((b) => { b.onclick = () => post({ type: 'set', key: 'chats.scope', value: b.dataset.scope }); });
   $('refresh').onclick = () => post({ type: 'refreshChats' });
   $('list-options').onclick = (e) => {
@@ -712,7 +782,7 @@ export const SIDEBAR_SCRIPT = `
     if (m.type === 'state') { state = m.state; render(); renderChats(); }
     if (m.type === 'chats') { chats = m.chats; renderChats(); }
     if (m.type === 'navigate') go(m.tab, m.page);
-    if (m.type === 'reveal') { go('chats'); query = ''; $('search').value = ''; revealSwitched = false; renderChats(); reveal(m.id); }
+    if (m.type === 'reveal') { go('chats'); query = ''; $('search').value = ''; $('tools-row').classList.remove('searching'); revealSwitched = false; renderChats(); reveal(m.id); }
     if (m.type === 'toast') toast(m.text);
   });
 
