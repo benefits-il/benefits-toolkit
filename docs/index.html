@@ -1,647 +1,239 @@
-<!DOCTYPE html>
-<html lang="he" dir="rtl">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Benefit's Toolkit · כלים ל-Claude Code ב-VS Code</title>
-<meta name="description" content="כלי איכות-חיים ל-Claude Code בתוך VS Code: תמיכת עברית/RTL, צלילי התראה, וסרגל היסטוריית שיחות. הכל ב-extension אחד.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Varela+Round&family=Rubik:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
-<style>
-  :root {
-    --green-anchor:#047857; --green-ui:#10B981; --green-depth:#064E3B;
-    --green-soft:#D1FAE5; --green-mint:#6EE7B7; --green-teal:#2DD4BF;
-    --story-sun:#FCD34D; --story-cheek:#FB7185; --story-sky:#A78BFA; --story-leaf:#84CC16;
-    --terracotta:#E07856;
-    --bg:#FFFBEB; --paper:#FFFFFF; --soft:#FEF3C7;
-    --ink:#064E3B; --text:#064E3B; --text-muted:#4B5563; --text-soft:#6B7280;
-    --stamp:0 6px 0 0 var(--green-depth); --stamp-hover:0 8px 0 0 var(--green-depth); --stamp-active:0 2px 0 0 var(--green-depth);
-  }
-  *,*::before,*::after { box-sizing:border-box; }
-  html,body { margin:0; padding:0; overflow-x:hidden; max-width:100%; }
-  html { scroll-behavior:smooth; }
-  body {
-    font-family:'Varela Round',system-ui,sans-serif; font-size:16px; line-height:1.6;
-    color:var(--text); background:var(--bg);
-    background-image:
-      radial-gradient(circle at 12% 18%, rgba(167,139,250,0.07) 0, transparent 90px),
-      radial-gradient(circle at 88% 35%, rgba(252,211,77,0.08) 0, transparent 120px),
-      radial-gradient(circle at 50% 90%, rgba(110,231,183,0.10) 0, transparent 160px);
-    background-attachment:fixed; overflow-x:hidden;
-  }
-  @media (max-width:880px){ body{ background-attachment:scroll; } }
-  :is(a,button,input,[tabindex]):focus-visible { outline:3px solid var(--green-anchor); outline-offset:3px; border-radius:8px; }
-  @media (prefers-reduced-motion: reduce){ *,*::before,*::after{ transition-duration:.01ms!important; animation-duration:.01ms!important; } html{scroll-behavior:auto;} }
-  ::-webkit-scrollbar{ width:12px; } ::-webkit-scrollbar-thumb{ background:var(--green-mint); border:3px solid var(--bg); border-radius:6px; }
-  .mono{ font-family:'JetBrains Mono',monospace; }
-
-  /* NAV */
-  .nav{ position:sticky; top:0; z-index:50; background:rgba(255,251,235,0.92); backdrop-filter:blur(10px); border-bottom:2.5px solid var(--ink); }
-  .nav__inner{ max-width:1160px; margin:0 auto; padding:14px 24px; display:flex; align-items:center; gap:18px; }
-  .logo{ display:inline-flex; align-items:center; gap:10px; font-family:'Rubik',sans-serif; font-weight:800; font-size:19px; color:var(--ink); text-decoration:none; }
-  .logo__mark{ width:38px; height:38px; background:var(--green-anchor); border:2.5px solid var(--ink); border-radius:12px; display:grid; place-items:center; color:#fff; box-shadow:3px 3px 0 0 var(--ink); transition:transform .2s cubic-bezier(.34,1.56,.64,1); }
-  .logo:hover .logo__mark{ transform:rotate(-8deg) scale(1.05); }
-  .logo__mark i{ font-size:20px; }
-  .nav__links{ margin-inline-start:auto; display:flex; gap:4px; align-items:center; }
-  .nav__link{ color:var(--ink); text-decoration:none; padding:8px 14px; font-weight:600; font-size:14px; border-radius:999px; transition:background .15s; }
-  .nav__link:hover{ background:var(--story-sun); }
-  .btn{ display:inline-flex; align-items:center; gap:8px; font-family:inherit; font-weight:700; font-size:15px; padding:12px 22px; border:2.5px solid var(--ink); border-radius:999px; cursor:pointer; text-decoration:none; transition:all .15s cubic-bezier(.34,1.56,.64,1); }
-  .btn--primary{ background:var(--green-anchor); color:#fff; box-shadow:var(--stamp); }
-  .btn--primary:hover{ background:var(--green-depth); box-shadow:var(--stamp-hover); transform:translateY(-2px); }
-  .btn--primary:active{ box-shadow:var(--stamp-active); transform:translateY(3px); }
-  .btn--secondary{ background:var(--paper); color:var(--ink); box-shadow:0 4px 0 0 var(--ink); }
-  .btn--secondary:hover{ background:var(--story-sun); box-shadow:0 6px 0 0 var(--ink); transform:translateY(-2px); }
-  .btn--ghost{ background:transparent; color:var(--ink); border-color:transparent; box-shadow:none; padding:10px 16px; }
-  .btn--ghost:hover{ background:var(--green-soft); border-color:var(--ink); }
-  .btn--lg{ padding:16px 30px; font-size:17px; }
-
-  /* HERO */
-  .hero{ max-width:1160px; margin:0 auto; padding:80px 24px 56px; display:grid; grid-template-columns:1.1fr 1fr; gap:56px; align-items:center; position:relative; }
-  @media (max-width:880px){
-    .hero{ grid-template-columns:1fr; padding:48px 20px 36px; overflow:hidden; }
-    .deco-circle, .deco-square, .deco-squiggle{ display:none; }
-  }
-  .deco-circle{ position:absolute; top:36px; inset-inline-start:-36px; width:104px; height:104px; background:var(--story-sky); border:3px solid var(--ink); border-radius:50%; z-index:0; }
-  .deco-square{ position:absolute; top:210px; inset-inline-end:-26px; width:74px; height:74px; background:var(--story-cheek); border:3px solid var(--ink); transform:rotate(20deg); z-index:0; }
-  .deco-squiggle{ position:absolute; bottom:6px; inset-inline-start:42%; width:230px; color:var(--green-mint); opacity:.55; z-index:0; }
-  .hero__content{ position:relative; z-index:1; }
-  .pill{ display:inline-flex; align-items:center; gap:8px; background:var(--story-sun); color:var(--ink); padding:6px 14px; border:2.5px solid var(--ink); border-radius:999px; font-size:13px; font-weight:700; box-shadow:3px 3px 0 0 var(--ink); margin-bottom:24px; }
-  .pill i{ font-size:16px; color:var(--green-anchor); }
-  .hero__title{ font-family:'Rubik',sans-serif; font-size:clamp(38px,6vw,68px); font-weight:800; color:var(--ink); line-height:1.05; letter-spacing:-1.5px; margin:0 0 22px; }
-  .hero__title .stamp{ display:inline-block; background:var(--green-anchor); color:#fff; padding:0 14px; border:3px solid var(--ink); border-radius:14px; box-shadow:5px 5px 0 0 var(--ink); transform:rotate(-2deg); }
-  .hero__title .hl{ background-image:linear-gradient(180deg,transparent 60%,var(--story-sun) 60%); padding:0 4px; }
-  .hero__deck{ font-size:19px; color:var(--text-muted); max-width:520px; margin:0 0 30px; line-height:1.55; }
-  .hero__deck strong{ color:var(--ink); background:var(--green-soft); padding:0 6px; border-radius:6px; }
-  .hero__cta-row{ display:flex; gap:14px; flex-wrap:wrap; }
-
-  /* HERO visual mock — VS Code sidebar */
-  .mock{ position:relative; z-index:1; background:var(--paper); border:3px solid var(--ink); border-radius:24px; padding:20px; box-shadow:10px 10px 0 0 var(--ink); transform:rotate(2deg); }
-  .mock__head{ display:flex; align-items:center; gap:10px; padding-bottom:12px; border-bottom:2px dashed var(--ink); margin-bottom:14px; }
-  .mock__dots{ display:flex; gap:6px; }
-  .mock__dots span{ width:11px; height:11px; border-radius:50%; border:1.5px solid var(--ink); }
-  .mock__dots span:nth-child(1){ background:var(--story-cheek); } .mock__dots span:nth-child(2){ background:var(--story-sun); } .mock__dots span:nth-child(3){ background:var(--green-ui); }
-  .mock__title{ font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-soft); margin-inline-start:auto; direction:ltr; }
-  .row{ display:flex; align-items:center; gap:12px; padding:12px; background:var(--bg); border:2.5px solid var(--ink); border-radius:14px; margin-bottom:10px; box-shadow:3px 3px 0 0 var(--ink); }
-  .row:last-child{ margin-bottom:0; }
-  .row__ico{ width:40px; height:40px; flex-shrink:0; border:2.5px solid var(--ink); border-radius:11px; display:grid; place-items:center; font-size:20px; box-shadow:2px 2px 0 0 var(--ink); }
-  .row__t{ font-family:'Rubik'; font-weight:700; font-size:14px; }
-  .row__s{ font-size:12px; color:var(--text-muted); }
-  .row__pill{ margin-inline-start:auto; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; padding:3px 9px; border:2px solid var(--ink); border-radius:999px; background:var(--green-soft); color:var(--green-depth); }
-
-  /* SECTION */
-  section{ max-width:1160px; margin:0 auto; padding:88px 24px; position:relative; }
-  .section__head{ text-align:center; margin:0 auto 52px; max-width:720px; }
-  .kicker{ display:inline-flex; align-items:center; gap:6px; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--green-anchor); text-transform:uppercase; letter-spacing:2px; font-weight:700; background:var(--green-soft); padding:4px 14px; border:2px solid var(--ink); border-radius:999px; box-shadow:2px 2px 0 0 var(--ink); margin-bottom:18px; }
-  .section__title{ font-family:'Rubik'; font-size:clamp(30px,4.5vw,44px); font-weight:800; color:var(--ink); line-height:1.12; letter-spacing:-.8px; margin:0 0 14px; }
-  .section__title .ul{ background-image:linear-gradient(180deg,transparent 64%,var(--story-cheek) 64%); padding:0 4px; }
-  .section__deck{ font-size:18px; color:var(--text-muted); margin:0; }
-
-  .features{ display:grid; grid-template-columns:repeat(3,1fr); gap:24px; }
-  @media (max-width:880px){ .features{ grid-template-columns:1fr; } }
-  .feature{ background:var(--paper); border:2.5px solid var(--ink); border-radius:24px; padding:30px 26px; box-shadow:6px 6px 0 0 var(--ink); transition:transform .2s cubic-bezier(.34,1.56,.64,1),box-shadow .2s; position:relative; overflow:hidden; }
-  .feature:hover{ transform:translate(3px,-3px); box-shadow:9px 9px 0 0 var(--ink); }
-  .feature__deco{ position:absolute; top:-18px; inset-inline-start:-18px; width:74px; height:74px; opacity:.22; pointer-events:none; }
-  .feature__icon{ width:62px; height:62px; border:2.5px solid var(--ink); border-radius:18px; display:grid; place-items:center; margin-bottom:18px; box-shadow:3px 3px 0 0 var(--ink); font-size:28px; position:relative; z-index:1; }
-  .feature--a .feature__icon{ background:var(--story-sun); } .feature--b .feature__icon{ background:var(--story-sky); color:#fff; } .feature--c .feature__icon{ background:var(--story-cheek); color:#fff; }
-  .feature__title{ font-family:'Rubik'; font-size:21px; font-weight:700; margin:0 0 10px; color:var(--ink); position:relative; z-index:1; }
-  .feature__body{ font-size:15px; color:var(--text-muted); margin:0; line-height:1.55; position:relative; z-index:1; }
-
-  /* HOW / INSTALL */
-  .how{ background:var(--paper); border-top:3px solid var(--ink); border-bottom:3px solid var(--ink); }
-  .how-grid{ display:grid; grid-template-columns:repeat(4,1fr); border:2.5px solid var(--ink); border-radius:24px; overflow:hidden; box-shadow:8px 8px 0 0 var(--ink); background:var(--bg); }
-  @media (max-width:880px){ .how-grid{ grid-template-columns:1fr; } }
-  .how-step{ padding:30px 24px; border-inline-end:2.5px solid var(--ink); }
-  .how-step:last-child{ border-inline-end:none; }
-  @media (max-width:880px){ .how-step{ border-inline-end:none; border-bottom:2.5px solid var(--ink); } .how-step:last-child{ border-bottom:none; } }
-  .how-step:nth-child(1){ background:var(--green-soft); } .how-step:nth-child(2){ background:var(--bg); } .how-step:nth-child(3){ background:var(--soft); } .how-step:nth-child(4){ background:var(--paper); }
-  .how-step__num{ display:inline-block; font-family:'JetBrains Mono',monospace; font-weight:700; background:var(--ink); color:var(--story-sun); padding:3px 12px; border-radius:999px; font-size:13px; margin-bottom:14px; direction:ltr; }
-  .how-step__title{ font-family:'Rubik'; font-weight:700; font-size:17px; margin:0 0 8px; }
-  .how-step__body{ font-size:14px; color:var(--text-muted); margin:0; line-height:1.55; }
-  .how-step__body code{ font-family:'JetBrains Mono',monospace; font-size:12px; background:var(--ink); color:var(--green-mint); padding:2px 6px; border-radius:5px; direction:ltr; display:inline-block; }
-
-  /* CTA */
-  .cta-final{ text-align:center; padding:88px 24px; position:relative; overflow:hidden; }
-  .cta-blob{ position:absolute; top:20px; inset-inline-start:8%; width:110px; z-index:0; }
-  .cta-star{ position:absolute; bottom:28px; inset-inline-end:7%; width:90px; z-index:0; }
-  .cta-final__in{ position:relative; z-index:1; }
-  .cta-final h2{ font-family:'Rubik'; font-size:clamp(34px,5vw,52px); font-weight:800; color:var(--ink); line-height:1.06; letter-spacing:-1.2px; margin:0 auto 22px; max-width:700px; }
-  .cta-final h2 .stamp{ display:inline-block; background:var(--story-sun); padding:0 12px; border:3px solid var(--ink); border-radius:14px; box-shadow:5px 5px 0 0 var(--ink); transform:rotate(-1.5deg); }
-  .cta-final p{ font-size:18px; color:var(--text-muted); max-width:560px; margin:0 auto 30px; }
-
-  /* FOOTER */
-  footer.foot{ background:var(--ink); color:rgba(255,255,255,.8); padding:48px 24px 24px; }
-  .foot__inner{ max-width:1160px; margin:0 auto; display:flex; flex-wrap:wrap; gap:24px 40px; align-items:center; justify-content:space-between; }
-  .foot__brand{ color:#fff; font-family:'Rubik'; font-weight:800; font-size:20px; display:inline-flex; align-items:center; gap:10px; }
-  .foot__brand .logo__mark{ box-shadow:none; }
-  .foot__links{ display:flex; gap:18px; flex-wrap:wrap; }
-  .foot__links a{ color:rgba(255,255,255,.75); text-decoration:none; font-size:14px; font-weight:600; }
-  .foot__links a:hover{ color:var(--story-sun); }
-  .foot__bottom{ max-width:1160px; margin:28px auto 0; padding-top:20px; border-top:1px solid rgba(255,255,255,.15); font-size:13px; color:rgba(255,255,255,.55); text-align:center; }
-
-  .stagger>*{ opacity:0; transform:translateY(20px); transition:opacity .6s cubic-bezier(.16,1,.3,1),transform .6s cubic-bezier(.16,1,.3,1); }
-  .stagger.in>*{ opacity:1; transform:translateY(0); }
-  .stagger.in>*:nth-child(2){ transition-delay:.08s; } .stagger.in>*:nth-child(3){ transition-delay:.16s; }
-
-  /* Navigation styling updates for responsiveness */
-  @media (max-width: 880px) {
-    .nav__inner { padding: 10px 16px; gap: 8px; }
-    .nav__link { padding: 6px 8px; font-size: 13px; }
-    .btn--ghost { display: none !important; }
-    .btn { padding: 8px 14px; font-size: 13px; }
-  }
-  @media (max-width: 600px) {
-    .nav__inner {
-      padding: 8px 12px;
-      gap: 12px;
-      justify-content: space-between;
-      align-items: center;
-      flex-direction: row !important;
-    }
-    .logo {
-      font-size: 15px;
-      gap: 6px;
-      flex-shrink: 0;
-    }
-    .logo__mark {
-      width: 30px;
-      height: 30px;
-      border-radius: 8px;
-      box-shadow: 2px 2px 0 0 var(--ink);
-    }
-    .logo__mark i {
-      font-size: 16px;
-    }
-    .nav__links {
-      overflow-x: auto;
-      white-space: nowrap;
-      -webkit-overflow-scrolling: touch;
-      gap: 4px;
-      padding-bottom: 0;
-      margin-inline-start: 0;
-      scrollbar-width: none;
-    }
-    .nav__links::-webkit-scrollbar {
-      display: none;
-    }
-    .nav__link {
-      padding: 4px 6px;
-      font-size: 12px;
-      font-weight: 700;
-      flex-shrink: 0;
-    }
-    .btn { display: none !important; }
-  }
-
-  /* Walkthrough Section */
-  .walkthrough-list { display: flex; flex-direction: column; gap: 32px; }
-  .walkthrough-card {
-    background: var(--paper);
-    border: 2.5px solid var(--ink);
-    border-radius: 24px;
-    padding: 36px;
-    box-shadow: 6px 6px 0 0 var(--ink);
-    display: grid;
-    grid-template-columns: 1fr 1.2fr;
-    gap: 40px;
-    align-items: center;
-    transition: transform .2s cubic-bezier(.34,1.56,.64,1), box-shadow .2s;
-  }
-  .walkthrough-card:hover { transform: translate(3px, -3px); box-shadow: 9px 9px 0 0 var(--ink); }
-  .walkthrough-card__visual { width: 100%; min-width: 0; }
-  .walkthrough-card__content { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
-  
-  @media (max-width: 880px) {
-    .walkthrough-card {
-      grid-template-columns: 1fr;
-      gap: 24px;
-      padding: 20px;
-      border-radius: 20px;
-    }
-    .walkthrough-card__visual { order: -1; }
-    .mock {
-      padding: 12px;
-      box-shadow: 4px 4px 0 0 var(--ink) !important;
-      transform: none !important;
-    }
-    .row {
-      padding: 8px;
-      gap: 8px;
-      border-width: 2px;
-      box-shadow: 2px 2px 0 0 var(--ink) !important;
-    }
-    .row__ico {
-      width: 32px;
-      height: 32px;
-      font-size: 16px;
-      border-width: 2px;
-      box-shadow: 1px 1px 0 0 var(--ink) !important;
-    }
-    .row__t { font-size: 13px; }
-    .row__s { font-size: 11px; }
-    .row__pill { font-size: 10px; padding: 2px 6px; border-width: 1.5px; }
-  }
-
-  @media (max-width: 480px) {
-    .walkthrough-card {
-      padding: 16px;
-      border-radius: 16px;
-      gap: 16px;
-    }
-    .mock {
-      padding: 8px;
-      border-radius: 16px;
-    }
-    .row {
-      padding: 6px 8px;
-      gap: 6px;
-      margin-bottom: 8px;
-    }
-    .row__ico {
-      width: 28px;
-      height: 28px;
-      font-size: 14px;
-    }
-    .row__t { font-size: 12px; }
-    .row__s { font-size: 10px; }
-    .row__pill { font-size: 9px; padding: 1px 4px; }
-  }
-
-  /* Usage Section */
-  .usage-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-  @media (max-width: 880px) {
-    .usage-grid { grid-template-columns: 1fr; }
-  }
-  .cmd {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 13px;
-    background: var(--ink);
-    color: var(--green-mint);
-    padding: 3px 10px;
-    border-radius: 6px;
-    display: inline-block;
-    direction: ltr;
-    font-weight: 500;
-    max-width: 100%;
-    word-break: break-word;
-    overflow-wrap: break-word;
-    white-space: normal;
-  }
-  .mono {
-    word-break: break-all;
-    overflow-wrap: break-word;
-    white-space: normal;
-  }
-  @media (max-width: 480px) {
-    .cmd {
-      font-size: 11px;
-      padding: 2px 6px;
-      display: inline;
-    }
-  }
-</style>
-</head>
-<body>
-
-<header class="nav">
-  <div class="nav__inner">
-    <a href="#" class="logo"><span class="logo__mark"><i class="ti ti-tools"></i></span> Benefit's Toolkit</a>
-    <nav class="nav__links" aria-label="ניווט">
-      <a class="nav__link" href="#features">יכולות</a>
-      <a class="nav__link" href="#walkthrough">מה רואים</a>
-      <a class="nav__link" href="#usage">איך משתמשים</a>
-      <a class="nav__link" href="#value">ערך</a>
-      <a class="nav__link" href="#install">התקנה</a>
-      <a class="btn btn--ghost" href="https://github.com/benefits-il/benefits-toolkit"><i class="ti ti-brand-github"></i> GitHub</a>
-      <a class="btn btn--primary" href="https://github.com/benefits-il/benefits-toolkit/releases/latest"><i class="ti ti-download"></i> הורד</a>
-    </nav>
-  </div>
-</header>
-
-<section class="hero">
-  <div class="deco-circle" aria-hidden="true"></div>
-  <div class="deco-square" aria-hidden="true"></div>
-  <svg class="deco-squiggle" viewBox="0 0 240 40" aria-hidden="true"><path d="M5,20 Q25,2 45,20 T85,20 T125,20 T165,20 T205,20 T235,20" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/></svg>
-
-  <div class="hero__content">
-    <span class="pill"><i class="ti ti-plug"></i> Extension ל-Claude Code</span>
-    <h1 class="hero__title">עברית שעובדת.<br/>שליטה ש<span class="stamp">מרגישה</span> <span class="hl">בבית.</span></h1>
-    <p class="hero__deck">שלושה כלי איכות-חיים ל-Claude Code בתוך VS Code — <strong>תמיכת עברית/RTL</strong>, צלילי התראה, וסרגל היסטוריית שיחות. הכל ב-extension אחד, אפס תלויות.</p>
-    <div class="hero__cta-row">
-      <a class="btn btn--primary btn--lg" href="https://github.com/benefits-il/benefits-toolkit/releases/latest"><i class="ti ti-download"></i> הורד מ-Releases</a>
-      <a class="btn btn--secondary btn--lg" href="#install"><i class="ti ti-player-play"></i> איך מתקינים</a>
-    </div>
-  </div>
-
-  <aside class="mock" aria-label="תצוגה מקדימה">
-    <div class="mock__head"><div class="mock__dots"><span></span><span></span><span></span></div><span class="mock__title">benefit · sidebar</span></div>
-    <div class="row"><div class="row__ico" style="background:var(--story-sun)"><i class="ti ti-text-direction-rtl"></i></div><div><div class="row__t">עברית · RTL</div><div class="row__s">יישור וכיווניות נכונים בצ'אט</div></div><span class="row__pill">ON</span></div>
-    <div class="row"><div class="row__ico" style="background:var(--story-sky);color:#fff"><i class="ti ti-music"></i></div><div><div class="row__t">צלילי התראה</div><div class="row__s">סיום · אישור · שגיאה</div></div><span class="row__pill">3</span></div>
-    <div class="row"><div class="row__ico" style="background:var(--story-cheek);color:#fff"><i class="ti ti-history"></i></div><div><div class="row__t">היסטוריית שיחות</div><div class="row__s">דפדוף, חיפוש, חזרה</div></div><span class="row__pill">∞</span></div>
-  </aside>
+<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#022c22"><title>Benefit's Toolkit | כלים ל-Claude Code בתוך VS Code</title><meta name="description" content="Benefit's Toolkit מוסיף ל-Claude Code בתוך VS Code ניהול שיחות, תמיכה בעברית, התראות, צבעי חלון ופתיחת קבצים בדפדפן."><link rel="icon" href="assets/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&family=Varela+Round&display=swap" rel="stylesheet"><style>
+:root{--darker:#022c22;--depth:#064e3b;--anchor:#047857;--mint:#6ee7b7;--cream:#fffbeb;--sun:#fcd34d;--ink:#0f172a;--muted:#bfd0c8;--line:rgba(255,251,235,.14);--surface:rgba(255,251,235,.055);--head:Rubik,system-ui,sans-serif;--body:'Varela Round',system-ui,sans-serif;color-scheme:dark}
+*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:24px}body{margin:0;background:var(--darker);color:var(--cream);font:16px/1.8 var(--body)}h1,h2,h3,p,figure{margin:0}h1,h2,h3{font-family:var(--head);line-height:1.25}h1{font-size:clamp(34px,4.1vw,54px);font-weight:700;letter-spacing:-.025em;text-wrap:balance}h1 bdi{white-space:nowrap}.skip:not(:focus){clip-path:inset(50%);width:1px;height:1px;overflow:hidden;padding:0}h2{font-size:clamp(28px,3vw,38px);font-weight:600;text-wrap:balance}h3{font-size:26px;font-weight:600;text-wrap:balance}a{color:inherit;text-underline-offset:5px}button{font:inherit;cursor:pointer}button,a{-webkit-tap-highlight-color:transparent}button:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid var(--mint);outline-offset:5px}img{display:block;max-width:100%;height:auto}svg{display:block}.icon{width:22px;height:22px;flex:none}bdi,kbd,code{unicode-bidi:isolate}kbd{display:inline-block;direction:ltr;white-space:nowrap;font:12px/1.5 var(--head);border:1px solid var(--line);border-radius:4px;padding:1px 5px;background:rgba(0,0,0,.14)}.wrap{width:calc(100% - 32px);max-width:1088px;margin-inline:auto}.skip{position:fixed;top:-100px;inset-inline-start:16px;z-index:100;background:var(--sun);color:var(--ink);padding:10px 16px}.skip:focus{top:12px}.ribbon{background:var(--depth);border-bottom:1px solid var(--line);text-align:center;padding:10px 16px;font:400 13px/1.6 var(--head)}.ribbon a{text-decoration:none}.ribbon a:hover{text-decoration:underline}.header{border-bottom:1px solid var(--line)}.header-inner{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:88px}.brand{display:flex;align-items:center;gap:12px;text-decoration:none;font:600 20px var(--head)}.brand-b{display:grid;place-items:center;background:var(--cream);color:var(--anchor);width:40px;height:44px;border-radius:10px}.brand-b svg{width:28px;height:28px}.header-actions{display:flex;gap:16px;align-items:center}.language{display:flex;direction:ltr;align-items:center;gap:4px;border:1px solid var(--line);border-radius:999px;padding:4px;background:var(--surface);color:var(--muted)}.language span{width:36px;height:36px;display:grid;place-items:center;border-radius:50%}.language svg{width:25px;height:25px}.language .active{background:var(--sun);color:var(--darker)}.language-divider{width:1px!important;height:18px!important;background:var(--line)}.btn{display:inline-flex;gap:10px;align-items:center;justify-content:center;min-height:48px;padding:11px 22px;border:1px solid var(--line);border-radius:999px;text-decoration:none;font:500 16px/1.4 var(--head);transition:transform .18s,background .18s,box-shadow .18s}.btn-primary{background:var(--sun);color:var(--darker);border-color:var(--sun);box-shadow:0 6px 0 #011e17}.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 0 #011e17}.btn-primary:active{transform:translateY(4px);box-shadow:0 2px 0 #011e17}.btn-secondary{background:var(--surface)}.btn-secondary:hover{background:rgba(255,251,235,.11)}.header-install{min-height:40px;padding:9px 18px;font-size:14px}.hero{padding:72px 0 64px;background:radial-gradient(ellipse at 8% 15%,rgba(16,185,129,.12),transparent 62%)}.hero-grid{display:grid;gap:40px;align-items:center}.eyebrow{font:500 14px/1.6 var(--head);color:var(--mint);margin-bottom:20px}.hero-lead{font-size:19px;line-height:1.85;margin-top:24px;color:var(--muted);max-width:530px}.actions{display:flex;flex-wrap:wrap;gap:16px;align-items:center;margin-top:30px}.small{font-size:13px;color:var(--muted);line-height:1.7}.hero-note{margin-top:24px}.hero-art{position:relative;direction:ltr;min-width:0;padding:0 14% 8% 0}.hero-view{width:100%;border:1px solid #3a5146;border-radius:20px;box-shadow:0 24px 56px rgba(0,0,0,.25)}.hero-list{position:absolute;width:43%;right:0;bottom:0;border:1px solid #3a5146;border-radius:18px;box-shadow:0 20px 36px rgba(0,0,0,.35)}.hero-art-note{text-align:center;margin-top:20px}.section{padding-block:64px}.section-intro{max-width:720px;margin-bottom:32px}.section-intro p{color:var(--muted);margin-top:16px}.feature-nav{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:32px}.feature-nav a{font:400 13px/1.5 var(--head);padding:9px 14px;border:1px solid var(--line);border-radius:999px;text-decoration:none;background:var(--surface)}.feature-nav a:hover{background:var(--depth);color:var(--mint)}.features{display:grid;gap:24px}.feature{padding:32px 24px;border:1px solid var(--line);border-radius:28px;background:var(--surface);display:grid;gap:32px;align-items:center;scroll-margin-top:24px}.feature-label{display:flex;align-items:center;gap:10px;color:var(--mint);font:500 13px/1.4 var(--head);margin-bottom:18px}.feature-label>.icon,.feature-label>svg{width:22px;height:22px}.feature-lead{color:var(--muted);margin-top:18px;font-size:17px;line-height:1.85}.feature ul{padding:0;margin:22px 0 0;list-style:none;display:grid;gap:14px}.feature li{position:relative;padding-inline-start:23px;font-size:14px;line-height:1.85;color:#e1e8e1}.feature li:before{content:'';position:absolute;inset-inline-start:0;top:9px;width:7px;height:7px;border:1px solid var(--mint);border-radius:50%}.feature-media{min-width:0;display:flex;flex-direction:column;align-items:center;gap:16px}.shot{display:block;position:relative;padding:0;border:1px solid #47584e;border-radius:14px;overflow:hidden;background:#202321;color:var(--cream);width:100%;max-width:300px;box-shadow:0 12px 32px rgba(0,0,0,.17)}.shot img{width:100%}.shot:hover{border-color:var(--mint)}.shot.wide{max-width:100%}.zoom-icon{position:absolute;bottom:10px;right:10px;width:32px;height:32px;display:grid;place-items:center;background:rgba(2,44,34,.92);border-radius:8px;border:1px solid var(--line)}.zoom-icon .icon{width:17px;height:17px}.feature-media figcaption{text-align:center;max-width:380px}.popup-shot{width:100%;max-width:300px;filter:drop-shadow(0 8px 16px rgba(0,0,0,.2))}.course{padding:40px 24px;border-radius:28px;background:var(--cream);color:var(--darker);display:grid;gap:32px}.course .eyebrow{color:var(--anchor)}.course p{margin-top:20px;line-height:1.9;color:#334155}.course .actions{margin-top:28px}.course .mail-link{color:var(--anchor);font:500 15px var(--head)}.course-facts{display:grid;gap:16px}.course-fact{padding:20px 24px;border:1px solid #fde68a;background:#fef3c7;border-radius:14px}.course-fact h3{font-size:17px}.course-fact p{margin-top:8px;font-size:14px;line-height:1.8}.install-grid{display:grid;gap:16px;margin-top:32px}.install-card{min-width:0;padding:24px;border:1px solid var(--line);border-radius:20px;background:var(--surface)}.install-card h3{font-size:19px;display:flex;align-items:center;gap:10px}.step{color:var(--sun);font:500 13px var(--head)}.install-card p{font-size:14px;color:var(--muted);margin:16px 0}.install-card a{color:var(--mint);font-size:14px}.command{direction:ltr;display:block;width:100%;overflow-wrap:anywhere;white-space:normal;font:12px/1.8 ui-monospace,monospace;background:rgba(0,0,0,.23);padding:12px;border-radius:8px;border:1px solid var(--line);user-select:all}.copy-btn{display:none;gap:8px;align-items:center;margin-top:12px;background:none;color:var(--mint);border:0;padding:4px 0;font-size:14px}.js .copy-btn{display:inline-flex}.copy-btn .icon{width:17px;height:17px}.copy-status{min-height:22px;font-size:12px;color:var(--mint)}.compatibility{margin-top:24px;max-width:860px}.faq{max-width:880px;margin-inline:auto}.faq h2{margin-bottom:32px}.faq details{border-bottom:1px solid var(--line);padding-block:20px}.faq summary{font:500 17px/1.6 var(--head);cursor:pointer;padding-inline-end:16px}.faq details p{margin-top:16px;font-size:15px;color:var(--muted)}.faq code{direction:ltr;display:inline-block;overflow-wrap:anywhere;max-width:100%;font-size:12px}.footer{margin-top:64px;border-top:1px solid var(--line);padding-block:32px}.footer-inner{display:flex;gap:24px;justify-content:space-between;flex-wrap:wrap;align-items:center}.footer-links{display:flex;gap:20px;font-size:13px;color:var(--muted)}.slogan{direction:ltr;color:var(--mint);font:400 12px var(--head);margin-top:10px}.footer .brand{font-size:18px}.footer .brand-b{width:32px;height:36px}.footer .brand-b svg{width:24px;height:24px}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}.zoom-dialog{padding:56px 16px 16px;border:1px solid var(--line);border-radius:20px;background:var(--darker);color:var(--cream);max-width:min(1100px,94vw);max-height:94vh}.zoom-dialog::backdrop{background:rgba(0,14,10,.88)}.dialog-close{position:absolute;top:10px;right:12px;width:36px;height:36px;display:grid;place-items:center;border:1px solid var(--line);border-radius:50%;background:var(--surface);color:var(--cream)}.zoom-dialog img{max-height:calc(94vh - 100px);width:auto;margin:auto;object-fit:contain}.zoom-dialog p{margin-top:12px;text-align:center;font-size:13px;color:var(--muted)}
+@media(min-width:800px){.hero-grid{grid-template-columns:1fr 1fr;gap:48px}.feature{grid-template-columns:1fr 1fr;padding:48px;gap:48px}.feature:nth-child(even) .feature-copy{order:2}.feature:nth-child(even) .feature-media{order:1}.course{grid-template-columns:1.1fr 1fr;padding:48px;gap:48px}.install-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:599px){.header-inner{min-height:80px;gap:8px}.brand{font-size:16px;gap:8px}.brand-b{width:32px;height:36px}.brand-b svg{width:24px;height:24px}.header-install{display:none}.language span{width:32px;height:32px}.language svg{width:23px;height:23px}.hero{padding:44px 0 32px}.hero-lead{font-size:17px;margin-top:20px}.hero-grid{gap:40px}.actions{gap:14px;margin-top:24px}.hero .actions{align-items:stretch;flex-direction:column}.hero-note{font-size:12px}.section{padding-block:40px}.feature{padding:28px 20px;gap:28px;border-radius:20px}.feature h3{font-size:24px}.feature-lead{font-size:16px}.feature li{font-size:14px}.feature-nav a{font-size:12px;padding:8px 11px}.course{padding:32px 24px;border-radius:20px}.course .actions{align-items:flex-start;flex-direction:column}.course-fact{padding:18px}.footer{margin-top:40px}.footer-inner{flex-direction:column;align-items:flex-start}.ribbon{font-size:11px;padding:9px 16px}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{transition:none!important;animation:none!important}.btn:hover,.btn:active{transform:none}}
+</style></head><body>
+<a data-i18n="skip" class="skip" href="#main">דלגו לתוכן</a>
+<div class="ribbon"><a href="https://benefits-il.dev/"><span data-i18n="ribbon" >התוסף הוא חלק מ-Benefits, קורס לעבודה עם AI</span></a></div>
+<header class="header"><div class="wrap header-inner"><a class="brand" href="#main"><span class="brand-b"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+  <svg x="4.48" y="2" width="15.05" height="20" viewBox="824 453 2250 2991" preserveAspectRatio="xMidYMid meet" overflow="visible">
+    <path fill-rule="evenodd" d="M826.492 3236.77C825.424 3122.47 824.356 2449.49 824.356 1741.27L824 453 1531.56 453C2204.58 453 2241.97 453.356 2291.11 459.765 2399.72 474.008 2482.33 498.221 2570.64 542.018 2723.41 617.505 2837 715.78 2927.09 850.376 2960.56 900.582 3002.58 982.834 3022.88 1038.74 3040.69 1086.45 3058.13 1157.67 3065.97 1213.57 3074.16 1269.47 3075.23 1407.63 3068.1 1460.68 3041.75 1653.32 2948.1 1834.56 2806.02 1968.44L2765.78 2006.54 2787.5 2024.7C2937.77 2149.32 3036.77 2323.8 3066.32 2514.65 3075.23 2572.69 3075.23 2703.73 3066.32 2759.99 3030.71 2986.09 2906.44 3178.73 2714.15 3307.27 2618.36 3371.01 2506.54 3414.45 2383.69 3435.45 2348.79 3441.51 2298.94 3442.22 1587.47 3442.93L828.63 3444 826.492 3236.77ZM2375.15 3229.65C2591.65 3181.22 2762.58 3034.87 2835.57 2835.83 2900.03 2659.93 2876.88 2476.91 2769.34 2315.61 2684.24 2188.14 2552.48 2099.47 2390.81 2061.73L2356.98 2053.9 1783.67 2051.76 1210.36 2049.98 1209.29 1442.17 1208.58 833.996 1706.04 833.996C2245.88 833.996 2233.06 833.64 2308.56 853.581 2498 904.143 2632.6 1041.59 2676.4 1229.24 2685.66 1269.12 2689.22 1378.07 2682.81 1431.84 2671.77 1527.62 2637.23 1617.71 2585.95 1684.3 2573.13 1700.67 2569.93 1702.81 2558.53 1702.81 2551.41 1702.81 2540.02 1701.03 2533.25 1699.25 2510.46 1692.48 2439.6 1681.45 2382.98 1675.39L2326.72 1669.34 2326.72 1657.95C2326.72 1649.04 2329.21 1644.42 2338.47 1638.36 2413.25 1585.66 2464.88 1501.63 2479.84 1406.2 2485.18 1372.73 2482.69 1310.78 2474.85 1281.22 2442.45 1161.94 2357.7 1079.69 2232.71 1046.57 2203.86 1038.74 2203.15 1038.74 1808.6 1038.74L1413.34 1038.74 1412.27 1414.39C1411.56 1620.91 1412.27 1803.22 1413.34 1819.25L1415.83 1848.44 1895.13 1849.87C2318.88 1850.94 2379.06 1851.65 2410.4 1856.63 2458.12 1864.47 2505.48 1875.15 2538.24 1885.83L2565.66 1894.38 2594.86 1872.66C2635.81 1842.39 2703.82 1775.09 2734.8 1734.15 2781.8 1671.48 2810.29 1618.07 2836.29 1542.58 2882.94 1407.27 2882.58 1273.39 2835.22 1136.66 2775.4 964.319 2649.34 818.329 2490.52 736.433 2426.78 703.674 2393.66 690.5 2342.74 677.325 2251.22 653.824 2286.48 654.892 1628.06 653.468L1030.53 652.044 1030.53 1946.72 1030.53 3241.04 1681.47 3239.97 2332.06 3238.9 2375.15 3229.65Z"/>
+    <path fill-rule="evenodd" d="M1213 2646.36 1213 2226.07 1314.43 2226.07 1415.86 2226.07 1415.86 2544.85 1415.86 2863.62 1845.79 2863.62C2328.76 2863.62 2301.35 2865.05 2358.65 2836.55 2447.27 2792.74 2498.88 2697.29 2481.79 2608.96 2463.29 2511.37 2384.63 2440.84 2282.84 2430.51L2259.35 2428.02 2259.35 2326.51 2259.35 2225 2301.35 2227.14C2375.02 2230.7 2457.24 2257.41 2515.6 2297.3 2528.06 2305.85 2550.84 2324.73 2566.14 2339.33 2629.14 2399.53 2663.66 2462.21 2681.45 2548.41 2689.29 2587.23 2690.35 2688.39 2683.23 2724.71 2666.51 2810.91 2628.07 2882.5 2566.5 2942.34 2505.64 3001.46 2440.51 3036.73 2353.67 3057.03 2321.99 3064.51 2317.01 3064.51 1767.5 3065.58L1213 3067 1213 2646.36Z"/>
+  </svg>
+</svg></span><bdi>Benefit's Toolkit</bdi></a><div class="header-actions"><button class="language" id="language" type="button" aria-label="Switch page language to English" title="English / עברית"><span data-letter="en"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+  <svg x="4.48" y="2" width="15.05" height="20" viewBox="824 453 2250 2991" preserveAspectRatio="xMidYMid meet" overflow="visible">
+    <path fill-rule="evenodd" d="M826.492 3236.77C825.424 3122.47 824.356 2449.49 824.356 1741.27L824 453 1531.56 453C2204.58 453 2241.97 453.356 2291.11 459.765 2399.72 474.008 2482.33 498.221 2570.64 542.018 2723.41 617.505 2837 715.78 2927.09 850.376 2960.56 900.582 3002.58 982.834 3022.88 1038.74 3040.69 1086.45 3058.13 1157.67 3065.97 1213.57 3074.16 1269.47 3075.23 1407.63 3068.1 1460.68 3041.75 1653.32 2948.1 1834.56 2806.02 1968.44L2765.78 2006.54 2787.5 2024.7C2937.77 2149.32 3036.77 2323.8 3066.32 2514.65 3075.23 2572.69 3075.23 2703.73 3066.32 2759.99 3030.71 2986.09 2906.44 3178.73 2714.15 3307.27 2618.36 3371.01 2506.54 3414.45 2383.69 3435.45 2348.79 3441.51 2298.94 3442.22 1587.47 3442.93L828.63 3444 826.492 3236.77ZM2375.15 3229.65C2591.65 3181.22 2762.58 3034.87 2835.57 2835.83 2900.03 2659.93 2876.88 2476.91 2769.34 2315.61 2684.24 2188.14 2552.48 2099.47 2390.81 2061.73L2356.98 2053.9 1783.67 2051.76 1210.36 2049.98 1209.29 1442.17 1208.58 833.996 1706.04 833.996C2245.88 833.996 2233.06 833.64 2308.56 853.581 2498 904.143 2632.6 1041.59 2676.4 1229.24 2685.66 1269.12 2689.22 1378.07 2682.81 1431.84 2671.77 1527.62 2637.23 1617.71 2585.95 1684.3 2573.13 1700.67 2569.93 1702.81 2558.53 1702.81 2551.41 1702.81 2540.02 1701.03 2533.25 1699.25 2510.46 1692.48 2439.6 1681.45 2382.98 1675.39L2326.72 1669.34 2326.72 1657.95C2326.72 1649.04 2329.21 1644.42 2338.47 1638.36 2413.25 1585.66 2464.88 1501.63 2479.84 1406.2 2485.18 1372.73 2482.69 1310.78 2474.85 1281.22 2442.45 1161.94 2357.7 1079.69 2232.71 1046.57 2203.86 1038.74 2203.15 1038.74 1808.6 1038.74L1413.34 1038.74 1412.27 1414.39C1411.56 1620.91 1412.27 1803.22 1413.34 1819.25L1415.83 1848.44 1895.13 1849.87C2318.88 1850.94 2379.06 1851.65 2410.4 1856.63 2458.12 1864.47 2505.48 1875.15 2538.24 1885.83L2565.66 1894.38 2594.86 1872.66C2635.81 1842.39 2703.82 1775.09 2734.8 1734.15 2781.8 1671.48 2810.29 1618.07 2836.29 1542.58 2882.94 1407.27 2882.58 1273.39 2835.22 1136.66 2775.4 964.319 2649.34 818.329 2490.52 736.433 2426.78 703.674 2393.66 690.5 2342.74 677.325 2251.22 653.824 2286.48 654.892 1628.06 653.468L1030.53 652.044 1030.53 1946.72 1030.53 3241.04 1681.47 3239.97 2332.06 3238.9 2375.15 3229.65Z"/>
+    <path fill-rule="evenodd" d="M1213 2646.36 1213 2226.07 1314.43 2226.07 1415.86 2226.07 1415.86 2544.85 1415.86 2863.62 1845.79 2863.62C2328.76 2863.62 2301.35 2865.05 2358.65 2836.55 2447.27 2792.74 2498.88 2697.29 2481.79 2608.96 2463.29 2511.37 2384.63 2440.84 2282.84 2430.51L2259.35 2428.02 2259.35 2326.51 2259.35 2225 2301.35 2227.14C2375.02 2230.7 2457.24 2257.41 2515.6 2297.3 2528.06 2305.85 2550.84 2324.73 2566.14 2339.33 2629.14 2399.53 2663.66 2462.21 2681.45 2548.41 2689.29 2587.23 2690.35 2688.39 2683.23 2724.71 2666.51 2810.91 2628.07 2882.5 2566.5 2942.34 2505.64 3001.46 2440.51 3036.73 2353.67 3057.03 2321.99 3064.51 2317.01 3064.51 1767.5 3065.58L1213 3067 1213 2646.36Z"/>
+  </svg>
+</svg></span><span class="language-divider" aria-hidden="true"></span><span class="active" data-letter="he"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+  <path fill-rule="evenodd" d="M 3.600 2.000 H 12.200 A 6.200 6.200 0 0 1 18.400 8.200 V 18.060 H 20.400 V 19.430 H 17.030 V 8.200 A 4.830 4.830 0 0 0 12.200 3.370 H 3.600 Z M 3.600 4.570 H 12.200 A 3.630 3.630 0 0 1 15.830 8.200 V 19.430 H 3.600 V 18.060 H 14.460 V 8.200 A 2.260 2.260 0 0 0 12.200 5.940 H 3.600 Z M 3.600 20.630 H 20.400 V 22.000 H 3.600 Z"/>
+</svg></span></button><a class="btn btn-primary header-install" href="#install"><span data-i18n="install-short" >התקנה ב-VS Code</span></a></div></div></header>
+<main id="main"><section class="hero"><div class="wrap hero-grid"><div class="hero-copy">
+<p data-i18n="eyebrow" class="eyebrow">תוסף חינמי ל-VS Code · גרסה 0.8.0</p>
+<h1 data-i18n="headline" >כלים לעבודה עם <bdi>Claude Code</bdi> בתוך <bdi>VS Code</bdi></h1>
+<p data-i18n="intro" class="hero-lead">Benefit's Toolkit מוסיף רשימת שיחות וקורא שיחות, תמיכה בעברית בצ׳אט, התראות כש-Claude מסיים, צבע נפרד לכל חלון ופתיחת קבצים בדפדפן.</p>
+<div class="actions"><a class="btn btn-primary" href="https://marketplace.visualstudio.com/items?itemName=benakiva.benefits-toolkit"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4"/></svg><span data-i18n="install-cta" >התקנה ב-VS Code</span></a><a class="btn btn-secondary" href="#course"><span data-i18n="course-cta" >על הקורס Benefits</span></a></div>
+<p data-i18n="requirements" class="small hero-note">חינם ובקוד פתוח (MIT). נדרשים VS Code והתוסף Claude Code.</p>
+</div><figure><div class="hero-art"><img class="hero-view" src="assets/shots/viewer.png" alt="קורא שיחות עם נתוני הדגמה" data-alt="hero-view" fetchpriority="high"><img class="hero-list" src="assets/shots/sidebar.png" alt="רשימת השיחות בסרגל הצד" data-alt="hero-list"></div><figcaption data-i18n="hero-caption" class="small hero-art-note">תצוגות התוסף עם שיחות לדוגמה</figcaption></figure></div></section>
+<section class="section wrap" aria-labelledby="features-heading"><div class="section-intro">
+<h2 data-i18n="features-heading" id="features-heading">מה אפשר לעשות עם התוסף</h2>
+<p data-i18n="features-intro" >התכונות זמינות מסרגל הצד. לכל אחת יש הגדרות ומתג הפעלה נפרד.</p>
+</div><nav class="feature-nav" aria-label="תכונות התוסף" data-label="features-nav">
+<a data-i18n="nav-chats" href="#chats">רשימת שיחות</a>
+<a data-i18n="nav-viewer" href="#viewer">קריאת שיחות</a>
+<a data-i18n="nav-rtl" href="#rtl">עברית בצ׳אט</a>
+<a data-i18n="nav-alerts" href="#alerts">צלילים והתראות</a>
+<a data-i18n="nav-colors" href="#colors">צבע לכל חלון</a>
+<a data-i18n="nav-browser" href="#browser">פתיחה בדפדפן</a>
+<a data-i18n="nav-settings" href="#settings">הגדרות התוסף</a>
+</nav><div class="features">
+<article class="feature" id="chats" aria-labelledby="chats-heading"><div class="feature-copy"><div class="feature-label"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 10h8M8 14h5M5 4h14a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H8l-5 3V6a2 2 0 0 1 2-2Z"/></svg><span data-i18n="chats-label" >רשימת שיחות</span></div>
+<h3 data-i18n="chats-heading" id="chats-heading">למצוא שיחה קודמת לפי שם או פרויקט</h3>
+<p data-i18n="chats-lead" class="feature-lead">רשימת השיחות של Claude Code מופיעה בסרגל הצד, כדי שאפשר יהיה לחזור לעבודה קודמת בלי לחפש בין תיקיות וקבצים.</p>
+<ul>
+<li data-i18n="chats-0" >מחפשים לפי כותרת או פרויקט, מציגים את הפרויקט הנוכחי או את כולם, ומקבצים לפי תאריך או פרויקט.</li>
+<li data-i18n="chats-1" >ליד כל שיחה מופיעים מד ואחוז שמראים כמה מחלון ההקשר שלה כבר מלא. הנקודה הצבעונית מזהה את הפרויקט.</li>
+<li data-i18n="chats-2" >לחיצה ימנית או <kbd>Shift+F10</kbd> פותחות תפריט לפתיחה, שינוי שם, העברה לארכיון ושחזור, שמירה כ-Markdown או מחיקה.</li>
+<li data-i18n="chats-3" >אפשר לנווט ברשימה עם החצים, <kbd>Home</kbd> ו-<kbd>End</kbd>, ולפתוח שיחה עם <kbd>Enter</kbd>.</li>
+</ul></div><figure class="feature-media">
+<button class="shot " type="button" data-zoom aria-haspopup="dialog" aria-label="הגדלת תמונת המוצר" data-label="zoom"><img src="assets/shots/sidebar.png" alt="רשימת שיחות לדוגמה עם חיפוש, סינון לפי פרויקט ומדי הקשר" data-alt="alt-sidebar" loading="lazy"><span class="zoom-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5m6 0h5v5M4 15v5h5m6 0h5v-5"/></svg></span></button>
+<figcaption data-i18n="chats-caption" class="small">רשימת שיחות עם נתוני הדגמה</figcaption>
+</figure></article>
+<article class="feature" id="viewer" aria-labelledby="viewer-heading"><div class="feature-copy"><div class="feature-label"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h7M7 16h5"/></svg><span data-i18n="viewer-label" >קריאת שיחות</span></div>
+<h3 data-i18n="viewer-heading" id="viewer-heading">לקרוא את התשובות בלי לפתוח כל שלב בדרך</h3>
+<p data-i18n="viewer-lead" class="feature-lead">השיחה מוצגת בבועות, כשהחילוף האחרון בראש העמוד. הפעלת כלים, תוצאות ביניים וחשיבה מקופלות לשורה שאפשר לפתוח כשצריך לבדוק איך התקבלה התשובה.</p>
+<ul>
+<li data-i18n="viewer-0" >חיפוש עם <kbd>Ctrl+F</kbd> או <kbd>Cmd+F</kbd> מציג התאמות ופותח גם תוכן מקופל. אפשר להסתיר את העבודה של Claude או את החשיבה שלו.</li>
+<li data-i18n="viewer-1" >במצב Auto כל פסקה מקבלת כיוון לפי השפה שלה. אפשר גם לקבוע כיוון לכל התצוגה באמצעות ב או B.</li>
+<li data-i18n="viewer-2" >כפתור Copy מעתיק קוד, Open in md-he פותח הודעה לקריאה בדפדפן, וקישורי קבצים פותחים אותם בתוך VS Code.</li>
+<li data-i18n="viewer-3" >אפשר לשמור את השיחה המלאה או רק את ההודעות שמוצגות, למשל כדי לשמור תשובה בלי כל העבודה שמסביבה.</li>
+</ul></div><figure class="feature-media">
+<button class="shot wide" type="button" data-zoom aria-haspopup="dialog" aria-label="הגדלת תמונת המוצר" data-label="zoom"><img src="assets/shots/viewer.png" alt="קורא השיחות עם הודעות בבועות, חיפוש וכפתורי העתקת קוד" data-alt="alt-viewer" loading="lazy"><span class="zoom-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5m6 0h5v5M4 15v5h5m6 0h5v-5"/></svg></span></button>
+<figcaption data-i18n="viewer-caption" class="small">קורא השיחות עם נתוני הדגמה</figcaption>
+</figure></article>
+<article class="feature" id="rtl" aria-labelledby="rtl-heading"><div class="feature-copy"><div class="feature-label"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+  <path fill-rule="evenodd" d="M 3.600 2.000 H 12.200 A 6.200 6.200 0 0 1 18.400 8.200 V 18.060 H 20.400 V 19.430 H 17.030 V 8.200 A 4.830 4.830 0 0 0 12.200 3.370 H 3.600 Z M 3.600 4.570 H 12.200 A 3.630 3.630 0 0 1 15.830 8.200 V 19.430 H 3.600 V 18.060 H 14.460 V 8.200 A 2.260 2.260 0 0 0 12.200 5.940 H 3.600 Z M 3.600 20.630 H 20.400 V 22.000 H 3.600 Z"/>
+</svg><span data-i18n="rtl-label" >עברית בצ׳אט</span></div>
+<h3 data-i18n="rtl-heading" id="rtl-heading">עברית בכיוון הנכון בתוך Claude Code</h3>
+<p data-i18n="rtl-lead" class="feature-lead">התוסף מוסיף תמיכה בעברית, בערבית ובפרסית לצ׳אט של Claude Code. הטקסט נקרא מימין לשמאל, בזמן שקוד, כלים וחשיבה נשארים משמאל לימין.</p>
+<ul>
+<li data-i18n="rtl-0" >המתג B | ב בכותרת הצ׳אט מחליף את כיוון הטקסט. האות המוארת מסמנת את הכיוון הפעיל.</li>
+<li data-i18n="rtl-1" >בוחרים הפעלה ידנית, כיוון קבוע מימין לשמאל או זיהוי אוטומטי לכל הודעה.</li>
+<li data-i18n="rtl-2" >את הגופן לצ׳אט ואת הגופן לקוד בוחרים בנפרד מתוך רשימה. Rubik ו-Varela Round כלולים בתוסף.</li>
+</ul></div><figure class="feature-media">
+<button class="shot wide" type="button" data-zoom aria-haspopup="dialog" aria-label="הגדלת תמונת המוצר" data-label="zoom"><img src="assets/shots/rtl.png" alt="שחזור של צ׳אט Claude Code בעברית עם מתג B וב" data-alt="alt-rtl" loading="lazy"><span class="zoom-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5m6 0h5v5M4 15v5h5m6 0h5v-5"/></svg></span></button>
+<figcaption data-i18n="rtl-caption" class="small">הדמיה נאמנה של הצ׳אט בעברית, לא צילום מתוך Claude Code</figcaption>
+</figure></article>
+<article class="feature" id="alerts" aria-labelledby="alerts-heading"><div class="feature-copy"><div class="feature-label"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 5a2 2 0 0 1 4 0 6 6 0 0 1 4 6v4l2 3H4l2-3v-4a6 6 0 0 1 4-6M10 21h4"/></svg><span data-i18n="alerts-label" >צלילים והתראות</span></div>
+<h3 data-i18n="alerts-heading" id="alerts-heading">לדעת ש-Claude סיים גם כשעובדים בחלון אחר</h3>
+<p data-i18n="alerts-lead" class="feature-lead">צליל אחד מודיע ש-Claude סיים, וצליל אחר מסמן שהוא צריך קלט. כשפתוחים כמה פרויקטים, צליל נפרד לכל פרויקט עוזר לזהות מאיפה הגיעה ההתראה.</p>
+<ul>
+<li data-i18n="alerts-0" >בוחרים צליל ברשימה שמשמיעה כל אפשרות בלחיצה. אפשר לקבוע ברירת מחדל לכל הפרויקטים או צלילים לפרויקט מסוים.</li>
+<li data-i18n="alerts-1" >פרויקט חדש מקבל אוטומטית צליל סיום שעדיין לא משויך לפרויקט אחר.</li>
+<li data-i18n="alerts-2" >ב-Windows וב-macOS מופיעה התראה עם שם הפרויקט והצבע שלו. לחיצה עליה מחזירה לחלון המתאים, והיא לא מופיעה כשכבר עובדים בו.</li>
+<li data-i18n="alerts-3" >אפשר לתת להתראה שם אחר, להשאיר אותה עד שלוחצים עליה, ולכבות בנפרד התראות סיום או בקשות לקלט. ב-Linux ההתראות הן בצליל בלבד.</li>
+</ul></div><figure class="feature-media">
+<img class="popup-shot" src="assets/shots/popup.png" alt="התראה לדוגמה עם שם הפרויקט" data-alt="popup" loading="lazy">
+<button class="shot " type="button" data-zoom aria-haspopup="dialog" aria-label="הגדלת תמונת המוצר" data-label="zoom"><img src="assets/shots/sounds.png" alt="רשימת צלילי ההתראה עם בחירה לפרויקט או לכל הפרויקטים" data-alt="alt-sounds" loading="lazy"><span class="zoom-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5m6 0h5v5M4 15v5h5m6 0h5v-5"/></svg></span></button>
+<figcaption data-i18n="alerts-caption" class="small">בחירת צליל והתראה עם שם הפרויקט</figcaption>
+</figure></article>
+<article class="feature" id="colors" aria-labelledby="colors-heading"><div class="feature-copy"><div class="feature-label"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 9v11"/></svg><span data-i18n="colors-label" >צבע לכל חלון</span></div>
+<h3 data-i18n="colors-heading" id="colors-heading">להבחין בין פרויקטים פתוחים לפי צבע החלון</h3>
+<p data-i18n="colors-lead" class="feature-lead">התוסף צובע את שורת הכותרת, סרגל הפעילות ושורת המצב של כל חלון VS Code. כך אפשר לזהות את הפרויקט לפני שמתחילים לעבוד בחלון.</p>
+<ul>
+<li data-i18n="colors-0" >פרויקט חדש מקבל אוטומטית צבע שעוד לא משויך לפרויקט אחר.</li>
+<li data-i18n="colors-1" >אפשר לבחור מתוך 38 צבעים, להזין קוד HEX או להשתמש בבורר צבע.</li>
+<li data-i18n="colors-2" >צבע הטקסט נבחר לפי הרקע כדי לשמור על ניגודיות. כיבוי הצביעה שומר את הבחירה להפעלה הבאה.</li>
+</ul></div><figure class="feature-media">
+<button class="shot " type="button" data-zoom aria-haspopup="dialog" aria-label="הגדלת תמונת המוצר" data-label="zoom"><img src="assets/shots/colors.png" alt="הגדרות צבעי חלון עם פלטה ושדה HEX" data-alt="alt-colors" loading="lazy"><span class="zoom-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5m6 0h5v5M4 15v5h5m6 0h5v-5"/></svg></span></button>
+<figcaption data-i18n="colors-caption" class="small">בחירת צבע לחלון הנוכחי</figcaption>
+</figure></article>
+<article class="feature" id="browser" aria-labelledby="browser-heading"><div class="feature-copy"><div class="feature-label"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M7 6.5h.01M10 6.5h.01M10 13l-2 2 2 2m4-4 2 2-2 2"/></svg><span data-i18n="browser-label" >פתיחה בדפדפן</span></div>
+<h3 data-i18n="browser-heading" id="browser-heading">לפתוח HTML ו-Markdown מתוך העורך</h3>
+<p data-i18n="browser-lead" class="feature-lead">כפתור Benefits בשורת הכותרת של הקובץ ובתפריט של סייר הקבצים פותח HTML בדפדפן. על קובצי Markdown, אותו כפתור פותח את הקורא md-he.</p>
+<ul>
+<li data-i18n="browser-0" >אפשר לבדוק עמוד HTML בדפדפן בלי לחפש את הקובץ מחדש בתיקייה.</li>
+<li data-i18n="browser-1" >md-he הוא קורא Markdown שבן בנה עם תמיכה בעברית, לקריאת מסמכים והודעות מחוץ לעורך.</li>
+<li data-i18n="browser-2" >הקבצים נפתחים בדפדפן ברירת המחדל של המערכת, או בדפדפן שבוחרים בהגדרות.</li>
+</ul></div><figure class="feature-media">
+<button class="shot " type="button" data-zoom aria-haspopup="dialog" aria-label="הגדלת תמונת המוצר" data-label="zoom"><img src="assets/shots/open.png" alt="הגדרות פתיחת HTML ו-Markdown בדפדפן" data-alt="alt-open" loading="lazy"><span class="zoom-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5m6 0h5v5M4 15v5h5m6 0h5v-5"/></svg></span></button>
+<figcaption data-i18n="browser-caption" class="small">הגדרות הפתיחה בדפדפן</figcaption>
+</figure></article>
+<article class="feature" id="settings" aria-labelledby="settings-heading"><div class="feature-copy"><div class="feature-label"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h6m4 0h6M4 12h10m4 0h2M4 18h2m4 0h10"/><circle cx="12" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="8" cy="18" r="2"/></svg><span data-i18n="settings-label" >הגדרות התוסף</span></div>
+<h3 data-i18n="settings-heading" id="settings-heading">לנהל את התכונות מסרגל הצד</h3>
+<p data-i18n="settings-lead" class="feature-lead">בסרגל הצד יש שתי לשוניות: Chats לשיחות ו-Settings להגדרות. לכל תכונה יש עמוד עם האפשרויות שלה ומתג הפעלה בראשו.</p>
+<ul>
+<li data-i18n="settings-0" >אפשר לכבות ולהפעיל תכונות בנפרד, בלי להסיר את התוסף. גם לכפתורי Copy ו-Open in md-he בקורא השיחות יש מתגים משלהם.</li>
+<li data-i18n="settings-1" >ערכת נושא אחת חלה על סרגל הצד, קורא השיחות וההתראה: Light, Dark או Auto שעוקב אחרי העורך.</li>
+<li data-i18n="settings-2" >ההגדרות מרוכזות לפי נושא, כך שאפשר למצוא את בחירת הצליל, צבע החלון או כיוון הטקסט בעמוד המתאים.</li>
+</ul></div><figure class="feature-media">
+<button class="shot " type="button" data-zoom aria-haspopup="dialog" aria-label="הגדלת תמונת המוצר" data-label="zoom"><img src="assets/shots/settings.png" alt="לשונית Settings עם עמודי ההגדרות של התוסף" data-alt="alt-settings" loading="lazy"><span class="zoom-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5m6 0h5v5M4 15v5h5m6 0h5v-5"/></svg></span></button>
+<figcaption data-i18n="settings-caption" class="small">עמודי ההגדרות בסרגל הצד</figcaption>
+</figure></article>
+</div></section>
+<section class="section wrap" id="course" aria-labelledby="course-heading"><div class="course"><div>
+<div data-i18n="course-eyebrow" class="eyebrow">הקורס Benefits · בן עקיבא</div>
+<h2 data-i18n="course-heading" id="course-heading">ללמוד לתכנן ולבנות תהליכי עבודה עם AI</h2>
+<p data-i18n="course-body" >Benefit's Toolkit הוא תוסף חינמי שבן עקיבא בנה כחלק מ-Benefits. בקורס לומדים לעבוד עם AI, מבחירת כלי ותכנון משימה ועד ניהול ידע, בניית סקילים וסוכנים ותיאום ביניהם. Claude Code ו-VS Code הם חלק מהכלים שבהם עובדים.</p>
+<div class="actions"><a class="btn btn-primary" href="https://benefits-il.dev/"><span data-i18n="course-link" >לתוכנית הקורס</span><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 7H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-5M14 4h6v6m0-6-10 10"/></svg></a><a class="mail-link" href="mailto:ben.akiva@tailorplayed.com"><span data-i18n="contact" >דברו איתי</span></a></div></div><div class="course-facts">
+<div class="course-fact">
+<h3 data-i18n="fact-h0" >לומדים 11 יכולות</h3>
+<p data-i18n="fact-p0" >המסלול מתקדם מבחירת כלי ותכנון משימות למחקר, אוטומציה ובניית סוכנים עצמאיים.</p>
+</div>
+<div class="course-fact">
+<h3 data-i18n="fact-h1" >הקורס המלא</h3>
+<p data-i18n="fact-p1" >חמישה מפגשים של שלוש שעות, בקבוצה קטנה, עם תרגול על חומרי העבודה של המשתתפים.</p>
+</div>
+<div class="course-fact">
+<h3 data-i18n="fact-h2" >ליווי אישי ועבודה עם ארגונים</h3>
+<p data-i18n="fact-p2" >אפשר ללמוד גם בליווי אישי 1:1, ביום האקתון לארגונים או בסדנאות לארגונים.</p>
+</div>
+</div></div></section>
+<section class="section wrap" id="install" aria-labelledby="install-heading">
+<h2 data-i18n="install-heading" id="install-heading">התקנת התוסף</h2>
+<div class="install-grid"><article class="install-card"><h3><span class="step">01</span><bdi>VS Marketplace</bdi></h3>
+<p data-i18n="market-text" >מחפשים Benefit's Toolkit בתצוגת התוספים של VS Code, או פותחים את עמוד התוסף.</p>
+<a href="https://marketplace.visualstudio.com/items?itemName=benakiva.benefits-toolkit"><span data-i18n="market-link" >לעמוד התוסף</span></a></article><article class="install-card"><h3><span class="step">02</span><span data-i18n="terminal" >התקנה בפקודה</span></h3>
+<p data-i18n="terminal-text" >אפשר להתקין גם באמצעות הפקודה הבאה:</p>
+<code class="command" id="command">code --install-extension benakiva.benefits-toolkit</code><button class="copy-btn" id="copy" type="button"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4H4v12h4"/></svg><span data-i18n="copy" >העתקת הפקודה</span></button><div class="copy-status" id="copy-status" role="status" aria-live="polite"></div></article><article class="install-card"><h3><span class="step">03</span><span data-i18n="vsix-title" >התקנה מקובץ VSIX</span></h3>
+<p data-i18n="vsix-text" >מורידים קובץ .vsix מעמוד הגרסאות ב-GitHub, וב-VS Code בוחרים Install from VSIX.</p>
+<a href="https://github.com/benefits-il/benefits-toolkit/releases"><span data-i18n="vsix-link" >להורדת קובץ ההתקנה</span></a></article></div>
+<p data-i18n="compatibility" class="small compatibility">לאחר ההתקנה, סמל Benefits בסרגל הפעילות פותח את התוסף. כל התכונות זמינות ב-Windows וב-macOS. ב-Linux ההתראות הן בצליל בלבד, ללא חלונית קופצת.</p>
 </section>
-
-<section id="features" aria-labelledby="features-title">
-  <div class="section__head">
-    <span class="kicker">FEATURES</span>
-    <h2 id="features-title" class="section__title">שלושה כלים, <span class="ul">עבודה אחת.</span></h2>
-    <p class="section__deck">כל אחד פותר חיכוך אמיתי בעבודה היומית מול Claude Code — בלי הגדרות, בלי תלויות.</p>
-  </div>
-  <div class="features stagger">
-    <article class="feature feature--a">
-      <svg class="feature__deco" viewBox="0 0 160 160" aria-hidden="true" style="color:var(--story-sun)"><defs><pattern id="d1" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="4" cy="4" r="2.2" fill="currentColor"/></pattern></defs><rect width="160" height="160" fill="url(#d1)"/></svg>
-      <div class="feature__icon"><i class="ti ti-text-direction-rtl"></i></div>
-      <h3 class="feature__title">עברית · RTL</h3>
-      <p class="feature__body">תמיכת כיווניות מלאה בצ'אט של Claude Code: טקסט עברי מיושר נכון, פיסוק במקום, וערבוב עברית-אנגלית קריא — בלי הקפיצות המעצבנות.</p>
-    </article>
-    <article class="feature feature--b">
-      <svg class="feature__deco" viewBox="0 0 240 32" aria-hidden="true" style="color:var(--story-sky)"><path d="M5,5 L25,27 L45,5 L65,27 L85,5 L105,27 L125,5 L145,27 L165,5 L185,27 L205,5 L225,27 L235,16" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/></svg>
-      <div class="feature__icon"><i class="ti ti-music"></i></div>
-      <h3 class="feature__title">צלילי התראה</h3>
-      <p class="feature__body">Hooks קוליים שמודיעים מה קורה: צליל כשמשימה מסתיימת, כשצריך אישור, וכשיש שגיאה. תפסיק לבהות במסך ולחכות.</p>
-    </article>
-    <article class="feature feature--c">
-      <svg class="feature__deco" viewBox="0 0 240 40" aria-hidden="true" style="color:var(--story-cheek)"><path d="M5,20 Q25,2 45,20 T85,20 T125,20 T165,20 T205,20 T235,20" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/></svg>
-      <div class="feature__icon"><i class="ti ti-history"></i></div>
-      <h3 class="feature__title">היסטוריית שיחות</h3>
-      <p class="feature__body">סרגל צד שמרכז את כל השיחות שלך: דפדוף, חיפוש, וחזרה לכל שיחה קודמת בלחיצה — בלי לאבד הקשר.</p>
-    </article>
-  </div>
-</section>
-
-<section id="walkthrough" aria-labelledby="walkthrough-title">
-  <div class="section__head">
-    <span class="kicker">WALKTHROUGH</span>
-    <h2 id="walkthrough-title" class="section__title">מה רואים <span class="ul">ואיפה?</span></h2>
-    <p class="section__deck">איך הכלים השונים נראים ואיפה הם משתלבים בסביבת העבודה שלכם ב-VS Code.</p>
-  </div>
-
-  <div class="walkthrough-list stagger">
-    <!-- Walkthrough Item 1 -->
-    <div class="walkthrough-card">
-      <div class="walkthrough-card__visual">
-        <aside class="mock" style="transform:none; margin:0; box-shadow:5px 5px 0 0 var(--ink);">
-          <div class="mock__head"><div class="mock__dots"><span></span><span></span><span></span></div><span class="mock__title">Claude Chats</span></div>
-          <div class="row" style="background:var(--paper); border-color:var(--green-anchor);">
-            <div class="row__ico" style="background:var(--green-soft); font-size:16px; color:var(--green-depth);"><i class="ti ti-brand-hipchat"></i></div>
-            <div>
-              <div class="row__t">שיחה: הוספת RTL</div>
-              <div class="row__s">פרויקט: benefits-toolkit</div>
-            </div>
-            <span class="row__pill" style="background:var(--story-sun)">פעיל</span>
-          </div>
-          <div class="row" style="background:var(--paper); opacity: 0.85;">
-            <div class="row__ico" style="background:var(--bg); font-size:16px; color:var(--ink);"><i class="ti ti-check"></i></div>
-            <div>
-              <div class="row__t">תיקון שגיאת ייבוא</div>
-              <div class="row__s">פרויקט: point-to-power</div>
-            </div>
-            <span class="row__pill">לפני שעה</span>
-          </div>
-          <div class="row" style="background:var(--paper); opacity: 0.65;">
-            <div class="row__ico" style="background:var(--bg); font-size:16px; color:var(--ink);"><i class="ti ti-archive"></i></div>
-            <div>
-              <div class="row__t">שיחת בדיקה קולית</div>
-              <div class="row__s">פרויקט: benefits-toolkit</div>
-            </div>
-            <span class="row__pill">ארכיון</span>
-          </div>
-        </aside>
-      </div>
-      <div class="walkthrough-card__content">
-        <span class="pill" style="background:var(--story-cheek); color:#fff; border-color:var(--ink); margin-bottom:12px;">
-          <i class="ti ti-layout-sidebar" style="color:#fff;"></i> סרגל צד (Sidebar)
-        </span>
-        <h3 class="feature__title">היסטוריית השיחות (Claude Chats)</h3>
-        <p class="feature__body" style="margin-bottom:14px;">
-          סרגל צד פשוט שמציג את כל השיחות הקודמות שלך עם Claude Code. האייקון שלו מופיע בסרגל הצידי של VS Code ופותח את רשימת השיחות בלחיצה.
-        </p>
-        <ul style="padding-inline-start:20px; margin:0; font-size:14px; color:var(--text-muted); display:flex; flex-direction:column; gap:6px;">
-          <li><strong>חיפוש וסינון:</strong> אפשר לחפש שיחות מהר או לסנן רק את השיחות של הפרויקט שאתה עובד עליו כרגע.</li>
-          <li><strong>ניהול קל:</strong> שינוי שם, העברה לארכיון, מחיקה מהירה או שמירת השיחה לקובץ Markdown מעוצב.</li>
-          <li><strong>קיצור דרך תחתון:</strong> כפתור בסרגל הסטטוס התחתון מאפשר לתת שם לשיחה הנוכחית ברגע.</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- Walkthrough Item 2 -->
-    <div class="walkthrough-card">
-      <div class="walkthrough-card__visual">
-        <aside class="mock" style="transform:none; margin:0; box-shadow:5px 5px 0 0 var(--ink); background:var(--bg);">
-          <div class="mock__head"><span class="mock__title" style="margin-inline-start:0;">Claude Code terminal</span><span class="row__pill" style="margin-inline-start:auto; background:var(--green-mint);">RTL Active</span></div>
-          <div style="background:var(--paper); border:2px solid var(--ink); border-radius:12px; padding:12px; font-size:13px; text-align:right; direction:rtl; margin-bottom:10px; box-shadow: 2px 2px 0 0 var(--ink);">
-            <strong style="color:var(--green-anchor);">קלאוד:</strong> מה תרצה שאעשה היום? אני יכול לעזור לך לכתוב קוד, להריץ בדיקות ולפתור באגים בפרויקט.
-          </div>
-          <div style="background:var(--green-soft); border:2px solid var(--ink); border-radius:12px; padding:12px; font-size:13px; text-align:right; direction:rtl; box-shadow: 2px 2px 0 0 var(--ink);">
-            <strong style="color:var(--green-depth);">אתה:</strong> תעזור לי להוסיף RTL ללנדינג פייג' ותריץ <code>npm run test</code> בבקשה.
-          </div>
-        </aside>
-      </div>
-      <div class="walkthrough-card__content">
-        <span class="pill" style="background:var(--story-sun); color:var(--ink); border-color:var(--ink); margin-bottom:12px;">
-          <i class="ti ti-text-direction-rtl" style="color:var(--ink);"></i> כיווניות ופונטים
-        </span>
-        <h3 class="feature__title">יישור עברית ופונטים מותאמים בצ'אט</h3>
-        <p class="feature__body" style="margin-bottom:14px;">
-          כותבים וקוראים עברית בצורה חלקה בתוך הטרמינל של Claude Code. הטקסט לא מתהפך, וסימני הפיסוק והקוד נשארים בדיוק במקום הנכון.
-        </p>
-        <ul style="padding-inline-start:20px; margin:0; font-size:14px; color:var(--text-muted); display:flex; flex-direction:column; gap:6px;">
-          <li><strong>לבחור מתי להפעיל:</strong> מצב ידני עם כפתור החלפה (Active), מיושר תמיד (Always) או זיהוי שפה אוטומטי (Auto).</li>
-          <li><strong>להתאים את המראה:</strong> אפשר לבחור פונט מותאם אישית לטקסט ופונט לקוד כדי שיהיה נוח בעין.</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- Walkthrough Item 3 -->
-    <div class="walkthrough-card">
-      <div class="walkthrough-card__visual">
-        <aside class="mock" style="transform:none; margin:0; box-shadow:5px 5px 0 0 var(--ink);">
-          <div class="mock__head"><div class="mock__dots"><span></span><span></span><span></span></div><span class="mock__title">Audio Hooks</span></div>
-          <div class="row" style="background:var(--paper); align-items:center;">
-            <div class="row__ico" style="background:var(--story-sky); color:#fff;"><i class="ti ti-music"></i></div>
-            <div style="flex-grow:1;">
-              <div class="row__t">Claude Finished Task</div>
-              <div class="row__s">Stop Event ➔ <code>sound-stop.wav</code></div>
-            </div>
-            <span class="row__pill" style="background:var(--green-soft); color:var(--green-depth);">Stop (alt)</span>
-          </div>
-          <div class="row" style="background:var(--paper); align-items:center;">
-            <div class="row__ico" style="background:var(--story-sky); color:#fff;"><i class="ti ti-help"></i></div>
-            <div style="flex-grow:1;">
-              <div class="row__t">Claude Awaiting Input</div>
-              <div class="row__s">Notification Event ➔ <code>sound-alert.wav</code></div>
-            </div>
-            <span class="row__pill" style="background:var(--green-soft); color:var(--green-depth);">Alert (default)</span>
-          </div>
-        </aside>
-      </div>
-      <div class="walkthrough-card__content">
-        <span class="pill" style="background:var(--story-sky); color:#fff; border-color:var(--ink); margin-bottom:12px;">
-          <i class="ti ti-volume" style="color:#fff;"></i> התראות שמע
-        </span>
-        <h3 class="feature__title">צלילי התראה וחיבור ל-Claude</h3>
-        <p class="feature__body" style="margin-bottom:14px;">
-          צליל קצר מושמע ברגע שקלאוד מסיים לעבוד או מחכה לתשובה שלך. ככה לא צריך לבהות במסך ולחכות לו כל הזמן.
-        </p>
-        <ul style="padding-inline-start:20px; margin:0; font-size:14px; color:var(--text-muted); display:flex; flex-direction:column; gap:6px;">
-          <li><strong>סוגי צלילים שונים:</strong> אפשר לבחור איזה צליל לשמוע בכל שלב (סאונד רגיל או אלטרנטיבי).</li>
-          <li><strong>הפעלה בשני קליקים:</strong> מחברים או מנתקים את הצלילים בקלות ישר מתוך VS Code.</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section id="usage" aria-labelledby="usage-title" style="background:var(--paper); border-top:3.5px solid var(--ink); border-bottom:3.5px solid var(--ink);">
-  <div class="section__head">
-    <span class="kicker">USAGE & COMMANDS</span>
-    <h2 id="usage-title" class="section__title">איך <span class="ul">משתמשים?</span></h2>
-    <p class="section__deck">משנים הגדרות בקלות דרך הגדרות ה-VS Code או מריצים פקודות ישירות מלוח הפקודות.</p>
-  </div>
-
-  <div class="usage-grid stagger">
-    <!-- Card 1: Settings -->
-    <div class="feature feature--a">
-      <div class="feature__icon" style="background:var(--story-sun);"><i class="ti ti-settings"></i></div>
-      <h3 class="feature__title">הגדרות פשוטות (Settings)</h3>
-      <p class="feature__body" style="margin-bottom:18px;">כל ההגדרות נמצאות תחת השם <code>benefit.*</code>. אפשר להפעיל או לכבות כל פיצ'ר בנפרד:</p>
-      
-      <div style="display:flex; flex-direction:column; gap:12px;">
-        <div style="border-bottom:1.5px dashed var(--green-soft); padding-bottom:8px;">
-          <div class="mono" style="font-weight:700; font-size:13px; color:var(--green-anchor); direction:ltr; text-align:left;">benefit.rtl.enabled</div>
-          <div style="font-size:13px; color:var(--text-muted); margin-top:2px;">להפעיל או לכבות את יישור העברית (RTL) בצ'אט.</div>
-        </div>
-        <div style="border-bottom:1.5px dashed var(--green-soft); padding-bottom:8px;">
-          <div class="mono" style="font-weight:700; font-size:13px; color:var(--green-anchor); direction:ltr; text-align:left;">benefit.rtl.mode</div>
-          <div style="font-size:13px; color:var(--text-muted); margin-top:2px;">איך ליישר את הטקסט: <code>"active"</code> (כפתור ידני), <code>"always"</code> (תמיד מיושר), <code>"auto"</code> (זיהוי אוטומטי).</div>
-        </div>
-        <div style="border-bottom:1.5px dashed var(--green-soft); padding-bottom:8px;">
-          <div class="mono" style="font-weight:700; font-size:13px; color:var(--green-anchor); direction:ltr; text-align:left;">benefit.sounds.enabled</div>
-          <div style="font-size:13px; color:var(--text-muted); margin-top:2px;">להפעיל או לכבות את צלילי ההתראה של קלאוד.</div>
-        </div>
-        <div style="border-bottom:1.5px dashed var(--green-soft); padding-bottom:8px;">
-          <div class="mono" style="font-weight:700; font-size:13px; color:var(--green-anchor); direction:ltr; text-align:left;">benefit.sounds.stopVariant</div>
-          <div style="font-size:13px; color:var(--text-muted); margin-top:2px;">איזה צליל לשמוע כשמשימה מסתיימת: <code>"default"</code> או <code>"alt"</code>.</div>
-        </div>
-        <div style="border-bottom:1.5px dashed var(--green-soft); padding-bottom:8px;">
-          <div class="mono" style="font-weight:700; font-size:13px; color:var(--green-anchor); direction:ltr; text-align:left;">benefit.chats.enabled</div>
-          <div style="font-size:13px; color:var(--text-muted); margin-top:2px;">להפעיל או לכבות את סרגל ההיסטוריה בצד.</div>
-        </div>
-        <div>
-          <div class="mono" style="font-weight:700; font-size:13px; color:var(--green-anchor); direction:ltr; text-align:left;">benefit.chats.scope</div>
-          <div style="font-size:13px; color:var(--text-muted); margin-top:2px;">איזה שיחות להציג: רק של הפרויקט הפתוח (<code>"currentWorkspace"</code>) או של כל הפרויקטים (<code>"all"</code>).</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Card 2: Commands -->
-    <div class="feature feature--b">
-      <div class="feature__icon" style="background:var(--story-sky); color:#fff;"><i class="ti ti-terminal-2"></i></div>
-      <h3 class="feature__title">פקודות מהירות (Commands)</h3>
-      <p class="feature__body" style="margin-bottom:18px; color:var(--text-muted);">פותחים את לוח הפקודות (קיצור <code>Ctrl+Shift+P</code> או <code>Cmd+Shift+P</code>) ומקלידים:</p>
-
-      <div style="display:flex; flex-direction:column; gap:12px;">
-        <div style="border-bottom:1.5px dashed var(--green-soft); padding-bottom:8px;">
-          <span class="cmd" style="margin-bottom:4px;">Benefit: RTL: Toggle</span>
-          <div style="font-size:13px; color:var(--text-muted);">להדליק או לכבות עברית בצ'אט הנוכחי ברגע.</div>
-        </div>
-        <div style="border-bottom:1.5px dashed var(--green-soft); padding-bottom:8px;">
-          <span class="cmd" style="margin-bottom:4px;">Benefit: Sounds: Install Hooks</span>
-          <div style="font-size:13px; color:var(--text-muted);">להתקין ולחבר את צלילי ההתראה ל-Claude Code במחשב.</div>
-        </div>
-        <div style="border-bottom:1.5px dashed var(--green-soft); padding-bottom:8px;">
-          <span class="cmd" style="margin-bottom:4px;">Benefit: Sounds: Choose Sound Variants</span>
-          <div style="font-size:13px; color:var(--text-muted);">לבחור איזה סוגי צלילים יושמעו.</div>
-        </div>
-        <div style="border-bottom:1.5px dashed var(--green-soft); padding-bottom:8px;">
-          <span class="cmd" style="margin-bottom:4px;">Benefit: Sounds: Test Playback</span>
-          <div style="font-size:13px; color:var(--text-muted);">לנגן צליל בדיקה כדי לוודא ששומעים אותו.</div>
-        </div>
-        <div style="border-bottom:1.5px dashed var(--green-soft); padding-bottom:8px;">
-          <span class="cmd" style="margin-bottom:4px;">Benefit Chats: Search Conversations</span>
-          <div style="font-size:13px; color:var(--text-muted);">לחפש שיחה ישנה במהירות מתוך כל ההיסטוריה.</div>
-        </div>
-        <div>
-          <span class="cmd" style="margin-bottom:4px;">Benefit Chats: Rename Active Conversation</span>
-          <div style="font-size:13px; color:var(--text-muted);">לתת שם לשיחה הנוכחית כדי למצוא אותה בקלות אחר כך.</div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section id="value" aria-labelledby="value-title">
-  <div class="section__head">
-    <span class="kicker">PRODUCTIVITY & VALUE</span>
-    <h2 id="value-title" class="section__title">מה זה <span class="ul">נותן לנו?</span></h2>
-    <p class="section__deck">איך Benefit's Toolkit עושה לכם חיים קלים ועוזר לכם לעבוד הרבה יותר מהר.</p>
-  </div>
-
-  <div class="features stagger">
-    <article class="feature feature--a">
-      <svg class="feature__deco" viewBox="0 0 160 160" aria-hidden="true" style="color:var(--story-sun)"><defs><pattern id="d2" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="4" cy="4" r="2.2" fill="currentColor"/></pattern></defs><rect width="160" height="160" fill="url(#d2)"/></svg>
-      <div class="feature__icon" style="background:var(--story-sun);"><i class="ti ti-rocket"></i></div>
-      <h3 class="feature__title">עבודה שוטפת ונוחה בעברית</h3>
-      <p class="feature__body">בלי להיאבק עם סימני פיסוק הפוכים או טקסט מבולגן. פשוט כותבים ומקבלים תשובות בעברית תקינה ובצורה קריאה.</p>
-    </article>
-    <article class="feature feature--b">
-      <svg class="feature__deco" viewBox="0 0 240 32" aria-hidden="true" style="color:var(--story-sky)"><path d="M5,5 L25,27 L45,5 L65,27 L85,5 L105,27 L125,5 L145,27 L165,5 L185,27 L205,5 L225,27 L235,16" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/></svg>
-      <div class="feature__icon" style="background:var(--story-sky); color:#fff;"><i class="ti ti-brain"></i></div>
-      <h3 class="feature__title">עבודה בלי להיתקע מול המסך</h3>
-      <p class="feature__body">במקום לשבת ולחכות שקלאוד יסיים להריץ פקודות או יבקש מכם אישור, אתם יכולים לעבור לטאב אחר. צליל קצר יקרא לכם ברגע שצריך אתכם.</p>
-    </article>
-    <article class="feature feature--c">
-      <svg class="feature__deco" viewBox="0 0 240 40" aria-hidden="true" style="color:var(--story-cheek)"><path d="M5,20 Q25,2 45,20 T85,20 T125,20 T165,20 T205,20 T235,20" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/></svg>
-      <div class="feature__icon" style="background:var(--story-cheek); color:#fff;"><i class="ti ti-refresh"></i></div>
-      <h3 class="feature__title">למצוא הכל ברגע</h3>
-      <p class="feature__body">בלי להתחיל שיחות מחדש מאפס או לשמור קוד בצד. בקליק אחד חוזרים לשיחה מאתמול, מחפשים פתרונות ישנים או מייצאים את השיחה לקובץ Markdown.</p>
-    </article>
-  </div>
-</section>
-
-<section id="install" class="how" aria-labelledby="install-title">
-  <div class="section__head" style="max-width:none">
-    <span class="kicker">INSTALL</span>
-    <h2 id="install-title" class="section__title">מותקן ב<span class="ul">דקה.</span></h2>
-  </div>
-  <div class="how-grid">
-    <div class="how-step"><span class="how-step__num">01</span><h4 class="how-step__title">הורד את ה-VSIX</h4><p class="how-step__body">מעמוד ה-Releases — הקובץ <code>benefits-toolkit.vsix</code>.</p></div>
-    <div class="how-step"><span class="how-step__num">02</span><h4 class="how-step__title">Install from VSIX</h4><p class="how-step__body">לוח Extensions ← תפריט (···) ← Install from VSIX ← בחר את הקובץ.</p></div>
-    <div class="how-step"><span class="how-step__num">03</span><h4 class="how-step__title">או בטרמינל</h4><p class="how-step__body"><code>code --install-extension benefits-toolkit.vsix</code></p></div>
-    <div class="how-step"><span class="how-step__num">04</span><h4 class="how-step__title">הפעל מחדש</h4><p class="how-step__body">סרגל ה-Benefit יופיע בצד. עובד גם ב-Cursor.</p></div>
-  </div>
-</section>
-
-<section class="cta-final" aria-labelledby="final-title">
-  <svg class="cta-blob" viewBox="0 0 200 200" aria-hidden="true"><path d="M40,80 Q20,40 60,30 Q110,15 150,40 Q190,70 175,120 Q160,180 100,175 Q40,170 30,130 Q20,100 40,80 Z" fill="#6EE7B7" stroke="#064E3B" stroke-width="3" stroke-linejoin="round"/><circle cx="70" cy="80" r="6" fill="#064E3B"/><circle cx="130" cy="100" r="4" fill="#064E3B"/></svg>
-  <svg class="cta-star" viewBox="0 0 140 140" aria-hidden="true"><g transform="translate(70 70)"><path d="M0,-60 L14,-18 L58,-18 L24,8 L36,52 L0,26 L-36,52 L-24,8 L-58,-18 L-14,-18 Z" fill="#FCD34D" stroke="#064E3B" stroke-width="3" stroke-linejoin="round"/><circle r="10" fill="#FB7185" stroke="#064E3B" stroke-width="2.5"/></g></svg>
-  <div class="cta-final__in">
-    <span class="kicker"><i class="ti ti-sparkles"></i> מוכן להתקנה</span>
-    <h2>פחות חיכוך. <span class="stamp">יותר זרימה.</span></h2>
-    <p>הורד את ה-VSIX, התקן בדקה, והמשך לעבוד. קוד פתוח (MIT), אפס תלויות, עובד ב-VS Code וב-Cursor.</p>
-    <div style="display:flex; gap:14px; justify-content:center; flex-wrap:wrap;">
-      <a class="btn btn--primary btn--lg" href="https://github.com/benefits-il/benefits-toolkit/releases/latest"><i class="ti ti-download"></i> הורד מ-Releases</a>
-      <a class="btn btn--secondary btn--lg" href="https://github.com/benefits-il/benefits-toolkit"><i class="ti ti-brand-github"></i> קוד מקור</a>
-    </div>
-  </div>
-</section>
-
-<footer class="foot">
-  <div class="foot__inner">
-    <div class="foot__brand"><span class="logo__mark"><i class="ti ti-tools"></i></span> Benefit's Toolkit</div>
-    <div class="foot__links">
-      <a href="https://github.com/benefits-il/benefits-toolkit">GitHub</a>
-      <a href="https://github.com/benefits-il/benefits-toolkit/releases/latest">Releases</a>
-      <a href="https://benefits-il.dev/">Benefits</a>
-    </div>
-  </div>
-  <div class="foot__bottom" dir="ltr">This tool is part of <a href="https://benefits-il.dev/" style="color:inherit">Benefits</a> <b style="font-weight:900">·</b> the course that teaches you to work right with AI<br>AI that finally fits <b style="font-weight:900">·</b> Ben Akiva</div>
-</footer>
-
+<section class="section wrap"><div class="faq">
+<h2 data-i18n="faq-heading" >פרטיות ואופן הפעולה</h2>
+<details>
+<summary data-i18n="faq-q0" >האם השיחות נשלחות לשרת?</summary>
+<p data-i18n="faq-a0" >התוסף פועל מקומית ולא שולח את השיחות לשום מקום. כשפותחים הודעה ב-md-he, הטקסט עובר דחוס במקטע שאחרי הסימן # בכתובת. המקטע הזה לא נשלח לשרת.</p>
+</details>
+<details>
+<summary data-i18n="faq-q1" >איך התוסף מוסיף תמיכה בעברית?</summary>
+<p data-i18n="faq-a1" >התוסף מוסיף עיצוב וסקריפט קטנים לקובצי הצ׳אט של Claude Code. כיבוי התכונה מסיר אותם.</p>
+</details>
+<details>
+<summary data-i18n="faq-q2" >איך פועלות ההתראות?</summary>
+<p data-i18n="faq-a2" >ההתראות משתמשות ב-hook בקובץ <code>~/.claude/settings.json</code>, שמפעיל סקריפט מקומי מתוך <code>~/.benefits-toolkit</code>. לאחר שינוי ה-hook, צריך להפעיל מחדש שיחות Claude Code שכבר היו פתוחות כדי שיקלטו אותו.</p>
+</details>
+<details>
+<summary data-i18n="faq-q3" >האם צריך להירשם לקורס כדי להשתמש בתוסף?</summary>
+<p data-i18n="faq-a3" >לא. Benefit's Toolkit הוא תוסף חינמי בקוד פתוח ברישיון MIT. הוא זמין גם למי שלא לומד ב-Benefits.</p>
+</details>
+</div></section></main><footer class="footer"><div class="wrap footer-inner"><div><a class="brand" href="https://benefits-il.dev/"><span class="brand-b"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+  <svg x="4.48" y="2" width="15.05" height="20" viewBox="824 453 2250 2991" preserveAspectRatio="xMidYMid meet" overflow="visible">
+    <path fill-rule="evenodd" d="M826.492 3236.77C825.424 3122.47 824.356 2449.49 824.356 1741.27L824 453 1531.56 453C2204.58 453 2241.97 453.356 2291.11 459.765 2399.72 474.008 2482.33 498.221 2570.64 542.018 2723.41 617.505 2837 715.78 2927.09 850.376 2960.56 900.582 3002.58 982.834 3022.88 1038.74 3040.69 1086.45 3058.13 1157.67 3065.97 1213.57 3074.16 1269.47 3075.23 1407.63 3068.1 1460.68 3041.75 1653.32 2948.1 1834.56 2806.02 1968.44L2765.78 2006.54 2787.5 2024.7C2937.77 2149.32 3036.77 2323.8 3066.32 2514.65 3075.23 2572.69 3075.23 2703.73 3066.32 2759.99 3030.71 2986.09 2906.44 3178.73 2714.15 3307.27 2618.36 3371.01 2506.54 3414.45 2383.69 3435.45 2348.79 3441.51 2298.94 3442.22 1587.47 3442.93L828.63 3444 826.492 3236.77ZM2375.15 3229.65C2591.65 3181.22 2762.58 3034.87 2835.57 2835.83 2900.03 2659.93 2876.88 2476.91 2769.34 2315.61 2684.24 2188.14 2552.48 2099.47 2390.81 2061.73L2356.98 2053.9 1783.67 2051.76 1210.36 2049.98 1209.29 1442.17 1208.58 833.996 1706.04 833.996C2245.88 833.996 2233.06 833.64 2308.56 853.581 2498 904.143 2632.6 1041.59 2676.4 1229.24 2685.66 1269.12 2689.22 1378.07 2682.81 1431.84 2671.77 1527.62 2637.23 1617.71 2585.95 1684.3 2573.13 1700.67 2569.93 1702.81 2558.53 1702.81 2551.41 1702.81 2540.02 1701.03 2533.25 1699.25 2510.46 1692.48 2439.6 1681.45 2382.98 1675.39L2326.72 1669.34 2326.72 1657.95C2326.72 1649.04 2329.21 1644.42 2338.47 1638.36 2413.25 1585.66 2464.88 1501.63 2479.84 1406.2 2485.18 1372.73 2482.69 1310.78 2474.85 1281.22 2442.45 1161.94 2357.7 1079.69 2232.71 1046.57 2203.86 1038.74 2203.15 1038.74 1808.6 1038.74L1413.34 1038.74 1412.27 1414.39C1411.56 1620.91 1412.27 1803.22 1413.34 1819.25L1415.83 1848.44 1895.13 1849.87C2318.88 1850.94 2379.06 1851.65 2410.4 1856.63 2458.12 1864.47 2505.48 1875.15 2538.24 1885.83L2565.66 1894.38 2594.86 1872.66C2635.81 1842.39 2703.82 1775.09 2734.8 1734.15 2781.8 1671.48 2810.29 1618.07 2836.29 1542.58 2882.94 1407.27 2882.58 1273.39 2835.22 1136.66 2775.4 964.319 2649.34 818.329 2490.52 736.433 2426.78 703.674 2393.66 690.5 2342.74 677.325 2251.22 653.824 2286.48 654.892 1628.06 653.468L1030.53 652.044 1030.53 1946.72 1030.53 3241.04 1681.47 3239.97 2332.06 3238.9 2375.15 3229.65Z"/>
+    <path fill-rule="evenodd" d="M1213 2646.36 1213 2226.07 1314.43 2226.07 1415.86 2226.07 1415.86 2544.85 1415.86 2863.62 1845.79 2863.62C2328.76 2863.62 2301.35 2865.05 2358.65 2836.55 2447.27 2792.74 2498.88 2697.29 2481.79 2608.96 2463.29 2511.37 2384.63 2440.84 2282.84 2430.51L2259.35 2428.02 2259.35 2326.51 2259.35 2225 2301.35 2227.14C2375.02 2230.7 2457.24 2257.41 2515.6 2297.3 2528.06 2305.85 2550.84 2324.73 2566.14 2339.33 2629.14 2399.53 2663.66 2462.21 2681.45 2548.41 2689.29 2587.23 2690.35 2688.39 2683.23 2724.71 2666.51 2810.91 2628.07 2882.5 2566.5 2942.34 2505.64 3001.46 2440.51 3036.73 2353.67 3057.03 2321.99 3064.51 2317.01 3064.51 1767.5 3065.58L1213 3067 1213 2646.36Z"/>
+  </svg>
+</svg></span>Benefits</a><p class="slogan" lang="en">AI that finally fits · Ben Akiva</p></div><div class="footer-links"><a href="https://github.com/benefits-il/benefits-toolkit">GitHub</a><a href="https://marketplace.visualstudio.com/items?itemName=benakiva.benefits-toolkit">Marketplace</a><a href="https://benefits-il.dev/"><span data-i18n="footer-course" >הקורס Benefits</span></a></div><p data-i18n="license" class="small">תוסף חינמי בקוד פתוח · רישיון MIT</p></div></footer><dialog class="zoom-dialog" id="zoom-dialog" aria-labelledby="zoom-caption"><button class="dialog-close" type="button" aria-label="סגירת התמונה" data-label="close"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button><img id="zoom-image" src="assets/shots/sidebar.png" alt=""><p id="zoom-caption"></p></dialog>
 <script>
-  const io = new IntersectionObserver((es)=>{ es.forEach(e=>{ if(e.isIntersecting) e.target.classList.add('in'); }); }, { threshold:0.15 });
-  document.querySelectorAll('.stagger').forEach(el=>io.observe(el));
-</script>
-</body>
-</html>
+'use strict';
+const english = {"skip": "Skip to content", "ribbon": "This tool is part of Benefits · the course that teaches you to work right with AI", "install-short": "Install in VS Code", "eyebrow": "Free VS Code extension · Version 0.8.0", "headline": "Tools for working with <bdi>Claude Code</bdi> in <bdi>VS Code</bdi>", "intro": "Benefit's Toolkit adds a conversation list and viewer, right-to-left chat support, notifications when Claude finishes, project window colors and a button to open files in your browser.", "install-cta": "Install in VS Code", "course-cta": "About the Benefits course", "requirements": "Free and open source (MIT). Requires VS Code and the Claude Code extension.", "hero-caption": "Toolkit views with demo conversations", "hero-view": "Conversation viewer with demo data", "hero-list": "Sidebar conversation list", "features-heading": "What the toolkit does", "features-intro": "Features are available from the sidebar, each with its own settings and on/off switch.", "nav-chats": "Conversation list", "nav-viewer": "Conversation viewer", "nav-rtl": "Right-to-left chat", "nav-alerts": "Sounds and notifications", "nav-colors": "Window colors", "nav-browser": "Open in browser", "nav-settings": "Toolkit settings", "chats-label": "Conversation list", "chats-heading": "Find a previous conversation by title or project", "chats-lead": "Browse your Claude Code history in the sidebar and find earlier work without digging through folders and files.", "chats-0": "Search by title or project, switch between This project and All projects, and group the list by date or project.", "chats-1": "A bar and percentage show how full each conversation’s context window is. A colored dot identifies its project.", "chats-2": "Right-click or press <kbd>Shift+F10</kbd> to open, rename, archive or restore, save as Markdown, or delete a conversation.", "chats-3": "Use the arrow keys, <kbd>Home</kbd> and <kbd>End</kbd> to move through the list, then <kbd>Enter</kbd> to open a conversation.", "alt-sidebar": "Demo conversation list with search, project filters and context usage", "chats-caption": "Conversation list with demo data", "viewer-label": "Conversation viewer", "viewer-heading": "Read the answers with the intermediate work folded away", "viewer-lead": "Messages appear as chat bubbles, with the newest exchange first. Tool calls, results and thinking collapse into a single line that expands when you need to inspect the work behind an answer.", "viewer-0": "Find text with <kbd>Ctrl+F</kbd> or <kbd>Cmd+F</kbd>, including inside folded content. Display controls can hide Claude’s work or its thinking.", "viewer-1": "Auto sets the direction of each paragraph from its language. Use ב or B to force right-to-left or left-to-right across the viewer.", "viewer-2": "Copy buttons copy code blocks, Open in md-he opens individual messages in the browser, and file links open directly in VS Code.", "viewer-3": "Save the full conversation or only the visible messages, for example to keep the answers without the intermediate work.", "alt-viewer": "Conversation viewer with message bubbles, find and code copy buttons", "viewer-caption": "Conversation viewer with demo data", "rtl-label": "Right-to-left chat", "rtl-heading": "Right-to-left text inside Claude Code", "rtl-lead": "The extension adds Hebrew, Arabic and Persian support to the Claude Code chat. Right-to-left text stays readable while code, tools and thinking keep their left-to-right layout.", "rtl-0": "The B | ב switch in the chat header changes text direction. The lit letter shows which direction is active.", "rtl-1": "Choose manual control, always-on right-to-left, or automatic detection for each message.", "rtl-2": "Choose chat and code fonts separately from a font list. Rubik and Varela Round are bundled with the extension.", "alt-rtl": "Recreated Claude Code chat in Hebrew with the B and ב direction switch", "rtl-caption": "Faithful recreation of the Hebrew chat, not a Claude Code capture", "alerts-label": "Sounds and notifications", "alerts-heading": "Know when Claude finishes while you work elsewhere", "alerts-lead": "One sound signals that Claude has finished; another means it needs input. Different project sounds help you tell which window needs attention when several projects are open.", "alerts-0": "Click sounds in the list to preview and select them. Set defaults for all projects or choose sounds for the current project.", "alerts-1": "A new project is automatically assigned a finished sound that no other project uses.", "alerts-2": "On Windows and macOS, a desktop popup shows the project’s name and color. Click it to return to that window; it stays quiet while you are already there.", "alerts-3": "Give the popup a custom name, keep it visible until clicked, and turn finished or needs-input popups off separately. Linux alerts are sound only.", "popup": "Demo desktop popup showing the project name", "alt-sounds": "Notification sound list with current-project and all-projects settings", "alerts-caption": "Sound selection and a popup showing the project name", "colors-label": "Window colors", "colors-heading": "Tell open projects apart by their window colors", "colors-lead": "Color the title bar, activity bar and status bar of each VS Code window so you can recognize the project before starting work in it.", "colors-0": "New projects automatically receive a color that no other project uses.", "colors-1": "Choose from 38 colors, enter a HEX value or use the color picker.", "colors-2": "Text color is selected for contrast against the background. Turning window colors off keeps the selection for when you turn them back on.", "alt-colors": "Window color settings with a palette and HEX field", "colors-caption": "Color settings for the current window", "browser-label": "Open in browser", "browser-heading": "Open HTML and Markdown files from the editor", "browser-lead": "A Benefits button in the editor title bar and the Explorer context menu opens HTML files in your browser. On Markdown files, the same button opens the md-he reader.", "browser-0": "Check an HTML page in the browser without locating the file again in a folder.", "browser-1": "md-he is Ben’s Hebrew-first Markdown reader, for reading documents and messages outside the editor.", "browser-2": "Use the system default browser, or choose a specific browser in Settings.", "alt-open": "Settings for opening HTML and Markdown in the browser", "browser-caption": "Open in browser settings", "settings-label": "Toolkit settings", "settings-heading": "Manage the toolkit from its sidebar", "settings-lead": "The sidebar has two tabs: Chats for conversations and Settings for configuration. Each feature has its own page, with its options below an on/off switch.", "settings-0": "Turn individual features off and on without uninstalling the extension. The viewer’s Copy and Open in md-he buttons also have separate switches.", "settings-1": "One theme covers the sidebar, conversation viewer and popup: Light, Dark, or Auto to follow the editor.", "settings-2": "Settings are grouped by feature, so sound selection, window colors and text direction each have a dedicated page.", "alt-settings": "Settings tab listing the toolkit’s configuration pages", "settings-caption": "Settings pages in the sidebar", "course-eyebrow": "Benefits course · Ben Akiva", "course-heading": "Learn to plan and build AI workflows", "course-body": "Benefit's Toolkit is a free extension built by Ben Akiva as part of Benefits. The course covers choosing tools, planning tasks, managing knowledge, building skills and agents, and coordinating their work. Claude Code and VS Code are among the tools used.", "course-link": "View the course", "contact": "Contact Ben", "fact-h0": "11 capabilities to learn", "fact-p0": "Progress from tool selection and task planning to research, automation and independent agents.", "fact-h1": "The full course", "fact-p1": "Five three-hour sessions in a small group, with exercises using participants’ own work materials.", "fact-h2": "Individual mentoring and team formats", "fact-p2": "Also available as 1:1 mentoring, an organizational hackathon day, or workshops for organizations.", "install-heading": "Install the extension", "market-text": "Search for Benefit's Toolkit in the VS Code Extensions view, or open its Marketplace page.", "market-link": "Open Marketplace", "terminal": "Install from the terminal", "terminal-text": "You can also install it with this command:", "copy": "Copy command", "vsix-title": "Install a VSIX file", "vsix-text": "Download a .vsix file from GitHub releases, then select Install from VSIX in VS Code.", "vsix-link": "Download a release", "compatibility": "After installation, open the toolkit from the Benefits icon in the activity bar. Windows and macOS support all features. On Linux, alerts are sound only, without a desktop popup.", "faq-heading": "Privacy and how it works", "faq-q0": "Are conversations sent to a server?", "faq-a0": "The toolkit runs locally and does not send your conversations anywhere. When you open a message in md-he, its text is compressed into the URL’s # fragment, which is not sent to the server.", "faq-q1": "How is right-to-left support added?", "faq-a1": "The extension adds a small stylesheet and script to Claude Code’s chat files. Turning RTL off removes them.", "faq-q2": "How do notifications work?", "faq-a2": "Notifications use a hook in <code>~/.claude/settings.json</code> to run a local script from <code>~/.benefits-toolkit</code>. Restart already-running Claude Code sessions after a hook change so they can pick it up.", "faq-q3": "Do I need to join the course to use the extension?", "faq-a3": "No. Benefit's Toolkit is free and open source under the MIT license. You can use it without joining Benefits.", "footer-course": "Benefits course", "license": "Free and open source · MIT license", "zoom": "Enlarge product image", "features-nav": "Toolkit features", "close": "Close image"};
+const textNodes = Array.from(document.querySelectorAll('[data-i18n]'));
+const imageNodes = Array.from(document.querySelectorAll('[data-alt]'));
+const labelNodes = Array.from(document.querySelectorAll('[data-label]'));
+const hebrew = Object.fromEntries(textNodes.map(el => [el.dataset.i18n, el.innerHTML]));
+imageNodes.forEach(el => { hebrew[el.dataset.alt] = el.alt; });
+labelNodes.forEach(el => { hebrew[el.dataset.label] = el.getAttribute('aria-label'); });
+const languageButton = document.getElementById('language');
+const storageKey = 'benefits-toolkit-landing-language';
+let language = 'he';
+function setLanguage(next, persist = false) {
+  language = next === 'en' ? 'en' : 'he';
+  const strings = language === 'en' ? english : hebrew;
+  document.documentElement.lang = language;
+  document.documentElement.dir = language === 'he' ? 'rtl' : 'ltr';
+  textNodes.forEach(el => { el.innerHTML = strings[el.dataset.i18n]; });
+  imageNodes.forEach(el => { el.alt = strings[el.dataset.alt]; });
+  labelNodes.forEach(el => { el.setAttribute('aria-label', strings[el.dataset.label]); });
+  document.querySelectorAll('[data-letter]').forEach(el => el.classList.toggle('active', el.dataset.letter === language));
+  languageButton.setAttribute('aria-label', language === 'he' ? 'Switch page language to English' : 'שינוי שפת העמוד לעברית');
+  document.title = language === 'he' ? "Benefit's Toolkit | כלים ל-Claude Code בתוך VS Code" : "Benefit's Toolkit | Tools for Claude Code in VS Code";
+  document.querySelector('meta[name="description"]').content = language === 'he' ? "Benefit's Toolkit מוסיף ניהול שיחות, תמיכה בעברית, התראות, צבעי חלון ופתיחת קבצים בדפדפן." : "Benefit's Toolkit adds conversation management, right-to-left support, alerts, window colors and browser shortcuts to Claude Code in VS Code.";
+  document.getElementById('copy-status').textContent = '';
+  if (persist) {
+    try { localStorage.setItem(storageKey, language); } catch (_) {}
+    try { const url = new URL(location.href); url.searchParams.set('lang', language); history.replaceState(null, '', url); } catch (_) {}
+  }
+}
+let saved = null;
+try { saved = localStorage.getItem(storageKey); } catch (_) {}
+const requested = new URLSearchParams(location.search).get('lang');
+const initial = ['he', 'en'].includes(requested) ? requested : ['he', 'en'].includes(saved) ? saved : /^(he|iw)(-|$)/i.test(navigator.language) ? 'he' : 'en';
+setLanguage(initial);
+document.documentElement.classList.add('js');
+languageButton.addEventListener('click', () => setLanguage(language === 'he' ? 'en' : 'he', true));
+document.getElementById('copy').addEventListener('click', async () => {
+  const value = document.getElementById('command').textContent;
+  let copied = false;
+  try { if (navigator.clipboard) { await navigator.clipboard.writeText(value); copied = true; } } catch (_) {}
+  if (!copied) {
+    const field = document.createElement('textarea'); field.value = value;
+    field.style.cssText = 'position:fixed;top:0;left:0;opacity:0'; document.body.append(field); field.select();
+    try { copied = document.execCommand('copy'); } catch (_) {} field.remove(); document.getElementById('copy').focus();
+  }
+  document.getElementById('copy-status').textContent = copied ? (language === 'he' ? 'הפקודה הועתקה' : 'Command copied') : (language === 'he' ? 'אפשר לסמן את הפקודה ולהעתיק אותה ידנית' : 'Select the command and copy it manually');
+});
+const dialog = document.getElementById('zoom-dialog');
+const zoomImage = document.getElementById('zoom-image');
+document.querySelectorAll('[data-zoom]').forEach(button => button.addEventListener('click', () => {
+  const img = button.querySelector('img'); zoomImage.src = img.src; zoomImage.alt = img.alt;
+  document.getElementById('zoom-caption').textContent = img.alt;
+  dialog.showModal();
+}));
+dialog.querySelector('button').addEventListener('click', () => dialog.close());
+dialog.addEventListener('click', event => {
+  const box = dialog.getBoundingClientRect();
+  if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) dialog.close();
+});
+</script></body></html>
