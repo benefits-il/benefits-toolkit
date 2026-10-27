@@ -12,23 +12,44 @@ export const SIDEBAR_CSS = `
   .side { display: flex; flex-direction: column; height: 100vh; }
   .side-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px 12px; }
   .tabs { padding: 3px; }
+  .head-new {
+    display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 14px 0 11px; flex: none;
+    border-radius: var(--pill); border: 1px solid var(--line); background: var(--input); color: var(--text);
+    font: 500 13px var(--head); white-space: nowrap; cursor: pointer;
+  }
+  .head-new:hover { background: var(--hover); }
+  .head-new .mark { width: 15px; height: 15px; }
   .tabs button { font: 500 13px var(--head); min-height: 28px; padding: 4px 16px; }
   .side-body { flex: 1; min-height: 0; overflow: auto; padding: 0 12px 12px; scrollbar-width: thin; }
 
   .brand {
-    flex: none; display: block; margin: 6px 12px 12px; padding: 12px; cursor: pointer; text-decoration: none;
-    border-radius: var(--card-r); background: var(--surface); border: 1px solid var(--line); color: var(--text);
+    flex: none; position: relative; margin: 6px 12px 12px;
+    border-radius: var(--card-r); background: var(--surface); border: 1px solid var(--line);
   }
-  .brand:hover { text-decoration: none; background: var(--hover); }
+  .brand-link { display: block; padding: 12px 40px 12px 12px; border-radius: inherit; color: var(--text); text-decoration: none; }
+  .brand-link:hover { text-decoration: none; background: var(--hover); }
   .brand .top { display: flex; align-items: center; gap: 8px; }
   .brand .logo { width: 30px; height: 30px; flex: none; }
   .brand .logo svg { width: 100%; height: 100%; display: block; }
   .brand .lock { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
   .brand strong { font: 700 16px var(--head); }
   .brand .lock small { margin-top: 2px; font: 500 11.5px var(--head); color: var(--accent); }
-  .brand .top .ico { width: 14px; height: 14px; color: var(--accent); }
   .brand p { margin-top: 8px; font: 11.5px/1.6 var(--body); color: var(--muted); }
   .brand .benefits-dot { font-weight: 900; }
+  .brand .fold {
+    position: absolute; top: 8px; right: 8px; width: 24px; height: 24px; display: grid; place-items: center;
+    border: 0; border-radius: var(--pill); background: transparent; color: var(--muted); cursor: pointer;
+  }
+  .brand .fold:hover { background: var(--hover); color: var(--text); }
+  .brand .fold .ico { width: 15px; height: 15px; }
+  /* Folded: one line, about a third of the open card. */
+  .brand.folded .brand-link { padding: 7px 40px 7px 10px; }
+  .brand.folded .logo { width: 22px; height: 22px; }
+  .brand.folded .lock { flex-direction: row; align-items: baseline; gap: 7px; white-space: nowrap; overflow: hidden; }
+  .brand.folded strong { font-size: 13.5px; }
+  .brand.folded .lock small { margin: 0; font-size: 11px; overflow: hidden; text-overflow: ellipsis; }
+  .brand.folded .by, .brand.folded p { display: none; }
+  .brand.folded .fold { top: 50%; margin-top: -12px; }
 
   /* ---- Chats ---- */
   .search {
@@ -46,7 +67,25 @@ export const SIDEBAR_CSS = `
   .group-label { font: 500 12px var(--head); color: var(--accent); margin: 14px 8px 6px; letter-spacing: 0.01em; }
   .group-label:first-child { margin-top: 6px; }
   #chat-list { outline: none; }
-  .row { position: relative; padding: 7px 26px 7px 12px; margin-bottom: 3px; border-radius: var(--row-r); cursor: pointer; }
+  /* One line per conversation, like Claude Code's list: the agent's mark, the
+     title in a softer gray, then the project's dot, the context bar and the time. */
+  :root { --row-text: #CDD1CC; }
+  :root[data-theme="light"] { --row-text: #2E3A33; }
+  :root[data-theme^="hc"] { --row-text: var(--text); }
+  .row {
+    position: relative; display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 10px 0 32px;
+    margin-bottom: 2px; border-radius: var(--row-r); cursor: pointer;
+  }
+  /* The agent's mark: Claude, Cursor or Antigravity, at a glance. */
+  .row > .mark { position: absolute; left: 10px; top: 50%; width: 15px; height: 15px; margin-top: -7.5px; }
+  .agent-copy { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .agent-copy .mark { width: 20px; height: 20px; }
+  /* A "Benefits alert only" row: its button sits under its text, above the row's line. */
+  .own-row { border-bottom: 1px solid var(--line); }
+  .own-row .srow { border-bottom: 0; align-items: flex-start; }
+  .own-row .agent-copy { align-items: flex-start; }
+  .own-row .agent-copy .mark { margin-top: 1px; }
+  .own-row .btn-row { margin: 0 0 12px 32px; }
   /* A hairline between two rows of a group; it hides next to a highlighted row. */
   .row + .row::before {
     content: ""; position: absolute; left: 12px; right: 12px; top: -2px; height: 1px; background: var(--line); pointer-events: none;
@@ -54,23 +93,19 @@ export const SIDEBAR_CSS = `
   .row:hover::before, .row:hover + .row::before, .row.selected::before, .row.selected + .row::before { visibility: hidden; }
   .row:hover { background: var(--hover); }
   .row.selected { background: var(--selected); }
-  .row.selected::after {
-    content: ""; position: absolute; inset-inline-end: 11px; top: 50%; width: 6px; height: 6px; margin-top: -3px;
-    border-radius: 50%; background: var(--dot);
-  }
   #chat-list:focus-visible .row.focused { outline: 2px solid var(--focus); outline-offset: -2px; }
-  .row-title { display: block; font: 500 13px/1.3 var(--head); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row-title { flex: 1; min-width: 0; font: 400 13px/1.3 var(--head); color: var(--row-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row.selected .row-title { color: var(--text); font-weight: 500; }
   .row.archived .row-title { color: var(--muted); }
-  .row-meta { display: flex; align-items: center; gap: 6px; margin-top: 3px; font-size: 11.5px; color: var(--muted); min-width: 0; }
-  .row-meta .what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row-meta { flex: none; display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--muted); }
   .ctx { flex: none; display: inline-flex; align-items: center; gap: 5px; font-variant-numeric: tabular-nums; }
-  .ctx .cbar { width: 34px; height: 4px; border-radius: 4px; background: var(--line); overflow: hidden; }
+  .ctx .cbar { width: 22px; height: 4px; border-radius: 4px; background: var(--line); overflow: hidden; }
   .ctx .cbar i { display: block; height: 100%; border-radius: 4px; background: var(--accent); }
   .ctx .cbar i.warn { background: var(--warning); }
   .ctx .cbar i.high { background: var(--danger); }
-  .row-meta time { margin-inline-start: auto; font-size: 11px; white-space: nowrap; unicode-bidi: isolate; }
+  .row-meta time { font-size: 11px; white-space: nowrap; unicode-bidi: isolate; }
   .pdot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--c, transparent); border: 1.5px solid var(--c, var(--muted)); }
-  .skeleton { height: 54px; margin: 6px 0; border-radius: var(--row-r); background: var(--surface); animation: pulse 1.4s ease-in-out infinite; }
+  .skeleton { height: 28px; margin: 2px 0; border-radius: var(--row-r); background: var(--surface); animation: pulse 1.4s ease-in-out infinite; }
   @keyframes pulse { 50% { opacity: 0.55; } }
 
   .empty { padding: 30px 8px; text-align: center; }
@@ -156,8 +191,11 @@ export const SIDEBAR_CSS = `
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
   }
   :root[data-theme^="hc"] .popup-preview { border-color: var(--line); }
-  .popup-preview .ptile { width: 34px; height: 34px; flex: none; display: grid; place-items: center; border-radius: 8px; background: var(--c); color: var(--ct); }
-  .popup-preview .ptile .ico { width: 18px; height: 18px; }
+  /* Like the real popup: the agent's mark on a quiet tile; the project's color is the frame. */
+  .popup-preview .ptile { width: 34px; height: 34px; flex: none; display: grid; place-items: center; border-radius: 8px; background: #2C302E; color: var(--text); }
+  :root[data-theme="light"] .popup-preview .ptile { background: #F1ECDD; }
+  :root[data-theme^="hc"] .popup-preview .ptile { background: transparent; border: 1px solid var(--line); }
+  .popup-preview .ptile .mark { width: 20px; height: 20px; }
   .popup-preview .pcopy { flex: 1; min-width: 0; }
   .popup-preview strong { display: block; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .popup-preview small { display: block; font-size: 11px; color: var(--accent); }
@@ -215,8 +253,23 @@ export const SIDEBAR_SCRIPT = `
   $('tab-settings').onclick = () => go('settings', null);
   $$('[data-open-page]').forEach((b) => { b.onclick = () => go('settings', b.dataset.openPage); });
   $$('.back').forEach((b) => { b.onclick = () => go('settings', null); });
-  $('theme-btn').onclick = () => post({ type: 'toggleTheme' });
-  $('brand').onclick = (e) => { e.preventDefault(); post({ type: 'openBrand' }); };
+  $('brand-link').onclick = (e) => { e.preventDefault(); post({ type: 'openBrand' }); };
+  $('new-chat').onclick = () => post({ type: 'newChat' });
+  $('open-cursor-settings').onclick = () => post({ type: 'openCursorSettings' });
+  // The card folds to one line; the choice is a setting, so every window follows.
+  $('brand-fold').onclick = () => {
+    const folded = !$('brand').classList.contains('folded');
+    renderFold(folded);
+    post({ type: 'set', key: 'appearance.brandFolded', value: folded });
+  };
+  function renderFold(folded) {
+    $('brand').classList.toggle('folded', folded);
+    const fold = $('brand-fold');
+    fold.innerHTML = folded ? ICONS.chevronsUp : ICONS.chevronDown;
+    fold.setAttribute('aria-expanded', String(!folded));
+    fold.setAttribute('aria-label', folded ? 'Unfold the Benefits card' : 'Fold the Benefits card');
+    fold.title = folded ? 'Unfold' : 'Fold';
+  }
 
   // ---- Settings: every control names its setting in data-set; the extension checks and writes it.
   document.addEventListener('change', (e) => {
@@ -260,10 +313,12 @@ export const SIDEBAR_SCRIPT = `
   function render() {
     if (!state) return;
     document.documentElement.dataset.theme = state.theme;
-    const dark = state.theme === 'dark' || state.theme === 'hc-dark';
-    $('theme-btn').innerHTML = dark ? ICONS.sun : ICONS.moon;
-    $('theme-btn').setAttribute('aria-label', dark ? 'Switch to light theme' : 'Switch to dark theme');
-    $('theme-btn').title = dark ? 'Light theme' : 'Dark theme';
+    renderFold(!!value('appearance.brandFolded'));
+    // New chat: this editor's agent, or Claude Code when chosen; the mark says which.
+    const target = value('chats.newChatOpens') === 'claudeCode' ? 'claude' : EDITOR_AGENT;
+    $('new-chat').hidden = !value('chats.newChatButton');
+    $('new-chat').querySelector('.mark').className = 'mark mark-' + target;
+    $('new-chat').title = 'New ' + (target === 'claude' ? 'Claude Code' : AGENT_NAMES[target] + ' Agent') + ' chat';
 
     $$('[data-set]').forEach((el) => {
       const v = value(el.dataset.set);
@@ -288,6 +343,7 @@ export const SIDEBAR_SCRIPT = `
     renderSounds();
     renderPopup();
     renderHooks();
+    renderAgents();
   }
 
   function renderProject() {
@@ -390,6 +446,17 @@ export const SIDEBAR_SCRIPT = `
   $('popup-name').addEventListener('change', (e) => post({ type: 'setPopupName', value: e.target.value }));
   $('test-popup').onclick = () => post({ type: 'testPopup' });
 
+  function renderAgents() {
+    for (const [agent, a] of Object.entries(state.agents || {})) {
+      const el = $('agent-' + agent + '-status');
+      if (!el) continue;
+      el.textContent = !a.present ? 'Not installed on this computer'
+        : !value('agents.' + agent) ? 'Off'
+        : !state.hooks.wanted ? 'Sounds and popup are off; chats are listed'
+        : a.hooked ? 'Connected' : 'Not connected';
+    }
+  }
+
   function renderHooks() {
     const h = state.hooks;
     const on = h.wanted && h.installed;
@@ -461,17 +528,17 @@ export const SIDEBAR_SCRIPT = `
     let html = '';
     let n = 0;
     list.groups.forEach((g) => {
-      const rows = g.rows.filter((r) => !q || r.title.toLowerCase().includes(q) || r.project.toLowerCase().includes(q));
+      const rows = g.rows.filter((r) => !q || r.title.toLowerCase().includes(q) || r.project.toLowerCase().includes(q) || AGENT_NAMES[r.agent].toLowerCase().includes(q));
       if (!rows.length) return;
       if (g.label) html += '<h3 class="group-label">' + esc(g.label) + '</h3>';
       rows.forEach((r) => {
         const sel = chats.active === r.id;
-        html += '<div class="row' + (sel ? ' selected' : '') + (r.archived ? ' archived' : '') + '" role="option" id="row-' + n + '" data-id="' + esc(r.id) + '" aria-selected="' + sel + '">' +
+        html += '<div class="row' + (sel ? ' selected' : '') + (r.archived ? ' archived' : '') + '" role="option" id="row-' + n + '" data-id="' + esc(r.id) + '"' + (r.readOnly ? ' data-read-only="1"' : '') + ' aria-selected="' + sel + '">' +
+          '<i class="mark mark-' + esc(r.agent) + '" role="img" aria-label="' + esc(AGENT_NAMES[r.agent]) + '" title="' + esc(AGENT_NAMES[r.agent]) + '"></i>' +
           '<span class="row-title" dir="auto" title="' + esc(r.title) + '">' + esc(r.title) + '</span>' +
-          '<span class="row-meta"><i class="pdot"' + (r.color ? ' style="--c:' + esc(r.color) + '"' : '') + '></i>' +
-          '<span class="what">' + [
-            scope === 'all' ? '<bdi>' + esc(r.project) + '</bdi>' : '',
-          ].filter(Boolean).join(' \\u00b7 ') + '</span>' + contextMeter(r.context) +
+          // One line: the project is the dot's color, and its name on hover.
+          '<span class="row-meta"><i class="pdot" role="img" aria-label="' + esc(r.project) + '" title="' + esc(r.project) + '"' + (r.color ? ' style="--c:' + esc(r.color) + '"' : '') + '></i>' +
+          contextMeter(r.context) +
           '<time datetime="' + esc(r.modified) + '" title="' + esc(new Date(r.modified).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })) + '">' + esc(relTime(r.modified)) + '</time></span></div>';
         n++;
       });
@@ -487,12 +554,12 @@ export const SIDEBAR_SCRIPT = `
     if (pendingReveal) reveal(pendingReveal);
   }
 
-  // How full the conversation's context window is: a small bar and the percent.
+  // How full the conversation's context window is: a small bar, the percent on hover.
   function contextMeter(pct) {
     if (pct === null || pct === undefined) return '';
     const tier = pct >= 80 ? ' class="high"' : pct >= 50 ? ' class="warn"' : '';
     const shown = pct > 0 && pct < 1 ? '<1' : String(Math.round(pct));
-    return '<span class="ctx" title="Context window ' + shown + '% full"><span class="cbar"><i' + tier + ' style="width:' + Math.max(2, pct) + '%"></i></span>' + esc(shown) + '%</span>';
+    return '<span class="ctx" role="img" aria-label="Context window ' + shown + '% full" title="Context window ' + shown + '% full"><span class="cbar"><i' + tier + ' style="width:' + Math.max(2, pct) + '%"></i></span></span>';
   }
 
   $('chat-list').addEventListener('click', (e) => {
@@ -533,6 +600,7 @@ export const SIDEBAR_SCRIPT = `
       const r = row.getBoundingClientRect();
       openRowMenu(row, r.left + 24, r.bottom - 6);
     }
+    if (row.dataset.readOnly) return;
     if (e.key === 'Delete') post({ type: 'chat', action: 'delete', id: row.dataset.id });
     if (e.key === 'F2') post({ type: 'chat', action: 'rename', id: row.dataset.id });
   });
@@ -612,9 +680,12 @@ export const SIDEBAR_SCRIPT = `
       '<button type="button" role="menuitem"' + (cls ? ' class="' + cls + '"' : '') + ' data-row-action="' + action + '">' + ICONS[icon] + label + '</button>';
     const menu = $('row-menu');
     menu.dataset.id = row.dataset.id;
-    menu.innerHTML = item('open', 'messages', 'Open') + item('rename', 'pencil', 'Rename') +
-      (archived ? item('restore', 'restore', 'Restore from archive') : item('archive', 'archive', 'Archive')) +
-      item('export', 'download', 'Save as Markdown') + '<hr />' + item('delete', 'trash', 'Delete', 'danger');
+    // Cursor's and Antigravity's conversations are theirs: open and save only.
+    menu.innerHTML = row.dataset.readOnly
+      ? item('open', 'messages', 'Open') + item('export', 'download', 'Save as Markdown')
+      : item('open', 'messages', 'Open') + item('rename', 'pencil', 'Rename') +
+        (archived ? item('restore', 'restore', 'Restore from archive') : item('archive', 'archive', 'Archive')) +
+        item('export', 'download', 'Save as Markdown') + '<hr />' + item('delete', 'trash', 'Delete', 'danger');
     toggleMenu(null, menu, x, y, false);
   }
   $('row-menu').addEventListener('click', (e) => {

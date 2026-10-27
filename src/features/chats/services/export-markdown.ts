@@ -1,6 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as vscode from "vscode";
+import { AGENT_NAMES } from "../../../shared/agents";
 import { ConversationMeta } from "../domain/conversation";
 import { ConversationRepository } from "./conversation-repository";
 import { atomicWriteText, ensureDir } from "../../../shared/fs-utils";
@@ -16,10 +17,11 @@ export class MarkdownExporter {
   }
 
   async render(meta: ConversationMeta): Promise<string> {
-    const messages = await this.repo.readMessages(meta.filePath);
+    const messages = await this.repo.messages(meta);
     const lines: string[] = [];
     lines.push(`# ${meta.title}`);
     lines.push("");
+    lines.push(`- Agent: ${AGENT_NAMES[meta.source]}`);
     lines.push(`- Project: \`${meta.projectDisplayName}\``);
     lines.push(`- Conversation ID: \`${meta.conversationId}\``);
     if (meta.firstMessageAt) lines.push(`- Started: \`${meta.firstMessageAt}\``);
@@ -30,7 +32,7 @@ export class MarkdownExporter {
     lines.push("");
 
     for (const m of messages) {
-      const speaker = m.role === "user" ? "You" : "Claude";
+      const speaker = m.role === "user" ? "You" : AGENT_NAMES[meta.source];
       lines.push(`## ${speaker} · ${formatTimestamp(m.timestamp)}`);
       lines.push("");
       lines.push(m.text || "_(no text content)_");

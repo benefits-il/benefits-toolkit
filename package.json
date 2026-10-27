@@ -1,8 +1,8 @@
 {
   "name": "benefits-toolkit",
   "displayName": "Benefit's Toolkit",
-  "description": "Quality-of-life tools for Claude Code: RTL chat, sounds, a conversation manager and viewer, window colors and HTML in your browser. Part of Benefits, the course that teaches you to work right with AI (benefits-il.dev).",
-  "version": "0.8.1",
+  "description": "Quality-of-life tools for Claude Code, and for Cursor's and Antigravity's own agents: RTL chat, sounds and popups, a conversation manager and viewer, window colors and HTML in your browser. Part of Benefits, the course that teaches you to work right with AI (benefits-il.dev).",
+  "version": "0.9.0",
   "publisher": "benakiva",
   "author": {
     "name": "Ben Akiva"
@@ -25,6 +25,8 @@
   "keywords": [
     "claude",
     "claude code",
+    "cursor",
+    "antigravity",
     "rtl",
     "hebrew",
     "chat history",
@@ -62,43 +64,179 @@
       ]
     },
     "commands": [
-      { "command": "benefit.rtl.toggle", "title": "RTL: Toggle", "category": "Benefit" },
-      { "command": "benefit.rtl.enableActive", "title": "RTL: Enable (Active mode)", "category": "Benefit" },
-      { "command": "benefit.rtl.enableAlways", "title": "RTL: Enable (Always)", "category": "Benefit" },
-      { "command": "benefit.rtl.enableAuto", "title": "RTL: Enable (Auto-detect)", "category": "Benefit" },
-      { "command": "benefit.rtl.disable", "title": "RTL: Disable", "category": "Benefit" },
-      { "command": "benefit.rtl.status", "title": "RTL: Show Status", "category": "Benefit" },
-
-      { "command": "benefit.sounds.install", "title": "Sounds: Install Hooks", "category": "Benefit" },
-      { "command": "benefit.sounds.uninstall", "title": "Sounds: Uninstall Hooks", "category": "Benefit" },
-      { "command": "benefit.sounds.chooseSounds", "title": "Sounds: Choose Sounds", "category": "Benefit" },
-      { "command": "benefit.sounds.test", "title": "Sounds: Test Playback", "category": "Benefit" },
-      { "command": "benefit.sounds.status", "title": "Sounds: Show Status", "category": "Benefit" },
-      { "command": "benefit.popup.test", "title": "Popup: Test", "category": "Benefit" },
-
-      { "command": "benefit.settings.open", "title": "Toolkit Settings", "category": "Benefit" },
-      { "command": "benefit.settings.close", "title": "Show Chats", "category": "Benefit" },
-      { "command": "benefit.appearance.chooseTheme", "title": "Theme", "category": "Benefit" },
-
-      { "command": "benefit.windowColor.pick", "title": "Window Color: Pick", "category": "Benefit" },
-      { "command": "benefit.windowColor.clear", "title": "Window Color: Clear", "category": "Benefit" },
-
-      { "command": "benefit.html.openInBrowser", "title": "Benefits: Open in Browser", "icon": { "light": "media/benefits-mark-light.svg", "dark": "media/benefits-mark-dark.svg" } },
-      { "command": "benefit.mdHe.openFile", "title": "Benefits: Open in md-he", "icon": { "light": "media/benefits-mark-light.svg", "dark": "media/benefits-mark-dark.svg" } },
-
-      { "command": "benefit.chats.refresh", "title": "Refresh", "category": "Benefit Chats", "icon": "$(refresh)" },
-      { "command": "benefit.chats.rename", "title": "Rename", "category": "Benefit Chats", "icon": "$(edit)" },
-      { "command": "benefit.chats.archive", "title": "Archive", "category": "Benefit Chats", "icon": "$(archive)" },
-      { "command": "benefit.chats.restore", "title": "Restore from Archive", "category": "Benefit Chats" },
-      { "command": "benefit.chats.delete", "title": "Delete", "category": "Benefit Chats", "icon": "$(trash)" },
-      { "command": "benefit.chats.search", "title": "Search Conversations", "category": "Benefit Chats", "icon": "$(search)" },
-      { "command": "benefit.chats.export", "title": "Export to Markdown", "category": "Benefit Chats" },
-      { "command": "benefit.chats.view", "title": "View Conversation", "category": "Benefit Chats" },
-      { "command": "benefit.chats.toggleSort", "title": "Toggle Sort Order", "category": "Benefit Chats", "icon": "$(sort-precedence)" },
-      { "command": "benefit.chats.toggleGroupBy", "title": "Toggle Group By (Date / Project)", "category": "Benefit Chats" },
-      { "command": "benefit.chats.toggleArchived", "title": "Show/Hide Archived", "category": "Benefit Chats", "icon": "$(eye)" },
-      { "command": "benefit.chats.toggleScope", "title": "Toggle Scope (This Project / All Projects)", "category": "Benefit Chats" },
-      { "command": "benefit.chats.statusBarRename", "title": "Rename This Project's Latest Conversation", "category": "Benefit Chats" }
+      {
+        "command": "benefit.rtl.toggle",
+        "title": "RTL: Toggle",
+        "category": "Benefit"
+      },
+      {
+        "command": "benefit.rtl.enableActive",
+        "title": "RTL: Enable (Active mode)",
+        "category": "Benefit"
+      },
+      {
+        "command": "benefit.rtl.enableAlways",
+        "title": "RTL: Enable (Always)",
+        "category": "Benefit"
+      },
+      {
+        "command": "benefit.rtl.enableAuto",
+        "title": "RTL: Enable (Auto-detect)",
+        "category": "Benefit"
+      },
+      {
+        "command": "benefit.rtl.disable",
+        "title": "RTL: Disable",
+        "category": "Benefit"
+      },
+      {
+        "command": "benefit.rtl.status",
+        "title": "RTL: Show Status",
+        "category": "Benefit"
+      },
+      {
+        "command": "benefit.sounds.install",
+        "title": "Sounds: Install Hooks",
+        "category": "Benefit"
+      },
+      {
+        "command": "benefit.sounds.uninstall",
+        "title": "Sounds: Uninstall Hooks",
+        "category": "Benefit"
+      },
+      {
+        "command": "benefit.sounds.chooseSounds",
+        "title": "Sounds: Choose Sounds",
+        "category": "Benefit"
+      },
+      {
+        "command": "benefit.sounds.test",
+        "title": "Sounds: Test Playback",
+        "category": "Benefit"
+      },
+      {
+        "command": "benefit.sounds.status",
+        "title": "Sounds: Show Status",
+        "category": "Benefit"
+      },
+      {
+        "command": "benefit.popup.test",
+        "title": "Popup: Test",
+        "category": "Benefit"
+      },
+      {
+        "command": "benefit.settings.open",
+        "title": "Toolkit Settings",
+        "category": "Benefit"
+      },
+      {
+        "command": "benefit.settings.close",
+        "title": "Show Chats",
+        "category": "Benefit"
+      },
+      {
+        "command": "benefit.appearance.chooseTheme",
+        "title": "Theme",
+        "category": "Benefit"
+      },
+      {
+        "command": "benefit.windowColor.pick",
+        "title": "Window Color: Pick",
+        "category": "Benefit"
+      },
+      {
+        "command": "benefit.windowColor.clear",
+        "title": "Window Color: Clear",
+        "category": "Benefit"
+      },
+      {
+        "command": "benefit.html.openInBrowser",
+        "title": "Benefits: Open in Browser",
+        "icon": {
+          "light": "media/benefits-mark-light.svg",
+          "dark": "media/benefits-mark-dark.svg"
+        }
+      },
+      {
+        "command": "benefit.mdHe.openFile",
+        "title": "Benefits: Open in md-he",
+        "icon": {
+          "light": "media/benefits-mark-light.svg",
+          "dark": "media/benefits-mark-dark.svg"
+        }
+      },
+      {
+        "command": "benefit.chats.refresh",
+        "title": "Refresh",
+        "category": "Benefit Chats",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "benefit.chats.rename",
+        "title": "Rename",
+        "category": "Benefit Chats",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "benefit.chats.archive",
+        "title": "Archive",
+        "category": "Benefit Chats",
+        "icon": "$(archive)"
+      },
+      {
+        "command": "benefit.chats.restore",
+        "title": "Restore from Archive",
+        "category": "Benefit Chats"
+      },
+      {
+        "command": "benefit.chats.delete",
+        "title": "Delete",
+        "category": "Benefit Chats",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "benefit.chats.search",
+        "title": "Search Conversations",
+        "category": "Benefit Chats",
+        "icon": "$(search)"
+      },
+      {
+        "command": "benefit.chats.export",
+        "title": "Export to Markdown",
+        "category": "Benefit Chats"
+      },
+      {
+        "command": "benefit.chats.view",
+        "title": "View Conversation",
+        "category": "Benefit Chats"
+      },
+      {
+        "command": "benefit.chats.toggleSort",
+        "title": "Toggle Sort Order",
+        "category": "Benefit Chats",
+        "icon": "$(sort-precedence)"
+      },
+      {
+        "command": "benefit.chats.toggleGroupBy",
+        "title": "Toggle Group By (Date / Project)",
+        "category": "Benefit Chats"
+      },
+      {
+        "command": "benefit.chats.toggleArchived",
+        "title": "Show/Hide Archived",
+        "category": "Benefit Chats",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "benefit.chats.toggleScope",
+        "title": "Toggle Scope (This Project / All Projects)",
+        "category": "Benefit Chats"
+      },
+      {
+        "command": "benefit.chats.statusBarRename",
+        "title": "Rename This Project's Latest Conversation",
+        "category": "Benefit Chats"
+      }
     ],
     "menus": {
       "editor/title": [
@@ -131,7 +269,11 @@
       "properties": {
         "benefit.appearance.theme": {
           "type": "string",
-          "enum": ["auto", "light", "dark"],
+          "enum": [
+            "auto",
+            "light",
+            "dark"
+          ],
           "default": "auto",
           "enumDescriptions": [
             "Follow the editor's theme.",
@@ -140,6 +282,11 @@
           ],
           "description": "Theme for the sidebar, the conversation viewer and the desktop popup. High contrast in the editor always wins."
         },
+        "benefit.appearance.brandFolded": {
+          "type": "boolean",
+          "default": false,
+          "description": "Fold the Benefits card at the foot of the sidebar to one line."
+        },
         "benefit.rtl.enabled": {
           "type": "boolean",
           "default": true,
@@ -147,7 +294,12 @@
         },
         "benefit.rtl.mode": {
           "type": "string",
-          "enum": ["off", "active", "always", "auto"],
+          "enum": [
+            "off",
+            "active",
+            "always",
+            "auto"
+          ],
           "default": "active",
           "enumDescriptions": [
             "RTL is off.",
@@ -292,6 +444,39 @@
           "default": false,
           "description": "Keep the popup up until you click it or close it. The seconds setting is not used then."
         },
+        "benefit.popup.position": {
+          "type": "string",
+          "enum": [
+            "topRight",
+            "bottomRight"
+          ],
+          "default": "topRight",
+          "enumDescriptions": [
+            "Top right of the screen.",
+            "Bottom right of the screen, where Windows shows its own notifications."
+          ],
+          "description": "The screen corner the popup shows in. More popups stack away from the corner."
+        },
+        "benefit.agents.cursor": {
+          "type": "boolean",
+          "default": true,
+          "description": "Cursor's own agent: a sound and popup when it finishes (a hook in ~/.cursor/hooks.json), and its conversations in the list, read-only. No effect when Cursor is not installed."
+        },
+        "benefit.agents.antigravity": {
+          "type": "boolean",
+          "default": true,
+          "description": "Antigravity's own agent: a sound and popup when it finishes (a hook in ~/.gemini/config/hooks.json), and its conversations in the list, read-only. No effect when Antigravity is not installed."
+        },
+        "benefit.agents.cursorOwnAlertsOff": {
+          "type": "boolean",
+          "default": false,
+          "description": "Benefits alert only: turn off Cursor's own chime when its agent finishes. Works from the toolkit inside Cursor. Cursor's system notification is a Cursor setting (General, Notifications). Off puts the chime back."
+        },
+        "benefit.agents.antigravityOwnAlertsOff": {
+          "type": "boolean",
+          "default": false,
+          "description": "Benefits alert only: turn off Antigravity's own notification and sound for its agent (in ~/.gemini/config/config.json). Off puts them back."
+        },
         "benefit.sounds.cleanupOnDeactivate": {
           "type": "boolean",
           "default": false,
@@ -304,7 +489,10 @@
         },
         "benefit.chats.scope": {
           "type": "string",
-          "enum": ["currentWorkspace", "all"],
+          "enum": [
+            "currentWorkspace",
+            "all"
+          ],
           "default": "currentWorkspace",
           "enumDescriptions": [
             "Show only conversations belonging to the folder open in this window.",
@@ -314,13 +502,20 @@
         },
         "benefit.chats.groupBy": {
           "type": "string",
-          "enum": ["date", "project", "flat"],
+          "enum": [
+            "date",
+            "project",
+            "flat"
+          ],
           "default": "date",
           "description": "How to group conversations in the sidebar."
         },
         "benefit.chats.sortOrder": {
           "type": "string",
-          "enum": ["newest", "oldest"],
+          "enum": [
+            "newest",
+            "oldest"
+          ],
           "default": "newest",
           "description": "Conversation sort order."
         },
@@ -333,6 +528,24 @@
           "type": "boolean",
           "default": true,
           "description": "Hide conversations that contain no real messages."
+        },
+        "benefit.chats.newChatButton": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a New chat button at the top of the sidebar."
+        },
+        "benefit.chats.newChatOpens": {
+          "type": "string",
+          "enum": [
+            "editor",
+            "claudeCode"
+          ],
+          "default": "editor",
+          "enumDescriptions": [
+            "The agent built into this editor: Claude Code in VS Code, Cursor Agent in Cursor, Antigravity Agent in Antigravity.",
+            "Claude Code, in any editor that has it installed."
+          ],
+          "description": "What the New chat button opens."
         },
         "benefit.chats.confirmDelete": {
           "type": "boolean",
@@ -384,6 +597,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
     "package": "vsce package",
+    "publish:ovsx": "ovsx publish",
     "test": "node --test --import tsx test/**/*.test.ts"
   },
   "dependencies": {
@@ -395,6 +609,7 @@
     "@types/vscode": "^1.95.0",
     "@vscode/vsce": "^3.2.0",
     "esbuild": "^0.24.0",
+    "ovsx": "^1.3.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0"
   }

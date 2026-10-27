@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { ChatsScope, readConfig } from "../../core/config-manager";
 import { logger } from "../../core/logger";
 import { toolkitProjectsDir } from "../../core/paths";
+import { AgentId, AGENT_NAMES } from "../../shared/agents";
 import { isWindows } from "../../shared/platform-detector";
 import { findProject } from "../alerts/services/project-registry";
 import { readProjectRecords } from "../alerts/services/project-records-reader";
@@ -17,6 +18,10 @@ import { ChatViewerService } from "./ui/chat-viewer-webview";
 /** One row of the sidebar list. `id` is the conversation file: the identity every action uses. */
 export interface ChatRow {
   id: string;
+  /** Whose conversation: the row carries that agent's mark. */
+  agent: AgentId;
+  /** Another agent's conversation: open and save only, never rename, archive or delete. */
+  readOnly: boolean;
   title: string;
   project: string;
   /** The project's window color, when a window has recorded one. */
@@ -99,9 +104,16 @@ export class ChatsController implements vscode.Disposable {
   }
 
   private async build(): Promise<ChatListSnapshot> {
-    const cfg = readConfig().chats;
+    const config = readConfig();
+    const cfg = config.chats;
     const folders = workspaceFolders();
-    const all = await this.repo.scan({ hideEmpty: cfg.hideEmpty, includeArchived: cfg.showArchived });
+    const records = await readProjectRecords(toolkitProjectsDir());
+    const all = await this.repo.scan({
+      hideEmpty: cfg.hideEmpty,
+      includeArchived: cfg.showArchived,
+      agents: config.agents,
+      folders: [...folders, ...records.map((r) => r.folder)],
+    });
     this.known = new Map(all.map((m) => [m.filePath, m]));
     if (cfg.scope === "currentWorkspace" && folders.length === 0) {
       return { status: "noFolder", scope: cfg.scope, groups: [], total: 0 };
@@ -114,6 +126,8 @@ export class ChatsController implements vscode.Disposable {
       label: g.label,
       rows: g.items.map((m) => ({
         id: m.filePath,
+        agent: m.source,
+        readOnly: m.source !== "claude",
         title: m.title,
         project: m.projectDisplayName,
         color: colorOf(m),
@@ -136,7 +150,7 @@ export class ChatsController implements vscode.Disposable {
     };
   }
 
-  /** The conversation running in this window's project: the most recent one there, whatever the list's scope. */
+  /** The Claude Code conversation running in this window's project: the most recent one there, whatever the list's scope. */
   async liveConversation(): Promise<ConversationMeta | undefined> {
     const cfg = readConfig().chats;
     const all = await this.repo.scan({ hideEmpty: cfg.hideEmpty, includeArchived: false });
@@ -147,7 +161,12 @@ export class ChatsController implements vscode.Disposable {
   async pickConversation(placeHolder: string): Promise<ConversationMeta | undefined> {
     const snap = await this.list();
     const items = snap.groups.flatMap((g) =>
-      g.rows.map((r) => ({ label: r.title, description: r.project, detail: r.context === null ? undefined : `Context ${Math.round(r.context)}%`, id: r.id })),
+      g.rows.map((r) => ({
+        label: r.title,
+        description: r.agent === "claude" ? r.project : `${r.project} · ${AGENT_NAMES[r.agent]}`,
+        detail: r.context === null ? undefined : `Context ${Math.round(r.context)}%`,
+        id: r.id,
+      })),
     );
     if (items.length === 0) {
       vscode.window.showInformationMessage("Benefit: no conversations in this list.");
@@ -161,7 +180,15 @@ export class ChatsController implements vscode.Disposable {
     await this.viewer.open(meta);
   }
 
+  /** Cursor's and Antigravity's files belong to them: the toolkit only reads them. */
+  private refuseReadOnly(meta: ConversationMeta, verb: string): boolean {
+    if (meta.source === "claude") return false;
+    vscode.window.showInformationMessage(`Benefit: ${AGENT_NAMES[meta.source]} conversations are read-only. ${verb} works on Claude Code conversations.`);
+    return true;
+  }
+
   async rename(meta: ConversationMeta): Promise<void> {
+    if (this.refuseReadOnly(meta, "Rename")) return;
     const next = await vscode.window.showInputBox({
       title: "Rename conversation",
       value: meta.title,
@@ -181,10 +208,12 @@ export class ChatsController implements vscode.Disposable {
   }
 
   async archive(meta: ConversationMeta): Promise<void> {
+    if (this.refuseReadOnly(meta, "Archive")) return;
     await this.move(meta, () => this.archiver.archive(meta), "Archive");
   }
 
   async restore(meta: ConversationMeta): Promise<void> {
+    if (this.refuseReadOnly(meta, "Restore")) return;
     await this.move(meta, () => this.archiver.restore(meta), "Restore");
   }
 
@@ -200,6 +229,7 @@ export class ChatsController implements vscode.Disposable {
   }
 
   async delete(meta: ConversationMeta): Promise<void> {
+    if (this.refuseReadOnly(meta, "Delete")) return;
     if (readConfig().chats.confirmDelete) {
       const choice = await vscode.window.showWarningMessage(
         `Delete "${meta.title}"?`,

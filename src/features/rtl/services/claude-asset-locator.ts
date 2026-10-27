@@ -1,6 +1,5 @@
 import * as path from "node:path";
 import * as fs from "node:fs/promises";
-import { vscodeExtensionsDir } from "../../../core/paths";
 import { pathExists } from "../../../shared/fs-utils";
 
 export interface ClaudeAssets {
@@ -28,8 +27,23 @@ export function newestFirst(folderNames: readonly string[]): string[] {
   return [...folderNames].sort((a, b) => compare(version(b), version(a)) || b.localeCompare(a));
 }
 
+/**
+ * The extensions folders to look in, best first, with no repeats: the one the
+ * running Claude Code sits in, then this editor's own (where the toolkit
+ * sits), then VS Code's. Cursor and Antigravity keep their extensions apart
+ * from VS Code's (~/.cursor/extensions, ...), each with its own Claude Code.
+ */
+export function extensionDirs(claudeCodePath: string | undefined, ownPath: string, vscodeDir: string): string[] {
+  const dirs = [claudeCodePath && path.dirname(claudeCodePath), path.dirname(ownPath), vscodeDir];
+  return [...new Set(dirs.filter((d): d is string => !!d))];
+}
+
 export class ClaudeAssetLocator {
-  constructor(private readonly overridePath: string = "") {}
+  constructor(
+    private readonly overridePath: string,
+    /** Where to look, best first (extensionDirs). */
+    private readonly searchDirs: readonly string[],
+  ) {}
 
   async locate(): Promise<ClaudeAssets | undefined> {
     const candidate = this.overridePath.trim().length > 0
@@ -39,20 +53,19 @@ export class ClaudeAssetLocator {
   }
 
   private async findInstalledClaude(): Promise<ClaudeAssets | undefined> {
-    const extDir = vscodeExtensionsDir();
-    if (!(await pathExists(extDir))) return undefined;
-
-    const entries = await fs.readdir(extDir, { withFileTypes: true });
-    const candidates = newestFirst(
-      entries
-        .filter((e) => e.isDirectory())
-        .map((e) => e.name)
-        .filter((name) => name.startsWith("anthropic.claude-code")),
-    );
-
-    for (const name of candidates) {
-      const result = await this.tryDir(path.join(extDir, name));
-      if (result) return result;
+    for (const extDir of this.searchDirs) {
+      if (!(await pathExists(extDir))) continue;
+      const entries = await fs.readdir(extDir, { withFileTypes: true });
+      const candidates = newestFirst(
+        entries
+          .filter((e) => e.isDirectory())
+          .map((e) => e.name)
+          .filter((name) => name.startsWith("anthropic.claude-code")),
+      );
+      for (const name of candidates) {
+        const result = await this.tryDir(path.join(extDir, name));
+        if (result) return result;
+      }
     }
     return undefined;
   }

@@ -1,7 +1,7 @@
 import type { IconName } from "../../shared/icons";
 import { THEME_PREFERENCES } from "../../shared/theme-resolve";
 
-export type PageId = "appearance" | "windowColor" | "sounds" | "popup" | "chats" | "rtl" | "htmlOpen" | "diagnostics";
+export type PageId = "appearance" | "windowColor" | "sounds" | "popup" | "chats" | "agents" | "rtl" | "htmlOpen" | "diagnostics";
 
 /** One row of the Settings home list, and the page it opens. */
 export interface SettingsPage {
@@ -18,9 +18,10 @@ export interface SettingsPage {
 export const SETTINGS_PAGES: readonly SettingsPage[] = [
   { id: "appearance", title: "Appearance", summary: "Auto, light or dark", icon: "contrast" },
   { id: "windowColor", title: "Window colors", summary: "One color per project window", icon: "palette", switchKey: "windowColor.enabled", switchLabel: "Enable window colors" },
-  { id: "sounds", title: "Sounds", summary: "When Claude finishes or waits", icon: "volume", switchKey: "sounds.enabled", switchLabel: "Enable sounds" },
+  { id: "sounds", title: "Sounds", summary: "When an agent finishes or waits", icon: "volume", switchKey: "sounds.enabled", switchLabel: "Enable sounds" },
   { id: "popup", title: "Desktop popup", summary: "Desktop alert with project name", icon: "bell", switchKey: "popup.enabled", switchLabel: "Enable desktop popup" },
   { id: "chats", title: "Conversations", summary: "Chat list and viewer", icon: "messages", switchKey: "chats.enabled", switchLabel: "Enable conversations" },
+  { id: "agents", title: "Cursor and Antigravity", summary: "Their own agents: alerts and chats", icon: "robot" },
   { id: "rtl", title: "RTL in Claude Code", summary: "Right-to-left in the Claude chat", icon: "letterBet", switchKey: "rtl.enabled", switchLabel: "Enable RTL" },
   { id: "htmlOpen", title: "Open in browser", summary: "HTML files, and Markdown in md-he", icon: "browser", switchKey: "htmlOpen.enabled", switchLabel: "Enable Open in browser" },
   { id: "diagnostics", title: "Troubleshooting", summary: "Hooks and connection", icon: "plug" },
@@ -43,6 +44,7 @@ const PATH: SettingSpec = { kind: "string", max: 500 };
  */
 export const WRITABLE_SETTINGS: Readonly<Record<string, SettingSpec>> = {
   "appearance.theme": { kind: "enum", values: THEME_PREFERENCES },
+  "appearance.brandFolded": BOOL,
   "windowColor.enabled": BOOL,
   "windowColor.autoAssign": BOOL,
   "sounds.enabled": BOOL,
@@ -53,6 +55,7 @@ export const WRITABLE_SETTINGS: Readonly<Record<string, SettingSpec>> = {
   "popup.onWaiting": BOOL,
   "popup.seconds": { kind: "number", min: 3, max: 60 },
   "popup.stayUntilClicked": BOOL,
+  "popup.position": { kind: "enum", values: ["topRight", "bottomRight"] },
   "chats.enabled": BOOL,
   "chats.scope": { kind: "enum", values: ["currentWorkspace", "all"] },
   "chats.groupBy": { kind: "enum", values: ["date", "project", "flat"] },
@@ -63,6 +66,12 @@ export const WRITABLE_SETTINGS: Readonly<Record<string, SettingSpec>> = {
   "chats.showStatusBarRename": BOOL,
   "chats.codeCopyButtons": BOOL,
   "chats.mdHeButton": BOOL,
+  "chats.newChatButton": BOOL,
+  "chats.newChatOpens": { kind: "enum", values: ["editor", "claudeCode"] },
+  "agents.cursor": BOOL,
+  "agents.antigravity": BOOL,
+  "agents.cursorOwnAlertsOff": BOOL,
+  "agents.antigravityOwnAlertsOff": BOOL,
   "rtl.enabled": BOOL,
   "rtl.mode": { kind: "enum", values: ["active", "always", "auto"] },
   "rtl.textFont": { kind: "string", max: 200 },

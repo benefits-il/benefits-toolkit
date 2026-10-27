@@ -36,6 +36,9 @@ const SCRIPTS: Record<HookPlatform, { dir: string; files: string[] }> = {
 
 const VERSION_FILE = "VERSION";
 
+/** The agents' marks the popups draw (PNG: neither popup renders SVG), in bin/marks. */
+const MARKS_DIR = "marks";
+
 /**
  * Stand-ins for the pre-0.7 install (~/.claude/sounds/benefit): a play.ps1
  * that does nothing and silent slot sounds. Only written while an older
@@ -97,6 +100,10 @@ export class AlertAssets {
 
   private bundledScriptsDir(platform: HookPlatform): string {
     return path.join(this.ctx.extensionPath, "dist", "assets", "alerts", SCRIPTS[platform].dir);
+  }
+
+  private bundledMarksDir(): string {
+    return path.join(this.ctx.extensionPath, "dist", "assets", "alerts", MARKS_DIR);
   }
 
   /** Absolute path to a bundled pool sound by its id (filename). */
@@ -196,6 +203,13 @@ export class AlertAssets {
     if (installed && compareVersions(installed, own) > 0 && present.every(Boolean)) return;
     for (const f of files) {
       await fs.copyFile(path.join(this.bundledScriptsDir(platform), f), path.join(bin, f));
+    }
+    // Linux has no popup, so no marks.
+    if (platform !== "linux") {
+      await ensureDir(path.join(bin, MARKS_DIR));
+      for (const f of await fs.readdir(this.bundledMarksDir())) {
+        await fs.copyFile(path.join(this.bundledMarksDir(), f), path.join(bin, MARKS_DIR, f));
+      }
     }
     await atomicWriteText(path.join(bin, VERSION_FILE), own + "\n");
   }

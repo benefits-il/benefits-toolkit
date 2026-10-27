@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { BENEFITS_LOGO_SVG, BENEFITS_SLOGAN, BENEFITS_TAGLINE, BENEFITS_TAGLINE_HTML } from "../../src/shared/brand-bar";
+import { BENEFITS_LOGO_SVG, BENEFITS_SLOGAN, BENEFITS_SLOGAN_HTML, BENEFITS_TAGLINE, BENEFITS_TAGLINE_HTML } from "../../src/shared/brand-bar";
 
 test("the logo is the embedded Benefits SVG, not the build placeholder", () => {
   assert.ok(BENEFITS_LOGO_SVG.startsWith("<svg"));
@@ -15,6 +15,11 @@ test("the slogan and the tagline are verbatim and in English, joined by middle d
     assert.ok(!/[—–]/.test(s));
     assert.ok(!/[\u0590-\u05FF]/.test(s), "no Hebrew in the banner");
   }
+});
+
+test("the slogan markup keeps the text and marks the part the folded card hides", () => {
+  assert.equal(BENEFITS_SLOGAN_HTML.replace(/<[^>]+>/g, ""), BENEFITS_SLOGAN);
+  assert.ok(BENEFITS_SLOGAN_HTML.startsWith("AI that finally fits<span class=\"by\">"));
 });
 
 test("the tagline markup makes the middle dot bold", () => {

@@ -1,10 +1,13 @@
 # Benefit's Toolkit popup (Windows, WPF). Started detached by dispatch.ps1
 # (or by the extension's "Test popup") with the path of a JSON job file:
-#   { title, subtitle, kind, color, text, theme, cli, folder, seconds, stay }
-# A small card in the toolkit's theme, bottom-right, stacked under any popups
-# already showing: a tile in the project's color with a check (finished) or a
-# bell (needs input), the project name, and the status, framed in the
-# project's color. It never takes focus by itself; clicking it runs
+#   { agent, title, subtitle, kind, color, text, theme, cli, folder, seconds, stay, position }
+# A small card in the toolkit's theme, top-right (or bottom-right with
+# position "bottomRight", where Windows shows its own notifications), stacked
+# away from the corner past any popups already showing: a tile with the mark of the agent that finished (Claude,
+# Cursor or Antigravity, from marks/<agent>.png), the project name, and the
+# status, framed in the project's color. A job without a mark gets the older
+# tile: the project's color with a check (finished) or a bell (needs input).
+# It never takes focus by itself; clicking it runs
 # "<cli> <folder>", which brings that project's editor window to the front.
 # The x just closes it. With "stay" it waits for one of the two.
 #   -RenderTo <png>: draw the card into an image and exit, without showing it
@@ -57,10 +60,10 @@ try {
     # or high contrast). Same tokens as the sidebar. The frame takes the
     # project's color, except in high contrast.
     $themes = @{
-        "dark"     = @{ bg = "#1F2120"; line = "#363A38"; text = "#F6F4EA"; muted = "#A9B3AE"; done = "#8FD3B3"; waiting = "#FCD34D"; shadow = 0.45 }
-        "light"    = @{ bg = "#FFFDF6"; line = "#E6D9AE"; text = "#14231C"; muted = "#55635C"; done = "#047857"; waiting = "#92400E"; shadow = 0.18 }
-        "hc-dark"  = @{ bg = "#000000"; line = "#FFFFFF"; text = "#FFFFFF"; muted = "#FFFFFF"; done = "#FFFFFF"; waiting = "#FFFFFF"; shadow = 0 }
-        "hc-light" = @{ bg = "#FFFFFF"; line = "#000000"; text = "#000000"; muted = "#000000"; done = "#000000"; waiting = "#000000"; shadow = 0 }
+        "dark"     = @{ bg = "#1F2120"; tile = "#2C302E"; line = "#363A38"; text = "#F6F4EA"; muted = "#A9B3AE"; done = "#8FD3B3"; waiting = "#FCD34D"; shadow = 0.45 }
+        "light"    = @{ bg = "#FFFDF6"; tile = "#F1ECDD"; line = "#E6D9AE"; text = "#14231C"; muted = "#55635C"; done = "#047857"; waiting = "#92400E"; shadow = 0.18 }
+        "hc-dark"  = @{ bg = "#000000"; tile = "#000000"; line = "#FFFFFF"; text = "#FFFFFF"; muted = "#FFFFFF"; done = "#FFFFFF"; waiting = "#FFFFFF"; shadow = 0 }
+        "hc-light" = @{ bg = "#FFFFFF"; tile = "#FFFFFF"; line = "#000000"; text = "#000000"; muted = "#000000"; done = "#000000"; waiting = "#000000"; shadow = 0 }
     }
     $theme = $themes[[string]$job.theme]
     if (-not $theme) { $theme = $themes["dark"] }
@@ -102,11 +105,14 @@ try {
         <ColumnDefinition Width="Auto"/>
       </Grid.ColumnDefinitions>
       <Border x:Name="Tile" Grid.Column="0" Width="34" Height="34" CornerRadius="8" VerticalAlignment="Center">
-        <Viewbox Width="18" Height="18">
-          <Canvas Width="24" Height="24">
-            <Path x:Name="Glyph" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
-          </Canvas>
-        </Viewbox>
+        <Grid>
+          <Image x:Name="TileMark" Width="20" Height="20" RenderOptions.BitmapScalingMode="HighQuality" Visibility="Collapsed"/>
+          <Viewbox x:Name="GlyphBox" Width="18" Height="18">
+            <Canvas Width="24" Height="24">
+              <Path x:Name="Glyph" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+            </Canvas>
+          </Viewbox>
+        </Grid>
       </Border>
       <StackPanel x:Name="Texts" Grid.Column="1" Margin="10,0,6,0" VerticalAlignment="Center">
         <TextBlock x:Name="TitleText" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
@@ -145,6 +151,27 @@ try {
     $tile.Background = & $brush $hex
     $glyph.Stroke = & $brush $tileText
     $glyph.Data = [System.Windows.Media.Geometry]::Parse($(if ($waiting) { $bellPath } else { $checkPath }))
+    # The agent's mark fills the tile, on a quiet surface, so who finished
+    # shows at a glance; the project's color stays in the frame. Cursor's
+    # one-color cube comes in the card's text color.
+    $agent = [string]$job.agent
+    if ($agent -match '^[a-z]+$') {
+        $markName = if ($agent -eq "cursor") { if ([string]$job.theme -match "light") { "cursor-light.png" } else { "cursor-dark.png" } } else { "$agent.png" }
+        $markFile = Join-Path (Join-Path $PSScriptRoot "marks") $markName
+        if (Test-Path -LiteralPath $markFile) {
+            $mark = New-Object System.Windows.Media.Imaging.BitmapImage
+            $mark.BeginInit()
+            $mark.UriSource = New-Object System.Uri($markFile)
+            $mark.CacheOption = [System.Windows.Media.Imaging.BitmapCacheOption]::OnLoad
+            $mark.EndInit()
+            $tileMark = $window.FindName("TileMark")
+            $tileMark.Source = $mark
+            $tileMark.Visibility = "Visible"
+            $window.FindName("GlyphBox").Visibility = "Collapsed"
+            $tile.Background = & $brush $theme.tile
+            if ($highContrast) { $tile.BorderBrush = & $brush $theme.line; $tile.BorderThickness = 1 }
+        }
+    }
     $titleText.Foreground = & $brush $theme.text
     $subtitleText.Foreground = & $brush $(if ($waiting) { $theme.waiting } else { $theme.done })
     $window.FindName("CloseGlyph").Stroke = & $brush $theme.muted
@@ -175,7 +202,11 @@ try {
 
     $workArea = [System.Windows.SystemParameters]::WorkArea
     $window.Left = $workArea.Right - $width - 6
-    $window.Top = $workArea.Bottom - ($height * ($slot + 1)) - 6
+    if ($job.position -eq "bottomRight") {
+        $window.Top = $workArea.Bottom - ($height * ($slot + 1)) - 6
+    } else {
+        $window.Top = $workArea.Top + ($height * $slot) + 6
+    }
 
     # Gentle entrance: fades in while sliding a few pixels in from the right,
     # and fades out the same way. With Windows animations turned off

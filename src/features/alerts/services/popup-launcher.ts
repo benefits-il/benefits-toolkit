@@ -1,8 +1,10 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import * as path from "node:path";
+import type { PopupPosition } from "../../../core/config-manager";
 import { toolkitBinDir, toolkitHome } from "../../../core/paths";
 import { atomicWriteText } from "../../../shared/fs-utils";
+import type { AgentId } from "../../../shared/agents";
 import type { ResolvedTheme } from "../../../shared/theme-resolve";
 import type { HookPlatform } from "./hook-command";
 
@@ -11,6 +13,8 @@ export const DEFAULT_POPUP_COLOR = "#047857";
 
 /** What popup.ps1 / popup.js show; same shape the dispatchers write. */
 export interface PopupJob {
+  /** Whose mark the popup carries. */
+  agent: AgentId;
   title: string;
   subtitle: string;
   /** finished (check icon) or waiting (bell icon). */
@@ -26,6 +30,7 @@ export interface PopupJob {
   seconds: number;
   /** Up until clicked or closed; `seconds` is not used then. */
   stay: boolean;
+  position: PopupPosition;
 }
 
 /**

@@ -9,17 +9,16 @@ export const VIEWER_CSS = `
   body { overflow: hidden; }
   .viewer {
     display: flex; flex-direction: column; height: 100vh; background: var(--page);
-    /* The bubbles: yours gray, Claude's in the project's color. */
-    --me-bg: hsl(150 2% 23%); --me-text: var(--text);
-    --claude-bg: color-mix(in srgb, var(--proj) 24%, hsl(150 3% 13%));
-    --claude-line: color-mix(in srgb, var(--proj) 45%, transparent);
+    /* Every message is a card the width of the column with a stripe at its
+       start: the project's color for the agent, gray for you. The text is
+       the system font in a soft gray, as in the viewer before 0.8. */
+    --card: hsl(150 3% 14.5%); --card-line: hsl(150 3% 22%); --you-mark: #7C847F;
+    --read-font: 'Segoe UI', 'Segoe WPC', system-ui, -apple-system, sans-serif;
+    --read-text: #D1D2CA;
+    --agent-name: color-mix(in srgb, var(--proj) 85%, var(--text));
   }
-  :root[data-theme="light"] .viewer {
-    --me-bg: #ECEAE2;
-    --claude-bg: color-mix(in srgb, var(--proj) 13%, #FFFFFF);
-    --claude-line: color-mix(in srgb, var(--proj) 35%, transparent);
-  }
-  :root[data-theme^="hc"] .viewer { --me-bg: transparent; --claude-bg: transparent; --claude-line: var(--line); }
+  :root[data-theme="light"] .viewer { --card: #FAF7EF; --card-line: #E4E0D4; --you-mark: #9AA39E; --read-text: #36433C; }
+  :root[data-theme^="hc"] .viewer { --card: transparent; --card-line: var(--line); --you-mark: var(--line); --read-text: var(--text); --agent-name: var(--text); }
 
   .vhead { flex: none; padding: 20px 28px 14px; border-bottom: 1px solid var(--line); background: var(--panel); }
   .eyebrow { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; }
@@ -51,39 +50,52 @@ export const VIEWER_CSS = `
   .context .est { color: var(--warning); }
   .hidden-matches { margin-top: 10px; font-size: 12px; color: var(--muted); }
 
-  /* ---- The conversation: a reading column, newest exchange on top. */
+  /* ---- The conversation: a reading column, oldest exchange at the top, newest at the bottom. */
   .messages { flex: 1; min-height: 0; overflow: auto; padding: 0 24px; scrollbar-width: thin; }
   .column {
-    max-width: 920px; min-height: 100%; margin: 0 auto; padding: 8px 40px 56px;
+    max-width: 900px; min-height: 100%; margin: 0 auto; padding: 8px 40px 56px;
     background: var(--reading-bg); border-inline: 1px solid var(--line);
   }
-  .turn { display: flex; flex-direction: column; gap: 10px; padding: 22px 0 24px; content-visibility: auto; contain-intrinsic-size: auto 360px; }
-  .turn + .turn { border-top: 1px solid var(--line); }
+  .turn { display: flex; flex-direction: column; gap: 10px; padding: 14px 0; content-visibility: auto; contain-intrinsic-size: auto 240px; }
 
-  /* A message: the speaker's avatar beside a bubble whose sharp corner points at it. */
-  .msg { display: flex; align-items: flex-start; gap: 10px; min-width: 0; max-width: 90%; }
-  .msg.you { align-self: flex-end; flex-direction: row-reverse; max-width: 78%; }
-  .msg.claude { align-self: flex-start; }
-  .avatar {
-    width: 32px; height: 32px; flex: none; margin-top: 23px; display: grid; place-items: center; border-radius: 50%;
-    background: var(--surface); border: 1px solid var(--line); color: var(--text);
-  }
-  .avatar .ico { width: 16px; height: 16px; }
-  .msg.claude .avatar { color: #D97757; }
-  :root[data-theme^="hc"] .msg .avatar { color: var(--text); }
-  .speech { min-width: 0; display: flex; flex-direction: column; }
-  .msg.you .speech { align-items: flex-end; }
-  .msg-head { display: flex; align-items: center; gap: 8px; min-height: 18px; margin-bottom: 5px; max-width: 100%; }
-  .msg.you .msg-head, .msg.you .msg-toggle { flex-direction: row-reverse; }
+  /* A message: a header (the speaker's icon, name and time) over its card. */
+  .msg { min-width: 0; }
+  .msg-head { display: flex; align-items: center; gap: 8px; min-height: 24px; margin-bottom: 6px; cursor: pointer; }
   .msg-toggle {
-    min-width: 0; display: flex; align-items: center; gap: 8px; padding: 0; border: 0;
+    flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 0; border: 0;
     background: transparent; color: inherit; cursor: pointer; text-align: start; font-size: 12px;
   }
+  /* The icons: the agent's mark on a wash of its own color, you on a wash of the window's color. */
+  .avatar {
+    width: 22px; height: 22px; flex: none; display: inline-grid; place-items: center; border-radius: 50%;
+    border: 1px solid transparent; color: var(--text);
+  }
+  .avatar .ico, .avatar .mark { width: 12px; height: 12px; }
+  .msg.you .avatar { background: color-mix(in srgb, var(--proj) 24%, transparent); border-color: color-mix(in srgb, var(--proj) 45%, transparent); }
+  .avatar-claude { background: rgba(217, 119, 87, 0.2); border-color: rgba(217, 119, 87, 0.42); }
+  .avatar-cursor { background: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.26); }
+  :root[data-theme="light"] .avatar-cursor { background: rgba(20, 35, 28, 0.08); border-color: rgba(20, 35, 28, 0.2); }
+  .avatar-antigravity { background: rgba(49, 134, 255, 0.2); border-color: rgba(49, 134, 255, 0.42); }
+  :root[data-theme^="hc"] .msg .avatar { background: transparent; border-color: var(--line); }
+  .meta .agent { display: inline-flex; align-items: center; gap: 6px; }
+  .meta .agent .mark { width: 14px; height: 14px; }
   .who { font: 600 12.5px var(--head); }
+  .msg.claude .who { color: var(--agent-name); }
+  .msg.you .who { color: var(--muted); }
   .msg-head time { color: var(--muted); font-size: 11.5px; white-space: nowrap; }
-  .preview { display: none; min-width: 0; max-width: 48ch; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .msg.collapsed .preview { display: block; }
-  .msg.collapsed .msg-body { display: none; }
+  .preview { display: none; }
+  .chev { display: grid; place-items: center; flex: none; width: 22px; height: 22px; color: var(--muted); }
+  .chev .ico { width: 15px; height: 15px; transition: transform 0.15s; }
+  .msg:not(.collapsed) .chev .ico { transform: rotate(180deg); }
+  .msg-head:hover .chev { color: var(--text); }
+  /* Closed: the card shows its first lines and fades; a click opens the rest.
+     The work before a closed answer stays out of the way until it opens. */
+  .msg.collapsed .msg-body { position: relative; max-height: calc(13px * 1.75 * 3 + 32px); overflow: hidden; cursor: pointer; }
+  .msg.collapsed .msg-body::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 60%; pointer-events: none;
+    background: linear-gradient(transparent, var(--card));
+  }
+  .turn:has(.msg.claude.collapsed) details.work { display: none; }
   .actions { display: flex; gap: 6px; flex: none; opacity: 0; transition: opacity 0.15s; }
   .msg:hover .actions, .msg:focus-within .actions { opacity: 1; }
   .mini {
@@ -96,10 +108,12 @@ export const VIEWER_CSS = `
   .mini.copied { color: var(--accent); border-color: var(--accent); }
   body.no-mdhe .mdhe { display: none; }
 
-  .msg-body { max-width: 100%; padding: 12px 16px; font: 14px/1.7 var(--body); overflow-wrap: anywhere; }
-  .msg.you .msg-body { background: var(--me-bg); color: var(--me-text); border-radius: 16px 4px 16px 16px; }
-  .msg.claude .msg-body { padding: 14px 18px; background: var(--claude-bg); border: 1px solid var(--claude-line); border-radius: 4px 16px 16px 16px; }
-  :root[data-theme^="hc"] .msg.you .msg-body { border: 1px solid var(--line); }
+  .msg-body {
+    max-width: 100%; padding: 16px 20px; font: 13px/1.75 var(--read-font); color: var(--read-text); overflow-wrap: anywhere;
+    background: var(--card); border: 1px solid var(--card-line); border-radius: 8px;
+  }
+  .msg.claude .msg-body { border-inline-start: 4px solid var(--proj); }
+  .msg.you .msg-body { border-inline-start: 4px solid var(--you-mark); }
 
   .block + .block { margin-top: 12px; }
   .block.text > :first-child { margin-top: 0; }
@@ -143,9 +157,10 @@ export const VIEWER_CSS = `
   }
   details.block .tool-text { font-family: var(--mono); font-size: 12px; direction: ltr; text-align: left; }
   .msg.you details.attach .tool-text { background: var(--reading-bg); }
+  .msg-body details.block .thinking-text, .msg-body details.block .tool-text { background: var(--reading-bg); }
 
   /* Claude's work between your message and its answer: one quiet line, open on click. */
-  details.work { align-self: flex-start; max-width: 90%; margin-inline-start: 42px; color: var(--muted); }
+  details.work { align-self: flex-start; max-width: 100%; color: var(--muted); }
   details.work > summary, details.step > summary {
     list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; max-width: 100%;
   }
@@ -179,7 +194,7 @@ export const VIEWER_CSS = `
   }
   .vfoot a { display: inline-flex; align-items: center; gap: 5px; color: var(--accent); }
   .vfoot a .ico { width: 12px; height: 12px; }
-  .to-oldest { position: fixed; inset-inline-end: 22px; bottom: 46px; box-shadow: var(--pop-shadow); }
+  .to-latest { position: fixed; inset-inline-end: 22px; bottom: 46px; box-shadow: var(--pop-shadow); }
 
   @media (max-width: 620px) {
     .vhead { padding: 16px 16px 12px; }
@@ -188,9 +203,7 @@ export const VIEWER_CSS = `
     .heading-row h1 { font-size: 19px; }
     .find { flex-basis: 100%; }
     .meta { gap: 2px 10px; }
-    .msg, .msg.you { max-width: 100%; }
-    .avatar { width: 26px; height: 26px; }
-    details.work { margin-inline-start: 36px; }
+    .msg-body { padding: 12px 14px; }
   }
 `;
 
@@ -217,8 +230,8 @@ export const VIEWER_SCRIPT = `
   function applyPrefs() {
     document.body.classList.toggle('hide-work', !!prefs.hideWork);
     document.body.classList.toggle('hide-thinking', !!prefs.hideThinking);
-    // Auto: every paragraph follows its own language. LTR or RTL forces one direction on all of them.
-    $$('.block.text, .block.text [dir], .preview').forEach((el) => { el.dir = prefs.direction; });
+    // One direction for the whole conversation: B left to right, ב right to left.
+    $$('.column, .preview').forEach((el) => { el.dir = prefs.direction; });
     $$('[data-dir]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.dir === prefs.direction)));
     $$('[data-pref]').forEach((s) => { s.checked = !!prefs[s.dataset.pref]; });
     const on = ['hideWork', 'hideThinking'].filter((k) => prefs[k]).length;
@@ -286,12 +299,22 @@ export const VIEWER_SCRIPT = `
     $('collapse').querySelector('span').textContent = anyOpen ? 'Collapse all' : 'Expand all';
   }
   $('messages').addEventListener('click', (e) => {
-    const toggle = e.target.closest('.msg-toggle');
-    if (!toggle) return;
-    const article = toggle.closest('.msg');
+    const head = e.target.closest('.msg-head');
+    if (!head || e.target.closest('.actions')) return;
+    const article = head.closest('.msg');
     setCollapsed(article, !article.classList.contains('collapsed'));
     syncCollapseAll();
   });
+  // A closed card shows its first lines; a click anywhere on it opens it,
+  // even on a link in the faded part.
+  $('messages').addEventListener('click', (e) => {
+    const body = e.target.closest('.msg.collapsed .msg-body');
+    if (!body) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setCollapsed(body.closest('.msg'), false);
+    syncCollapseAll();
+  }, true);
   $('collapse').onclick = () => {
     const anyOpen = $$('.msg').some((m) => !m.classList.contains('collapsed'));
     $$('.msg').forEach((m) => setCollapsed(m, anyOpen));
@@ -346,6 +369,11 @@ export const VIEWER_SCRIPT = `
       $$('.msg-body, .work').forEach((root) => { hidden += highlight(root, q); });
       // A match opens what holds it: a folded message, the work, a step, a tool call.
       $$('.msg').forEach((m) => { if (m.querySelector('.msg-body mark.hit')) setCollapsed(m, false); });
+      // The work shows only beside an open answer, so a match in it opens the answer too.
+      $$('.turn').forEach((t) => {
+        const answer = t.querySelector('.msg.claude');
+        if (answer && t.querySelector('details.work mark.hit')) setCollapsed(answer, false);
+      });
       $$('details').forEach((d) => { if (d.querySelector('mark.hit')) d.open = true; });
       syncCollapseAll();
     }
@@ -437,7 +465,7 @@ export const VIEWER_SCRIPT = `
   // ---- Save visible messages: what passes the filters, oldest first.
   function buildMarkdown() {
     const lines = ['# ' + INITIAL.title, ''];
-    $$('.turn').reverse().forEach((turn) => {
+    $$('.turn').forEach((turn) => {
       $$('.unit', turn).forEach((unit) => {
         if (hiddenByPrefs(unit)) return;
         const parts = blockTexts(unit, false);
@@ -453,14 +481,27 @@ export const VIEWER_SCRIPT = `
     return lines.join('\\n');
   }
 
-  // ---- Back to the oldest message (the page shows the newest first).
+  // ---- The newest message is at the bottom: the page opens there, and a
+  // button brings you back after scrolling up.
   const list = $('messages');
-  function syncOldest() {
-    $('to-oldest').hidden = list.scrollHeight - list.scrollTop - list.clientHeight < 120;
+  function syncLatest() {
+    $('to-latest').hidden = list.scrollHeight - list.scrollTop - list.clientHeight < 120;
   }
-  $('to-oldest').onclick = () => list.scrollTo({ top: list.scrollHeight, behavior: 'smooth' });
-  list.addEventListener('scroll', syncOldest, { passive: true });
-  window.addEventListener('resize', syncOldest);
+  $('to-latest').onclick = () => list.scrollTo({ top: list.scrollHeight, behavior: 'smooth' });
+  list.addEventListener('scroll', syncLatest, { passive: true });
+  window.addEventListener('resize', syncLatest);
+  // Turns off screen are laid out lazily (content-visibility) and fonts load
+  // late, so the page keeps growing after it opens: it stays pinned to the
+  // bottom until the first scroll, click or key.
+  function openAtLatest() {
+    let pinned = true;
+    const unpin = () => { pinned = false; };
+    ['wheel', 'touchstart', 'pointerdown'].forEach((type) => list.addEventListener(type, unpin, { passive: true, once: true }));
+    window.addEventListener('keydown', unpin, { once: true });
+    const pin = () => { if (pinned) list.scrollTop = list.scrollHeight; };
+    new ResizeObserver(pin).observe(list.firstElementChild);
+    pin();
+  }
 
   window.addEventListener('message', (e) => {
     const m = e.data || {};
@@ -474,5 +515,6 @@ export const VIEWER_SCRIPT = `
 
   applyPrefs();
   syncCollapseAll();
-  syncOldest();
+  openAtLatest();
+  syncLatest();
 `;

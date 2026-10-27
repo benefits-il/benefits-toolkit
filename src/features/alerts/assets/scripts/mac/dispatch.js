@@ -43,6 +43,11 @@ function toolkitRoot() {
   return $.NSHomeDirectory().js + '/.benefits-toolkit';
 }
 
+function envVar(name) {
+  const v = $.NSProcessInfo.processInfo.environment.objectForKey(name);
+  return v.isNil() ? '' : v.js;
+}
+
 function hash(s) {
   let h = 5381;
   for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
@@ -70,6 +75,15 @@ function run(argv) {
       else if (data.workspace_roots && data.workspace_roots.length) folder = String(data.workspace_roots[0]);
       else if (data.workspacePaths && data.workspacePaths.length) folder = String(data.workspacePaths[0]);
     }
+
+    // Cursor also runs Claude Code's hooks for its own agent (its "third-party
+    // configs" option). Its own hook, "cursor done", reports that turn, so the
+    // copy that arrives as "claude" stays quiet. Only Cursor sets these two.
+    if (agent === 'claude' && (envVar('CURSOR_TRANSCRIPT_PATH') || (data && data.cursor_version))) return;
+    // A turn the user stopped needs no alert; Antigravity also reports steps
+    // before its agent is done.
+    if (agent === 'cursor' && data && data.status === 'aborted') return;
+    if (agent === 'antigravity' && data && data.fullyIdle === false) return;
 
     const configText = readText(root + '/config.json');
     if (!configText) return;
@@ -115,6 +129,7 @@ function run(argv) {
       // The record carries the text color and the theme the extension worked
       // out; older records lack them, and popup.js falls back on its own.
       const job = {
+        agent: agent,
         title: (project && project.name) || (folder ? folder.replace(/\/+$/, '').split('/').pop() : agentLabel),
         subtitle: kind === 'waiting' ? agentLabel + ' needs input' : agentLabel + ' finished',
         kind: kind,
@@ -125,6 +140,9 @@ function run(argv) {
         folder: project ? project.folder : folder,
         seconds: config.popup.seconds,
         stay: config.popup.stay === true,
+        // Top right unless chosen otherwise: the editors' own notifications
+        // take the bottom right.
+        position: config.popup.position === 'bottomRight' ? 'bottomRight' : 'topRight',
       };
       const jobsDir = stateDir + '/popups';
       mkdirs(jobsDir);

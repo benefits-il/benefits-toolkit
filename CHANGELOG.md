@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.9.0 · Cursor and Antigravity
+
+**Their own agents, alongside Claude Code.** The agent built into Cursor and the one built into Antigravity now get the toolkit's alerts and appear in the chat list. Each is on by default and has its own switch on the new **Cursor and Antigravity** page in Settings (`benefit.agents.cursor`, `benefit.agents.antigravity`). A switch does nothing on a computer without that editor.
+
+**Alerts when they finish.** A sound and the desktop popup, through a hook in each editor's own hooks file (`~/.cursor/hooks.json`, `~/.gemini/config/hooks.json`). Your own hooks in those files stay as they are. A Cursor turn you stopped gets no alert. There is no "needs input" alert for either: neither agent reports it.
+
+**One alert per Cursor turn.** Cursor can also run Claude Code's hooks for its own agent (its "third-party configs" option), which showed up as "Claude finished". That copy now stays quiet, and Cursor's own hook reports the turn as Cursor.
+
+**Their conversations, read-only.** Cursor's and Antigravity's conversations join the list, with their project, and open in the viewer. Antigravity's titles are its own. You can open them and save them as Markdown; rename, archive and delete stay with Claude Code's. Only Antigravity conversations from version 1.107 on have a readable transcript.
+
+**Every agent shows its mark.** Each row in the list, the viewer's avatar and name, the viewer's header and the popup carry the agent's own mark: Claude's, Cursor's cube or Antigravity's arch. Searching "cursor" or "antigravity" finds that agent's conversations.
+
+**RTL in Cursor and Antigravity.** RTL looks for Claude Code in the editor it runs in (Cursor keeps its own copy in `~/.cursor/extensions`), then in VS Code's folder.
+
+**Benefits alert only.** Cursor and Antigravity also alert by themselves when their agent finishes, in the same corner as the popup. Two switches on the Cursor and Antigravity page turn theirs off (`benefit.agents.antigravityOwnAlertsOff`, `benefit.agents.cursorOwnAlertsOff`), and switching back puts them as they were. Antigravity's notification and sound go off from any editor. Cursor's chime goes off from the toolkit inside Cursor; Cursor's system notification is a Cursor setting, and the page opens Cursor Settings for it.
+
+**New chat.** A New chat button at the top of the sidebar opens a new conversation with the editor's own agent: Claude Code in VS Code, Cursor Agent in Cursor, Antigravity Agent in Antigravity. In Cursor and Antigravity it can open Claude Code instead (`benefit.chats.newChatOpens`). It has its own switch (`benefit.chats.newChatButton`).
+
+**The list fits more.** Each conversation is one line, like Claude Code's own list: the agent's mark, the title in a softer gray, the project's dot, the context bar and the time. The project's name and the context percent show on hover.
+
+**The viewer reads like a closed thread.**
+- The oldest exchange is at the top and the newest at the bottom, and a conversation opens at the bottom. The arrow button brings you back down after scrolling up.
+- Every message is a card the width of the column, with a stripe at its start: the project's color for the agent, gray for you. The text is the system font, 13px, in a soft gray, as before 0.8.
+- Each header carries the speaker's icon: the agent's mark on a wash of its own color (Claude orange, Cursor white, Antigravity blue), and yours on a wash of the window's color.
+- Messages start closed, showing their first lines as they fade; a click opens one. Only the latest answer starts open. The work before a closed answer shows when the answer opens.
+- The direction switch is B (left to right) or ב (right to left) for the whole conversation, as before 0.8; Auto is gone.
+
+**The popup moves away from the editors' own notifications.** It shows at the top right by default; Windows shows its notifications at the bottom right. The Popup page has the choice (`benefit.popup.position`). The test popup shows the mark of the editor's own agent.
+
+**A foldable Benefits card.** The card at the foot of the sidebar folds to one line with its own button, or with "Fold the Benefits card" on the Appearance page (`benefit.appearance.brandFolded`). The theme button left the sidebar's header; the theme is chosen on the Appearance page.
+
+**Fixed:** Antigravity's hook failed on Windows ("Illegal characters in path"): Antigravity passed the quotes around the dispatcher's path on to PowerShell. The command now has no quotes.
+
 ## 0.8.1 · RTL finds the right Claude Code after an update
 
 **Fixed**

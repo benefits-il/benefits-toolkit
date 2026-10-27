@@ -1,3 +1,5 @@
+import type { AgentId } from "../../../shared/agents";
+
 export type RawJsonlRecord = Record<string, unknown> & { type?: string };
 
 export interface SummaryRecord {
@@ -22,6 +24,8 @@ export interface MessageRecord {
 }
 
 export interface ConversationMeta {
+  /** Who wrote the conversation. Only Claude Code's can be renamed, archived or deleted. */
+  source: AgentId;
   filePath: string;
   fileName: string;
   projectFolder: string;

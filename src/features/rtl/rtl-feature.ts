@@ -2,10 +2,17 @@ import * as vscode from "vscode";
 import { affects, readConfig } from "../../core/config-manager";
 import type { DeactivateReason, Feature } from "../../core/feature-registry";
 import { logger } from "../../core/logger";
-import { ClaudeAssetLocator } from "./services/claude-asset-locator";
+import { vscodeExtensionsDir } from "../../core/paths";
+import { ClaudeAssetLocator, extensionDirs } from "./services/claude-asset-locator";
 import { RtlAssetPatcher } from "./services/css-injector";
 import { registerRtlCommands } from "./ui/rtl-commands";
 import { RtlStatusBar } from "./ui/rtl-status-bar";
+
+/** Claude Code in this editor: VS Code's, Cursor's or Antigravity's own copy. */
+function newLocator(ctx: vscode.ExtensionContext): ClaudeAssetLocator {
+  const claudeCode = vscode.extensions.getExtension("anthropic.claude-code")?.extensionPath;
+  return new ClaudeAssetLocator(readConfig().rtl.claudeCodePathOverride, extensionDirs(claudeCode, ctx.extensionPath, vscodeExtensionsDir()));
+}
 
 export function createRtlFeature(ctx: vscode.ExtensionContext): Feature {
   let disposables: vscode.Disposable[] = [];
@@ -64,8 +71,7 @@ export function createRtlFeature(ctx: vscode.ExtensionContext): Feature {
       return readConfig().rtl.enabled;
     },
     async activate(): Promise<void> {
-      const cfg = readConfig().rtl;
-      locator = new ClaudeAssetLocator(cfg.claudeCodePathOverride);
+      locator = newLocator(ctx);
       patcher = new RtlAssetPatcher(ctx);
       statusBar = new RtlStatusBar();
       disposables.push(statusBar);
@@ -83,7 +89,7 @@ export function createRtlFeature(ctx: vscode.ExtensionContext): Feature {
           if (!locator || !patcher) return;
           const touchedLocator = affects(e, "rtl.claudeCodePathOverride");
           if (touchedLocator) {
-            locator = new ClaudeAssetLocator(readConfig().rtl.claudeCodePathOverride);
+            locator = newLocator(ctx);
           }
           if (
             touchedLocator ||

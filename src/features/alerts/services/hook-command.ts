@@ -1,4 +1,5 @@
 import * as path from "node:path";
+import type { AgentId } from "../../../shared/agents";
 
 /**
  * Marker the pre-0.7 macOS/Linux hook commands carried. New commands are
@@ -8,7 +9,7 @@ import * as path from "node:path";
  */
 export const HOOK_MARKER = "BENEFIT_MANAGED_HOOK";
 
-export type AlertAgent = "claude" | "cursor" | "antigravity";
+export type AlertAgent = AgentId;
 export type AlertKind = "done" | "waiting";
 export type HookPlatform = "win32" | "darwin" | "linux";
 
@@ -26,6 +27,9 @@ export function dispatcherFile(binDir: string, platform: HookPlatform): string {
 function shellQuote(s: string): string {
   return `'${s.replace(/'/g, "'\\''")}'`;
 }
+
+/** How every Windows hook starts PowerShell; the dispatcher's path follows. */
+export const WIN_POWERSHELL_FILE = "powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File";
 
 /**
  * The hook command an agent runs: the dispatcher plus who is calling and why.
@@ -45,7 +49,7 @@ export function buildDispatchCommand(
   const file = dispatcherFile(binDir, platform);
   switch (platform) {
     case "win32":
-      return `powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "${file}" ${agent} ${kind}`;
+      return `${WIN_POWERSHELL_FILE} "${file}" ${agent} ${kind}`;
     case "darwin":
       return `osascript -l JavaScript ${shellQuote(file)} ${agent} ${kind}`;
     case "linux":

@@ -52,6 +52,33 @@ export function toolkitConfigFile(): string {
   return path.join(toolkitHome(), "config.json");
 }
 
+/** Cursor's per-user folder: its hooks.json and its agent's transcripts. */
+export function cursorRoot(): string {
+  return path.join(homeDir(), ".cursor");
+}
+
+export function cursorHooksFile(): string {
+  return path.join(cursorRoot(), "hooks.json");
+}
+
+export function cursorProjectsDir(): string {
+  return path.join(cursorRoot(), "projects");
+}
+
+/** Antigravity's per-user folder (its agent's conversations live under brain/). */
+export function antigravityRoot(): string {
+  return path.join(homeDir(), ".gemini", "antigravity");
+}
+
+export function antigravityBrainDir(): string {
+  return path.join(antigravityRoot(), "brain");
+}
+
+/** Antigravity's hooks file; ~/.gemini/config belongs to Antigravity, not to the Gemini CLI. */
+export function antigravityHooksFile(): string {
+  return path.join(homeDir(), ".gemini", "config", "hooks.json");
+}
+
 export function vscodeExtensionsDir(): string {
   return path.join(homeDir(), ".vscode", "extensions");
 }

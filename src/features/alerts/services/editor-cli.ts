@@ -2,7 +2,7 @@ import * as path from "node:path";
 import type { HookPlatform } from "./hook-command";
 
 /** Launcher names, best first, for editors built on VS Code. */
-const KNOWN_CLIS = ["code", "cursor", "antigravity", "code-insiders", "windsurf"];
+const KNOWN_CLIS = ["code", "cursor", "antigravity", "antigravity-ide", "code-insiders", "windsurf"];
 
 /**
  * Folders that may hold the editor's command-line launcher, relative to

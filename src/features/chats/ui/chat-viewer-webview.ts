@@ -171,7 +171,7 @@ export class ChatViewerService implements vscode.Disposable {
 
   private async render(entry: OpenViewer): Promise<void> {
     const { panel, meta } = entry;
-    const records = await this.repo.readAllRecords(meta.filePath);
+    const records = await this.repo.records(meta);
     panel.title = tabTitle(meta.title);
     panel.webview.html = buildViewerHtml({
       meta,

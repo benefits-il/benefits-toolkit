@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import type { NewChatOpens } from "../features/chats/services/new-chat";
 import { isThemePreference, ThemePreference } from "../shared/theme-resolve";
 
 const ROOT_SECTION = "benefit";
@@ -7,6 +8,8 @@ export type RtlMode = "off" | "active" | "always" | "auto";
 export type ChatsGroupBy = "date" | "project" | "flat";
 export type ChatsSortOrder = "newest" | "oldest";
 export type ChatsScope = "currentWorkspace" | "all";
+/** The screen corner the popup shows in; the editors' own notifications use the bottom right. */
+export type PopupPosition = "topRight" | "bottomRight";
 
 export interface BenefitConfig {
   appearance: {
@@ -40,6 +43,7 @@ export interface BenefitConfig {
     seconds: number;
     /** Keep the popup up until it is clicked or closed; `seconds` is not used then. */
     stayUntilClicked: boolean;
+    position: PopupPosition;
   };
   chats: {
     enabled: boolean;
@@ -54,6 +58,17 @@ export interface BenefitConfig {
     codeCopyButtons: boolean;
     /** Per-message "Open in md-he" button in the conversation viewer. */
     mdHeButton: boolean;
+    /** The New chat button at the top of the sidebar, and what it opens. */
+    newChatButton: boolean;
+    newChatOpens: NewChatOpens;
+  };
+  /** The agents built into Cursor and Antigravity: their alerts and their conversations. */
+  agents: {
+    cursor: boolean;
+    antigravity: boolean;
+    /** "Benefits alert only": the agent's own notification and sound turned off. */
+    cursorOwnAlertsOff: boolean;
+    antigravityOwnAlertsOff: boolean;
   };
   windowColor: {
     enabled: boolean;
@@ -104,6 +119,7 @@ export function readConfig(): BenefitConfig {
       onWaiting: readWith("popup.onWaiting", true),
       seconds: readWith("popup.seconds", 8),
       stayUntilClicked: readWith("popup.stayUntilClicked", false),
+      position: readWith<PopupPosition>("popup.position", "topRight") === "bottomRight" ? "bottomRight" : "topRight",
     },
     chats: {
       enabled: readWith("chats.enabled", true),
@@ -116,6 +132,14 @@ export function readConfig(): BenefitConfig {
       showStatusBarRename: readWith("chats.showStatusBarRename", true),
       codeCopyButtons: readWith("chats.codeCopyButtons", true),
       mdHeButton: readWith("chats.mdHeButton", true),
+      newChatButton: readWith("chats.newChatButton", true),
+      newChatOpens: readWith<NewChatOpens>("chats.newChatOpens", "editor") === "claudeCode" ? "claudeCode" : "editor",
+    },
+    agents: {
+      cursor: readWith("agents.cursor", true),
+      antigravity: readWith("agents.antigravity", true),
+      cursorOwnAlertsOff: readWith("agents.cursorOwnAlertsOff", false),
+      antigravityOwnAlertsOff: readWith("agents.antigravityOwnAlertsOff", false),
     },
     windowColor: {
       enabled: readWith("windowColor.enabled", true),

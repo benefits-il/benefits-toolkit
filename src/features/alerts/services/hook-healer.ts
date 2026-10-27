@@ -1,12 +1,18 @@
+import * as path from "node:path";
 import * as vscode from "vscode";
-import { claudeRoot } from "../../../core/paths";
+import { claudeSettingsFile } from "../../../core/paths";
 import { logger } from "../../../core/logger";
-import { HookInstaller } from "./hook-installer";
+
+/** Something that puts its hooks back when they are missing, and says whether it wrote. */
+export interface Healable {
+  ensureInstalled(): Promise<boolean>;
+}
 
 const DEBOUNCE_MS = 800;
 
 /**
- * Keeps the managed alert hooks alive in ~/.claude/settings.json.
+ * Keeps the managed alert hooks alive in a hooks file: ~/.claude/settings.json
+ * by default, or Cursor's or Antigravity's hooks.json.
  *
  * Those hooks live in a file that Claude Code ALSO owns and rewrites: every time
  * a new permission is approved, Claude Code writes the whole settings.json from
@@ -31,18 +37,21 @@ export class HookHealer implements vscode.Disposable {
   private active = true;
   private disposed = false;
 
-  constructor(private readonly installer: HookInstaller) {}
+  constructor(
+    private readonly installer: Healable,
+    private readonly file: string = claudeSettingsFile(),
+  ) {}
 
-  /** Heal once now, then watch settings.json and heal on every change. */
+  /** Heal once now, then watch the file and heal on every change. */
   async start(): Promise<void> {
     await this.heal("startup");
     try {
-      const pattern = new vscode.RelativePattern(vscode.Uri.file(claudeRoot()), "settings.json");
+      const pattern = new vscode.RelativePattern(vscode.Uri.file(path.dirname(this.file)), path.basename(this.file));
       this.watcher = vscode.workspace.createFileSystemWatcher(pattern);
       this.watcher.onDidChange(() => this.schedule());
       this.watcher.onDidCreate(() => this.schedule());
     } catch (err) {
-      logger.warn("alerts", "Could not watch settings.json for hook healing", err);
+      logger.warn("alerts", `Could not watch ${this.file} for hook healing`, err);
     }
   }
 
@@ -74,7 +83,7 @@ export class HookHealer implements vscode.Disposable {
     try {
       const changed = await this.installer.ensureInstalled();
       if (changed) {
-        logger.info("alerts", `Alert hooks re-applied after settings.json change (${source}).`);
+        logger.info("alerts", `Alert hooks re-applied in ${path.basename(this.file)} (${source}).`);
       }
     } catch (err) {
       // settings.json may be momentarily missing / half-written / invalid JSON

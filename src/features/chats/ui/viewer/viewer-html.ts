@@ -1,6 +1,7 @@
 import MarkdownIt from "markdown-it";
+import { AgentId, AGENT_NAMES, agentMark, agentMarkCss } from "../../../../shared/agents";
 import { BENEFITS_URL } from "../../../../shared/brand-bar";
-import { CLAUDE_MARK_SVG, icon } from "../../../../shared/icons";
+import { icon } from "../../../../shared/icons";
 import type { ResolvedTheme } from "../../../../shared/theme-resolve";
 import { BrandFonts, escapeHtml, renderWebviewPage } from "../../../../shared/webview-theme";
 import { CONTEXT_WINDOW, ContentBlock, contextTokens, extractBlocks, formatModelName, readLastUsage } from "../../domain/blocks";
@@ -10,15 +11,15 @@ import { VIEWER_CSS, VIEWER_SCRIPT } from "./viewer-assets";
 
 /** Reading direction and Display filters: one set for every open viewer. */
 export interface ViewerPrefs {
-  /** "auto": every paragraph takes the direction of its own text. */
-  direction: "auto" | "ltr" | "rtl";
+  /** The whole conversation's direction: B (left to right) or ב (right to left). */
+  direction: "ltr" | "rtl";
   /** Hide the folded work between your message and Claude's answer. */
   hideWork: boolean;
   hideThinking: boolean;
 }
 
 export const DEFAULT_VIEWER_PREFS: ViewerPrefs = {
-  direction: "auto",
+  direction: "ltr",
   hideWork: false,
   hideThinking: false,
 };
@@ -27,7 +28,8 @@ export const DEFAULT_VIEWER_PREFS: ViewerPrefs = {
 export function cleanViewerPrefs(raw: unknown): ViewerPrefs {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   return {
-    direction: r.direction === "rtl" || r.direction === "ltr" ? r.direction : "auto",
+    // An "auto" kept by an earlier build reads as left to right.
+    direction: r.direction === "rtl" ? "rtl" : "ltr",
     hideWork: r.hideWork === true,
     hideThinking: r.hideThinking === true,
   };
@@ -76,17 +78,6 @@ md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
   token.attrSet("data-raw", raw);
   return defaultLinkOpen(tokens, idx, options, env, self);
 };
-
-// Hebrew and English share conversations, often in one message: every
-// paragraph, list and heading takes the direction of its own first words. The
-// page's direction switch can force one direction over all of them.
-for (const rule of ["paragraph_open", "bullet_list_open", "ordered_list_open", "list_item_open", "heading_open", "blockquote_open", "th_open", "td_open"]) {
-  const defaultRule = md.renderer.rules[rule] ?? ((tokens, idx, options, _env, self) => self.renderToken(tokens, idx, options));
-  md.renderer.rules[rule] = (tokens, idx, options, env, self) => {
-    tokens[idx].attrSet("dir", "auto");
-    return defaultRule(tokens, idx, options, env, self);
-  };
-}
 
 // Every code block gets a Copy button under the code, inside the block.
 const COPY_CODE = `<button class="mini code-copy" type="button" data-act="code">${icon("copy")}<span>Copy code</span></button>`;
@@ -224,7 +215,7 @@ function renderBlocks(blocks: ContentBlock[]): string {
       }
       // data-md keeps the markdown source, so Copy and Save export the
       // original text rather than the rendered plain text.
-      return `<div class="block text" data-md="${escapeHtml(b.text)}" dir="auto">${md.render(b.text)}</div>`;
+      return `<div class="block text" data-md="${escapeHtml(b.text)}">${md.render(b.text)}</div>`;
     })
     .join("");
 }
@@ -280,35 +271,38 @@ function preview(blocks: ContentBlock[]): string {
 }
 
 interface Speech {
+  /** "claude" is whichever agent answered; `agent` says which. */
   who: "you" | "claude";
+  agent: AgentId;
   message: MessageRecord;
   body: string;
   blocks: ContentBlock[];
+  /** Open on arrival; the rest start closed, showing their first lines. */
+  open: boolean;
 }
 
-/** A message in a bubble, with the speaker's avatar beside it. */
-function article({ who, message, body, blocks }: Speech): string {
+/** A message: a header with the speaker's icon, name and time, over its card. */
+function article({ who, agent, message, body, blocks, open }: Speech): string {
   const claude = who === "claude";
-  const name = claude ? "Claude" : "You";
+  const name = claude ? AGENT_NAMES[agent] : "You";
   const modelRaw = (message.message as Record<string, unknown>)?.["model"];
   const model = claude && typeof modelRaw === "string" ? formatModelName(modelRaw) : undefined;
   return `
-    <article class="msg unit ${who}" data-who="${name}" data-when="${escapeHtml(dateTime(message.timestamp))}">
-      <span class="avatar" aria-hidden="true">${claude ? CLAUDE_MARK_SVG : icon("user")}</span>
-      <div class="speech">
-        <div class="msg-head">
-          <button class="msg-toggle" type="button" aria-expanded="true">
-            <strong class="who"${model ? ` title="${escapeHtml(model)}"` : ""}>${name}</strong>
-            <time datetime="${escapeHtml(message.timestamp)}" title="${escapeHtml(dateTime(message.timestamp))}">${escapeHtml(time(message.timestamp))}</time>
-            <span class="preview" dir="auto">${escapeHtml(preview(blocks))}</span>
-          </button>
-          <span class="actions">
-            <button class="mini" type="button" data-act="copy">${icon("copy")}<span>Copy</span></button>
-            <button class="mini mdhe" type="button" data-act="mdhe" title="Open in md-he">${icon("externalLink")}<span>md-he</span></button>
-          </span>
-        </div>
-        <div class="msg-body">${body || '<p class="muted">Empty message</p>'}</div>
+    <article class="msg unit ${who}${open ? "" : " collapsed"}" data-who="${name}" data-when="${escapeHtml(dateTime(message.timestamp))}">
+      <div class="msg-head">
+        <button class="msg-toggle" type="button" aria-expanded="${open}">
+          <span class="avatar${claude ? ` avatar-${agent}` : ""}" aria-hidden="true">${claude ? agentMark(agent) : icon("user")}</span>
+          <strong class="who"${model ? ` title="${escapeHtml(model)}"` : ""}>${name}</strong>
+          <time datetime="${escapeHtml(message.timestamp)}" title="${escapeHtml(dateTime(message.timestamp))}">${escapeHtml(time(message.timestamp))}</time>
+          <span class="preview">${escapeHtml(preview(blocks))}</span>
+        </button>
+        <span class="actions">
+          <button class="mini" type="button" data-act="copy">${icon("copy")}<span>Copy</span></button>
+          <button class="mini mdhe" type="button" data-act="mdhe" title="Open in md-he">${icon("externalLink")}<span>md-he</span></button>
+        </span>
+        <span class="chev" aria-hidden="true">${icon("chevronDown")}</span>
       </div>
+      <div class="msg-body">${body || '<p class="muted">Empty message</p>'}</div>
     </article>`;
 }
 
@@ -338,11 +332,11 @@ function names(list: string[]): string {
 }
 
 /**
- * Claude's work between your message and its answer, folded into one quiet
+ * The agent's work between your message and its answer, folded into one quiet
  * line: "12 updates, 31 tool calls · Read, Edit, Bash". Open, it shows the
  * running notes and each run of steps, each folded again.
  */
-function renderWork(items: ViewerItem[], extra: ContentBlock[], answerAt: string | undefined): string {
+function renderWork(items: ViewerItem[], extra: ContentBlock[], answerAt: string | undefined, agent: AgentId): string {
   if (items.length === 0 && extra.length === 0) return "";
   const all: ContentBlock[] = [];
   let updates = 0;
@@ -351,7 +345,7 @@ function renderWork(items: ViewerItem[], extra: ContentBlock[], answerAt: string
       updates++;
       const blocks = extractBlocks(item.message);
       all.push(...blocks);
-      return `<div class="note unit" data-who="Claude" data-when="${escapeHtml(dateTime(item.message.timestamp))}">${renderBlocks(blocks)}</div>`;
+      return `<div class="note unit" data-who="${AGENT_NAMES[agent]}" data-when="${escapeHtml(dateTime(item.message.timestamp))}">${renderBlocks(blocks)}</div>`;
     }
     const blocks = item.messages.flatMap((m) => extractBlocks(m));
     all.push(...blocks);
@@ -369,17 +363,18 @@ function renderWork(items: ViewerItem[], extra: ContentBlock[], answerAt: string
   return `<details class="work"><summary>${icon("chevronRight")}<span>${escapeHtml(summary + names(tools))}</span></summary><div class="work-body">${parts.join("")}</div></details>`;
 }
 
-function renderTurn(turn: Turn): string {
+/** `open`: which of the exchange's messages starts open, if any. */
+function renderTurn(turn: Turn, agent: AgentId, open: "you" | "claude" | null): string {
   let you = "";
   if (turn.user) {
     const { own, attached } = splitAttachments(extractBlocks(turn.user));
-    you = article({ who: "you", message: turn.user, body: renderAttachments(attached) + renderBlocks(own), blocks: own });
+    you = article({ who: "you", agent, message: turn.user, body: renderAttachments(attached) + renderBlocks(own), blocks: own, open: open === "you" });
   }
   // The answer's bubble holds its text; its thinking or tool calls join the work.
   const answerBlocks = turn.answer ? extractBlocks(turn.answer) : [];
   const text = answerBlocks.filter((b) => b.kind === "text");
-  const work = renderWork(turn.work, answerBlocks.filter((b) => b.kind !== "text"), turn.answer?.timestamp);
-  const answer = turn.answer ? article({ who: "claude", message: turn.answer, body: renderBlocks(text), blocks: text }) : "";
+  const work = renderWork(turn.work, answerBlocks.filter((b) => b.kind !== "text"), turn.answer?.timestamp, agent);
+  const answer = turn.answer ? article({ who: "claude", agent, message: turn.answer, body: renderBlocks(text), blocks: text, open: open === "claude" }) : "";
   return `<section class="turn">${you}${work}${answer}</section>`;
 }
 
@@ -388,16 +383,27 @@ function scriptJson(value: unknown): string {
   return JSON.stringify(value).replace(/</g, "\\u003c");
 }
 
-/** Claude's bubbles take the project's color; without one, the Benefits green. */
+/** The agent's stripe takes the project's color; without one, the Benefits green. */
 const DEFAULT_BUBBLE = "#10B981";
 
 export function buildViewerHtml(input: ViewerInput): string {
   const { meta, records, prefs, flags } = input;
   const messages = records.filter(isRealMessage) as MessageRecord[];
   const stats = contextStats(records, messages);
-  // Newest exchange first: the end of a conversation is what you open it for.
-  // Inside an exchange, top to bottom: your message, the work, the answer.
-  const turnsHtml = toTurns(messages).reverse().map(renderTurn).join("\n");
+  // Like a messaging app: the oldest exchange at the top, the newest at the
+  // bottom, and the page opens at the bottom. Inside an exchange, top to
+  // bottom: your message, the work, the answer.
+  const agent = meta.source;
+  const agentName = AGENT_NAMES[agent];
+  // Cursor's and Antigravity's files belong to them: no rename, archive or delete.
+  const readOnly = agent !== "claude";
+  // Every message starts closed but the latest answer (or, with no answer
+  // yet, the latest message): the conversation reads like a closed thread.
+  const turns = toTurns(messages);
+  const lastAnswer = turns.map((t) => Boolean(t.answer)).lastIndexOf(true);
+  const opened = (i: number): "you" | "claude" | null =>
+    lastAnswer >= 0 ? (i === lastAnswer ? "claude" : null) : i === turns.length - 1 ? "you" : null;
+  const turnsHtml = turns.map((t, i) => renderTurn(t, agent, opened(i))).join("\n");
   const started = dateTime(meta.firstMessageAt ?? messages[0]?.timestamp);
   const projectColor = input.projectColor && /^#[0-9a-f]{6}$/i.test(input.projectColor) ? input.projectColor : null;
   const color = projectColor ? ` style="--c:${projectColor}"` : "";
@@ -413,7 +419,7 @@ export function buildViewerHtml(input: ViewerInput): string {
     <div class="meta">
       ${started ? `<span>${escapeHtml(started)}</span>` : ""}
       <span>${messages.length} ${messages.length === 1 ? "message" : "messages"}</span>
-      ${stats.model ? `<span>${escapeHtml(`Claude ${stats.model}`)}</span>` : ""}
+      <span class="agent">${agentMark(agent)}${escapeHtml(stats.model && !readOnly ? `${agentName} ${stats.model}` : agentName)}</span>
     </div>
     <div class="tools">
       <div class="find" role="search">
@@ -424,22 +430,21 @@ export function buildViewerHtml(input: ViewerInput): string {
         <button class="icon-btn" type="button" id="next" aria-label="Next match" disabled>${icon("arrowDown")}</button>
       </div>
       <div class="seg" role="group" aria-label="Text direction">
-        <button type="button" data-dir="auto" aria-pressed="true" title="Each paragraph follows its own language">Auto</button>
         <button class="glyph" type="button" data-dir="ltr" aria-pressed="false" title="Left to right" aria-label="Left to right">${icon("letterB")}</button>
         <button class="glyph" type="button" data-dir="rtl" aria-pressed="false" title="Right to left" aria-label="Right to left">${icon("letterBet")}</button>
       </div>
       <button class="btn" type="button" id="display" aria-haspopup="true" aria-expanded="false">${icon("adjustments")}<span>Display</span></button>
       <button class="btn" type="button" id="collapse">${icon("chevronsUp")}<span>Collapse all</span></button>
     </div>
-    <div class="context" title="${escapeHtml(stats.tooltip)}">
+    ${readOnly ? "" : `<div class="context" title="${escapeHtml(stats.tooltip)}">
       <span>Context<strong>${Math.round(stats.pct)}%</strong></span>
       <div class="bar"><i class="tier-${stats.tier}" style="width:${stats.pct.toFixed(1)}%"></i></div>
       <span>${stats.estimate ? '<span class="est">Estimated</span> · ' : ""}${stats.used} / ${stats.window}</span>
-    </div>
+    </div>`}
     <div class="hidden-matches" id="hidden-matches" hidden><span id="hidden-count"></span> in hidden parts. <button class="link" type="button" id="show-hidden">Show them</button></div>
   </header>
   <main class="messages" id="messages">
-    <div class="column">
+    <div class="column" dir="${prefs.direction}">
 ${turnsHtml || '<div class="empty-state">No messages in this conversation.</div>'}
     </div>
   </main>
@@ -448,22 +453,22 @@ ${turnsHtml || '<div class="empty-state">No messages in this conversation.</div>
     <a href="${BENEFITS_URL}">Part of Benefits${icon("externalLink")}</a>
   </footer>
 </div>
-<button class="icon-btn framed to-oldest" type="button" id="to-oldest" title="Go to the oldest message" aria-label="Go to the oldest message" hidden>${icon("arrowDown")}</button>
+<button class="icon-btn framed to-latest" type="button" id="to-latest" title="Go to the latest message" aria-label="Go to the latest message" hidden>${icon("arrowDown")}</button>
 <div class="menu" id="more-menu" role="menu" aria-label="Conversation actions" hidden>
-  <button type="button" role="menuitem" data-action="rename">${icon("pencil")}Rename</button>
-  <hr />
+  ${readOnly ? "" : `<button type="button" role="menuitem" data-action="rename">${icon("pencil")}Rename</button>
+  <hr />`}
   <button type="button" role="menuitem" data-action="exportFull">${icon("download")}Save full conversation</button>
   <button type="button" role="menuitem" data-action="exportVisible">${icon("download")}Save visible messages</button>
   <hr />
-  ${meta.archived
+  ${readOnly ? "" : meta.archived
     ? `<button type="button" role="menuitem" data-action="restore">${icon("restore")}Restore from archive</button>`
     : `<button type="button" role="menuitem" data-action="archive">${icon("archive")}Archive</button>`}
   <button type="button" role="menuitem" data-action="reveal">${icon("list")}Show in list</button>
-  <hr />
-  <button type="button" role="menuitem" class="danger" data-action="delete">${icon("trash")}Delete</button>
+  ${readOnly ? "" : `<hr />
+  <button type="button" role="menuitem" class="danger" data-action="delete">${icon("trash")}Delete</button>`}
 </div>
 <div class="menu" id="display-menu" aria-label="Display" hidden>
-  <label>Hide Claude's work<input type="checkbox" class="switch" role="switch" data-pref="hideWork" /></label>
+  <label>Hide ${escapeHtml(agentName)}'s work<input type="checkbox" class="switch" role="switch" data-pref="hideWork" /></label>
   <label>Hide thinking<input type="checkbox" class="switch" role="switch" data-pref="hideThinking" /></label>
   <p class="menu-note">Applies to every conversation viewer.</p>
 </div>
@@ -475,5 +480,5 @@ ${turnsHtml || '<div class="empty-state">No messages in this conversation.</div>
   document.body.classList.toggle('no-mdhe', ${!flags.mdHe});
 ${VIEWER_SCRIPT}`;
 
-  return renderWebviewPage({ fonts: input.fonts, theme: input.theme, title: meta.title, css: VIEWER_CSS, body, script });
+  return renderWebviewPage({ fonts: input.fonts, theme: input.theme, title: meta.title, css: VIEWER_CSS + agentMarkCss(), body, script });
 }

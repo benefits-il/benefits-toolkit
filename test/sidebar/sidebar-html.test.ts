@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { BENEFITS_LOGO_SVG, BENEFITS_SLOGAN, BENEFITS_TAGLINE_HTML } from "../../src/shared/brand-bar";
+import { BENEFITS_LOGO_SVG, BENEFITS_SLOGAN_HTML, BENEFITS_TAGLINE_HTML } from "../../src/shared/brand-bar";
 import { SETTINGS_PAGES, WRITABLE_SETTINGS } from "../../src/features/sidebar/settings-catalog";
 import { sidebarHtml } from "../../src/features/sidebar/sidebar-html";
 import { PRESET_PALETTE } from "../../src/features/window-color/services/color-utils";
@@ -48,10 +48,23 @@ test("every theme has its tokens, high contrast included", () => {
 });
 
 test("Benefits sits at the foot: the real logo, the slogan and the tagline", () => {
-  const brand = html.slice(html.indexOf('<a class="brand"'));
+  const brand = html.slice(html.indexOf('<div class="brand"'));
   assert.ok(brand.includes(BENEFITS_LOGO_SVG));
-  assert.ok(brand.includes(`<small>${BENEFITS_SLOGAN}</small>`));
+  assert.ok(brand.includes(`<small>${BENEFITS_SLOGAN_HTML}</small>`));
   assert.ok(brand.includes(`<p>${BENEFITS_TAGLINE_HTML}</p>`));
+  // The fold button sits beside the link, not inside it, and folding is a setting the page may write.
+  assert.ok(/<\/a>\s*<button class="fold" type="button" id="brand-fold"/.test(brand));
+  assert.ok(html.includes("appearance.brandFolded"));
+});
+
+test("the theme is chosen on the Appearance page; the header has no theme button", () => {
+  assert.ok(!html.includes('id="theme-btn"'));
+  assert.ok(html.includes('data-set-value="appearance.theme"'));
+});
+
+test("the Popup page picks the screen corner", () => {
+  assert.ok(html.includes('data-set-value="popup.position" data-value="topRight"'));
+  assert.ok(html.includes('data-set-value="popup.position" data-value="bottomRight"'));
 });
 
 test("no em or en dashes in what the page says", () => {

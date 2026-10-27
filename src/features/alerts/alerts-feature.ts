@@ -2,24 +2,33 @@ import * as vscode from "vscode";
 import { affects, readConfig } from "../../core/config-manager";
 import type { Feature, DeactivateReason } from "../../core/feature-registry";
 import { logger } from "../../core/logger";
+import { editorAgent } from "../../shared/agents";
 import { currentPlatform } from "../../shared/platform-detector";
+import { AgentHookTarget, HookedAgent } from "./services/agent-hooks";
 import { AlertAssets } from "./services/alert-assets";
 import { HookInstaller } from "./services/hook-installer";
 import { HookHealer } from "./services/hook-healer";
+import { NativeAlerts } from "./services/native-alerts";
 import { ProjectRegistryWriter } from "./services/project-registry-writer";
 import { ProjectPrefsStore } from "./services/project-prefs-store";
 import { registerAlertsCommands } from "./ui/alerts-commands";
 
+const HOOKED_AGENTS: readonly HookedAgent[] = ["cursor", "antigravity"];
+
 /**
- * Alerts: a sound and/or a desktop popup when Claude finishes or needs you.
- * Claude Code's hooks run a small dispatcher script from ~/.benefits-toolkit;
- * this feature keeps that folder (scripts, sound pool, config.json, one record
- * per open project) and the hooks themselves in shape.
+ * Alerts: a sound and/or a desktop popup when an agent finishes or needs you.
+ * Claude Code's hooks, and the hooks of Cursor's and Antigravity's own agents,
+ * run a small dispatcher script from ~/.benefits-toolkit; this feature keeps
+ * that folder (scripts, sound pool, config.json, one record per open project)
+ * and the hooks themselves in shape.
  */
 export function createAlertsFeature(ctx: vscode.ExtensionContext): Feature {
   let disposables: vscode.Disposable[] = [];
   let installer: HookInstaller | undefined;
   let registry: ProjectRegistryWriter | undefined;
+  let agentTargets: AgentHookTarget[] = [];
+  let native: NativeAlerts | undefined;
+  const inCursor = editorAgent(vscode.env.uriScheme) === "cursor";
 
   return {
     id: "alerts",
@@ -66,10 +75,34 @@ export function createAlertsFeature(ctx: vscode.ExtensionContext): Feature {
         logger.error("alerts", "Hook healer failed to start", err);
       }
 
+      // Cursor's and Antigravity's agents: a hook in each one's own hooks
+      // file, while its switch is on and the agent is installed. Their files
+      // are healed the same way, in case the editor or the user rewrites them.
+      agentTargets = HOOKED_AGENTS.map((agent) => new AgentHookTarget(agent, platform));
+      for (const target of agentTargets) {
+        const agentHealer = new HookHealer({ ensureInstalled: () => target.ensure(readConfig().agents[target.agent]) }, target.file);
+        disposables.push(agentHealer);
+        agentHealer.start().catch((err) => logger.warn("alerts", `The ${target.agent} hook could not be set up`, err));
+      }
+
+      // "Benefits alert only": Cursor's and Antigravity's own alerts off.
+      native = new NativeAlerts(ctx.globalState);
+      const applyNative = () => {
+        const agents = readConfig().agents;
+        native?.antigravity(agents.antigravityOwnAlertsOff).catch((err) => logger.warn("alerts", "Changing Antigravity's own alerts failed", err));
+        native?.cursor(agents.cursorOwnAlertsOff, inCursor).catch((err) => logger.warn("alerts", "Changing Cursor's chime failed", err));
+      };
+      applyNative();
+
       // The dispatcher reads its settings from config.json, so a changed
       // sound or popup switch only rewrites that file, never the hooks.
       disposables.push(
         vscode.workspace.onDidChangeConfiguration(async (e) => {
+          if (affects(e, "agents.cursorOwnAlertsOff") || affects(e, "agents.antigravityOwnAlertsOff")) applyNative();
+          for (const target of agentTargets) {
+            if (!affects(e, `agents.${target.agent}`)) continue;
+            target.ensure(readConfig().agents[target.agent]).catch((err) => logger.warn("alerts", `Updating the ${target.agent} hook failed`, err));
+          }
           if (!affects(e, "sounds") && !affects(e, "popup")) return;
           try {
             await assets.writeConfig(readConfig());
@@ -102,8 +135,16 @@ export function createAlertsFeature(ctx: vscode.ExtensionContext): Feature {
         } catch (err) {
           logger.warn("alerts", "Uninstall on deactivate failed", err);
         }
+        for (const target of agentTargets) {
+          await target.ensure(false).catch((err) => logger.warn("alerts", `Removing the ${target.agent} hook failed`, err));
+        }
+        // With the toolkit's alerts gone, the editors' own come back.
+        await native?.antigravity(false).catch((err) => logger.warn("alerts", "Restoring Antigravity's own alerts failed", err));
+        await native?.cursor(false, inCursor).catch((err) => logger.warn("alerts", "Restoring Cursor's chime failed", err));
       }
       installer = undefined;
+      agentTargets = [];
+      native = undefined;
     },
   };
 }

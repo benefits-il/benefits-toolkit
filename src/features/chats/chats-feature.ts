@@ -39,7 +39,7 @@ export function createChatsFeature(ctx: vscode.ExtensionContext): Feature {
         vscode.workspace.onDidChangeConfiguration((e) => {
           if (affects(e, "chats.showStatusBarRename")) statusBar.setVisible(readConfig().chats.showStatusBarRename);
           if (affects(e, "chats.codeCopyButtons") || affects(e, "chats.mdHeButton")) controller.viewer.applyFlags();
-          if (LIST_KEYS.some((k) => affects(e, k))) controller.refresh();
+          if (LIST_KEYS.some((k) => affects(e, k)) || affects(e, "agents")) controller.refresh();
           // Project colors in the list follow the windows' colors.
           if (e.affectsConfiguration("workbench.colorCustomizations")) controller.refresh();
         }),

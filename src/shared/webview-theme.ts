@@ -89,6 +89,7 @@ export const THEME_TOKENS_CSS = `
     --tile-sounds: rgba(252, 211, 77, 0.14); --tile-sounds-fg: #FDE68A;
     --tile-popup: rgba(196, 181, 253, 0.14); --tile-popup-fg: #DDD6FE;
     --tile-chats: rgba(110, 231, 183, 0.13); --tile-chats-fg: #A7F3D0;
+    --tile-agents: rgba(253, 186, 116, 0.14); --tile-agents-fg: #FED7AA;
     --tile-rtl: rgba(94, 234, 212, 0.13); --tile-rtl-fg: #99F6E4;
     --tile-htmlOpen: rgba(253, 164, 175, 0.14); --tile-htmlOpen-fg: #FECDD3;
     --tile-diagnostics: hsl(150 10% 60% / 0.10); --tile-diagnostics-fg: #A9B3AE;
@@ -109,6 +110,7 @@ export const THEME_TOKENS_CSS = `
     --tile-sounds: #FEF3C7; --tile-sounds-fg: #92400E;
     --tile-popup: #EDE9FE; --tile-popup-fg: #6D28D9;
     --tile-chats: #D1FAE5; --tile-chats-fg: #047857;
+    --tile-agents: #FFEDD5; --tile-agents-fg: #C2410C;
     --tile-rtl: #CCFBF1; --tile-rtl-fg: #0F766E;
     --tile-htmlOpen: #FFE4E6; --tile-htmlOpen-fg: #BE123C;
     --tile-diagnostics: #EEF1EF; --tile-diagnostics-fg: #55635C;

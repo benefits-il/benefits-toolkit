@@ -1,14 +1,21 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { claudeArchiveDir, claudeProjectsDir } from "../../../core/paths";
+import type { BenefitConfig } from "../../../core/config-manager";
 import { atomicWriteText, pathExists } from "../../../shared/fs-utils";
 import { contextTokens, readLastUsage } from "../domain/blocks";
 import { ConversationMeta, MessageRecord, RawJsonlRecord, RenderedMessage } from "../domain/conversation";
 import { isAiTitle, isCustomTitle, isMessage, isRealMessage, isSummary, parseJsonlText } from "../domain/jsonl-parser";
+import { AntigravityConversations } from "./antigravity-conversations";
+import { CursorConversations } from "./cursor-conversations";
 
 interface ScanOptions {
   hideEmpty: boolean;
   includeArchived: boolean;
+  /** Also Cursor's and Antigravity's own agents (read-only); Claude Code's alone when left out. */
+  agents?: BenefitConfig["agents"];
+  /** Folders the toolkit knows of, to place Cursor's conversations (its transcripts name only a slug). */
+  folders?: string[];
 }
 
 const ARCHIVE_FOLDER_NAME = "_archive";
@@ -23,7 +30,41 @@ const HEAD_BYTES = 64 * 1024;
 const TAIL_BYTES = 256 * 1024;
 
 export class ConversationRepository {
+  private readonly cursor = new CursorConversations();
+  private readonly antigravity = new AntigravityConversations();
+
+  /** Claude Code's conversations, then the other agents' that are switched on. */
   async scan(options: ScanOptions): Promise<ConversationMeta[]> {
+    const claude = await this.scanClaude(options);
+    const others: ConversationMeta[] = [];
+    if (options.agents?.cursor) {
+      const known = [...(options.folders ?? []), ...claude.flatMap((m) => (m.cwd ? [m.cwd] : []))];
+      others.push(...(await this.cursor.scan([...new Set(known)], options.hideEmpty).catch(() => [])));
+    }
+    if (options.agents?.antigravity) {
+      others.push(...(await this.antigravity.scan(options.hideEmpty).catch(() => [])));
+    }
+    return [...claude, ...others];
+  }
+
+  /** A conversation's records, in Claude Code's shape whoever wrote it. */
+  async records(meta: ConversationMeta): Promise<RawJsonlRecord[]> {
+    switch (meta.source) {
+      case "cursor":
+        return this.cursor.records(meta.filePath);
+      case "antigravity":
+        return this.antigravity.records(meta.filePath);
+      default:
+        return this.readAllRecords(meta.filePath);
+    }
+  }
+
+  /** The messages with text, oldest first, for the Markdown export. */
+  async messages(meta: ConversationMeta): Promise<RenderedMessage[]> {
+    return toRendered(await this.records(meta));
+  }
+
+  private async scanClaude(options: ScanOptions): Promise<ConversationMeta[]> {
     const root = claudeProjectsDir();
     if (!(await pathExists(root))) return [];
 
@@ -143,6 +184,7 @@ export class ConversationRepository {
     const usage = readLastUsage(tailRecords.length ? tailRecords : records);
 
     return {
+      source: "claude",
       filePath,
       fileName: path.basename(filePath),
       projectFolder,
@@ -173,22 +215,6 @@ export class ConversationRepository {
     await atomicWriteText(filePath, text);
   }
 
-  async readMessages(filePath: string): Promise<RenderedMessage[]> {
-    const records = await this.readAllRecords(filePath);
-    const out: RenderedMessage[] = [];
-    for (const r of records) {
-      if (!isRealMessage(r)) continue;
-      const msg = r as MessageRecord;
-      out.push({
-        role: msg.message.role,
-        uuid: msg.uuid,
-        timestamp: msg.timestamp,
-        text: extractText(msg),
-        raw: msg,
-      });
-    }
-    return out;
-  }
 
   archiveDestFor(meta: ConversationMeta): string {
     return path.join(claudeArchiveDir(), meta.projectFolder, meta.fileName);
@@ -197,6 +223,22 @@ export class ConversationRepository {
   restoreDestFor(meta: ConversationMeta): string {
     return path.join(claudeProjectsDir(), meta.projectFolder, meta.fileName);
   }
+}
+
+function toRendered(records: RawJsonlRecord[]): RenderedMessage[] {
+  const out: RenderedMessage[] = [];
+  for (const r of records) {
+    if (!isRealMessage(r)) continue;
+    const msg = r as MessageRecord;
+    out.push({
+      role: msg.message.role,
+      uuid: msg.uuid,
+      timestamp: msg.timestamp,
+      text: extractText(msg),
+      raw: msg,
+    });
+  }
+  return out;
 }
 
 function extractText(record: MessageRecord): string {

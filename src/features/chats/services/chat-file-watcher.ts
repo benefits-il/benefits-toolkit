@@ -1,20 +1,29 @@
 import * as vscode from "vscode";
-import { claudeProjectsDir } from "../../../core/paths";
+import { antigravityBrainDir, claudeProjectsDir, cursorProjectsDir } from "../../../core/paths";
 import { logger } from "../../../core/logger";
 
 const DEBOUNCE_MS = 350;
 
+/** Where each agent writes its conversations. */
+const PATTERNS: [() => string, string][] = [
+  [claudeProjectsDir, "**/*.jsonl"],
+  [cursorProjectsDir, "*/agent-transcripts/*/*.jsonl"],
+  [antigravityBrainDir, "*/.system_generated/logs/transcript_full.jsonl"],
+];
+
 export class ChatFileWatcher implements vscode.Disposable {
-  private readonly watcher: vscode.FileSystemWatcher;
+  private readonly watchers: vscode.FileSystemWatcher[];
   private readonly emitter = new vscode.EventEmitter<void>();
   private timer: NodeJS.Timeout | undefined;
 
   constructor() {
-    const pattern = new vscode.RelativePattern(claudeProjectsDir(), "**/*.jsonl");
-    this.watcher = vscode.workspace.createFileSystemWatcher(pattern);
-    this.watcher.onDidCreate(() => this.schedule("create"));
-    this.watcher.onDidChange(() => this.schedule("change"));
-    this.watcher.onDidDelete(() => this.schedule("delete"));
+    this.watchers = PATTERNS.map(([dir, glob]) => {
+      const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(dir(), glob));
+      watcher.onDidCreate(() => this.schedule("create"));
+      watcher.onDidChange(() => this.schedule("change"));
+      watcher.onDidDelete(() => this.schedule("delete"));
+      return watcher;
+    });
   }
 
   get onDidChange(): vscode.Event<void> {
@@ -31,7 +40,7 @@ export class ChatFileWatcher implements vscode.Disposable {
 
   dispose(): void {
     if (this.timer) clearTimeout(this.timer);
-    this.watcher.dispose();
+    for (const w of this.watchers) w.dispose();
     this.emitter.dispose();
   }
 }

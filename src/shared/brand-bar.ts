@@ -7,8 +7,15 @@
 
 export const BENEFITS_URL = "https://benefits-il.dev/";
 
+// The slogan's two halves; the folded card shows only the first.
+const SLOGAN_LEAD = "AI that finally fits";
+const SLOGAN_BY = "Ben Akiva";
+
 /** The course's slogan, under the Benefits name. */
-export const BENEFITS_SLOGAN = "AI that finally fits · Ben Akiva";
+export const BENEFITS_SLOGAN = `${SLOGAN_LEAD} · ${SLOGAN_BY}`;
+
+/** The slogan as markup: the folded card hides the part after the dot. */
+export const BENEFITS_SLOGAN_HTML = `${SLOGAN_LEAD}<span class="by"> · ${SLOGAN_BY}</span>`;
 
 // The tagline's two halves; on screen they are joined by a bold middle dot.
 const TAGLINE_LEAD = "This tool is part of Benefits";

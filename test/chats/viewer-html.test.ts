@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { CLAUDE_MARK_SVG } from "../../src/shared/icons";
 import type { ConversationMeta, MessageRecord } from "../../src/features/chats/domain/conversation";
 import { buildViewerHtml, cleanViewerPrefs, DEFAULT_VIEWER_PREFS, toItems, toTurns } from "../../src/features/chats/ui/viewer/viewer-html";
 
@@ -15,7 +14,7 @@ const result = () => [{ type: "tool_result", content: "ok" }];
 const thinking = () => [{ type: "thinking", thinking: "hmm" }];
 
 const meta: ConversationMeta = {
-  filePath: "C:/x/abc.jsonl", fileName: "abc.jsonl", projectFolder: "C--x", projectDisplayName: "x", conversationId: "abc",
+  source: "claude", filePath: "C:/x/abc.jsonl", fileName: "abc.jsonl", projectFolder: "C--x", projectDisplayName: "x", conversationId: "abc",
   cwd: "C:/x", title: "A </script><script>alert(1)</script> title", hasSummary: false, leafUuid: undefined,
   firstMessageAt: "2026-10-26T12:00:00.000Z", lastModifiedAt: "2026-10-26T13:00:00.000Z", contextTokens: undefined, realMessageCount: 6, archived: false, sizeBytes: 100,
 };
@@ -52,7 +51,7 @@ test("an exchange: your message, the work on the way, and the last thing Claude 
   assert.equal(turns[2].answer, null);
 });
 
-test("the page: newest exchange first, bubbles with icon avatars, the work folded into one line", () => {
+test("the page: oldest exchange at the top, cards with icons in their headers, all closed but the latest answer", () => {
   const records = [
     msg("user", text("hello there")),
     msg("assistant", text("let me look")),
@@ -64,11 +63,14 @@ test("the page: newest exchange first, bubbles with icon avatars, the work folde
     msg("assistant", text("second answer")),
   ];
   const html = buildViewerHtml({ meta, records, theme: "dark", fonts: null, prefs: DEFAULT_VIEWER_PREFS, flags: { codeCopy: true, mdHe: true }, projectColor: "#1f8a8a" });
-  const order = [...html.matchAll(/<article class="msg unit (\w+)"|<details class="work">/g)].map((m) => m[1] ?? "work");
-  assert.deepEqual(order, ["you", "claude", "you", "work", "claude"]);
-  assert.ok(html.indexOf("second question") < html.indexOf("hello there"), "the newest exchange comes first");
+  const order = [...html.matchAll(/<article class="msg unit (\w+)( collapsed)?"|<details class="work">/g)].map((m) => (m[1] ? m[1] + (m[2] ? " closed" : " open") : "work"));
+  assert.deepEqual(order, ["you closed", "work", "claude closed", "you closed", "claude open"]);
+  assert.ok(html.indexOf("hello there") < html.indexOf("second question"), "the newest exchange comes last");
+  assert.ok(html.includes('id="to-latest"') && html.includes("openAtLatest()"), "the page opens at the newest message");
   assert.ok(html.includes("1 update, 2 tool calls · Read, Edit"));
-  assert.ok(html.includes(CLAUDE_MARK_SVG));
+  assert.ok(html.includes('<span class="avatar avatar-claude" aria-hidden="true"><i class="mark mark-claude"'), "Claude's mark on a wash of its color");
+  assert.ok(html.includes('<span class="avatar" aria-hidden="true"><svg'), "your icon");
+  assert.ok(html.includes('class="chev"'), "a chevron on every header");
   assert.ok(html.includes("--proj:#1f8a8a"));
   assert.ok(!/>Y<\/|>C<\//.test(html), "no letter avatars");
   assert.ok(html.includes("<strong>hi</strong>"));
@@ -83,7 +85,7 @@ test("text attached to your message folds; your own words and a slash command st
   assert.ok(html.includes("Pasted text"));
   assert.ok(html.includes("Attached: system-reminder"));
   assert.ok(html.includes("<code>/clear</code>"));
-  assert.ok(html.includes('<p dir="auto">please read</p>'));
+  assert.ok(html.includes('<p>please read</p>'));
   assert.ok(!html.includes("&lt;pasted_content"), "the tag itself never shows");
 });
 
@@ -101,9 +103,21 @@ test("a title cannot break out of the page script", () => {
 
 test("viewer prefs from storage or a page are checked field by field", () => {
   assert.deepEqual(cleanViewerPrefs(undefined), DEFAULT_VIEWER_PREFS);
-  assert.equal(DEFAULT_VIEWER_PREFS.direction, "auto");
+  assert.equal(DEFAULT_VIEWER_PREFS.direction, "ltr");
   assert.deepEqual(cleanViewerPrefs({ direction: "rtl", hideWork: true, hideThinking: "yes", extra: 1 }), {
     ...DEFAULT_VIEWER_PREFS, direction: "rtl", hideWork: true,
   });
-  assert.equal(cleanViewerPrefs({ direction: "sideways" }).direction, "auto");
+  assert.equal(cleanViewerPrefs({ direction: "sideways" }).direction, "ltr");
+  assert.equal(cleanViewerPrefs({ direction: "auto" }).direction, "ltr", "an Auto kept by an earlier build");
+});
+
+test("another agent's conversation: its name and mark, no context bar, no rename, archive or delete", () => {
+  const records = [msg("user", text("hi")), msg("assistant", text("Hi there"))];
+  const html = buildViewerHtml({ meta: { ...meta, source: "cursor" }, records, theme: "dark", fonts: null, prefs: DEFAULT_VIEWER_PREFS, flags: { codeCopy: true, mdHe: true }, projectColor: null });
+  assert.ok(html.includes('<i class="mark mark-cursor"'));
+  assert.ok(html.includes('data-who="Cursor"'));
+  assert.ok(html.includes("Hide Cursor's work"));
+  assert.ok(!html.includes('class="context"'), "no context bar: Cursor records no usage");
+  for (const action of ["rename", "archive", "delete"]) assert.ok(!html.includes(`data-action="${action}"`), `no ${action}`);
+  assert.ok(html.includes('data-action="exportFull"'));
 });

@@ -2,16 +2,20 @@ import * as vscode from "vscode";
 import { onConfigChanged, readConfig, updateConfig, updateConfigEffective } from "../../core/config-manager";
 import { logger } from "../../core/logger";
 import { currentTheme, onThemeChanged } from "../../core/theme";
+import { AGENT_NAMES, editorAgent } from "../../shared/agents";
 import { BENEFITS_URL } from "../../shared/brand-bar";
 import { currentPlatform } from "../../shared/platform-detector";
 import { brandFontUris, panelResourceRoots } from "../../shared/webview-fonts";
+import { AgentHookTarget } from "../alerts/services/agent-hooks";
 import { AlertAssets, SoundSlot } from "../alerts/services/alert-assets";
+import { CURSOR_SETTINGS_COMMAND } from "../alerts/services/native-alerts";
 import { HookInstaller } from "../alerts/services/hook-installer";
 import { onProjectPrefsChanged, ProjectPrefsStore } from "../alerts/services/project-prefs-store";
 import { playPreview } from "../alerts/services/sound-player";
 import { playProjectSounds } from "../alerts/services/sound-test";
 import type { ChatsController } from "../chats/chats-controller";
 import { chatsHub } from "../chats/chats-hub";
+import { NEW_CHAT_COMMANDS, newChatAgent } from "../chats/services/new-chat";
 import { installedFonts } from "../rtl/services/font-catalog";
 import { lastOnMode, setMode, switchRtlOff, switchRtlOn } from "../rtl/services/rtl-mode-state";
 import { foregroundFor, normalizeHex } from "../window-color/services/color-utils";
@@ -74,7 +78,7 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
   resolveWebviewView(view: vscode.WebviewView): void {
     this.view = view;
     view.webview.options = { enableScripts: true, localResourceRoots: panelResourceRoots(this.ctx.extensionUri) };
-    view.webview.html = sidebarHtml(brandFontUris(view.webview, this.ctx.extensionUri), currentTheme());
+    view.webview.html = sidebarHtml(brandFontUris(view.webview, this.ctx.extensionUri), currentTheme(), editorAgent(vscode.env.uriScheme));
     view.webview.onDidReceiveMessage((msg: SidebarMessage) => void this.onMessage(msg));
 
     const subs = [
@@ -141,6 +145,16 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
         installed = false;
       }
     }
+    const agents: SidebarState["agents"] = { cursor: { present: false, hooked: false }, antigravity: { present: false, hooked: false } };
+    if (platform !== "unsupported") {
+      for (const agent of ["cursor", "antigravity"] as const) {
+        const target = new AgentHookTarget(agent, platform);
+        agents[agent] = {
+          present: await target.present(),
+          hooked: await target.isInstalled().catch(() => false),
+        };
+      }
+    }
     const sounds = await this.assets.listSounds().catch(() => []);
     const folders = projectFolders();
     const folder = folders[0];
@@ -175,6 +189,7 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
         overrides: folder ? this.prefs.sounds(folder.uri.fsPath) : {},
       },
       hooks: { wanted: cfg.sounds.enabled || cfg.popup.enabled, installed },
+      agents,
       fonts: await installedFonts(),
     };
     void this.view.webview.postMessage({ type: "state", state });
@@ -214,11 +229,6 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
         case "set":
           if (typeof msg.key === "string") await this.set(msg.key, msg.value);
           return;
-        case "toggleTheme": {
-          const dark = currentTheme() === "dark" || currentTheme() === "hc-dark";
-          await updateConfigEffective("appearance.theme", dark ? "light" : "dark");
-          return;
-        }
         case "setPopupName":
           // The registry writer hears the change and rewrites the record the
           // dispatcher reads, so the next popup already shows the new name.
@@ -263,6 +273,12 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
         case "openBrand":
           await vscode.env.openExternal(vscode.Uri.parse(BENEFITS_URL));
           return;
+        case "newChat":
+          await this.startNewChat();
+          return;
+        case "openCursorSettings":
+          await vscode.commands.executeCommand(CURSOR_SETTINGS_COMMAND);
+          return;
         case "openFolder":
           await vscode.commands.executeCommand("workbench.action.files.openFolder");
           return;
@@ -277,6 +293,18 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
       logger.error("sidebar", `Sidebar action '${msg.type}' failed`, err);
       vscode.window.showErrorMessage(`Benefit: ${(err as Error).message}`);
     }
+  }
+
+  /** New chat: this editor's own agent, or Claude Code when the setting says so. */
+  private async startNewChat(): Promise<void> {
+    const agent = newChatAgent(editorAgent(vscode.env.uriScheme), readConfig().chats.newChatOpens);
+    const command = NEW_CHAT_COMMANDS[agent];
+    if (!(await vscode.commands.getCommands(true)).includes(command)) {
+      const name = agent === "claude" ? "Claude Code" : `${AGENT_NAMES[agent]} Agent`;
+      vscode.window.showWarningMessage(`Benefit: ${name} is not available in this editor.`);
+      return;
+    }
+    await vscode.commands.executeCommand(command);
   }
 
   /** A setting the page changed: only keys and values the catalog allows. */

@@ -1,7 +1,9 @@
-import { BENEFITS_LOGO_SVG, BENEFITS_SLOGAN, BENEFITS_TAGLINE_HTML, BENEFITS_URL } from "../../shared/brand-bar";
+import { AGENT_NAMES, AgentId, agentMark, agentMarkCss } from "../../shared/agents";
+import { BENEFITS_LOGO_SVG, BENEFITS_SLOGAN_HTML, BENEFITS_TAGLINE_HTML, BENEFITS_URL } from "../../shared/brand-bar";
 import { icon, iconMap } from "../../shared/icons";
 import type { ResolvedTheme } from "../../shared/theme-resolve";
 import { BrandFonts, escapeHtml, renderWebviewPage } from "../../shared/webview-theme";
+import type { HookedAgent } from "../alerts/services/agent-hooks";
 import type { SoundSlot } from "../alerts/services/alert-assets";
 import { DISPLAY_NAME_MAX } from "../alerts/services/project-registry";
 import type { ChatListSnapshot } from "../chats/chats-controller";
@@ -34,6 +36,8 @@ export interface SidebarState {
   };
   /** Hooks: wanted (sounds or popup on) and whether they are installed. */
   hooks: { wanted: boolean; installed: boolean };
+  /** Cursor's and Antigravity's agents: on this computer at all, and whether their hook is in. */
+  agents: Record<HookedAgent, { present: boolean; hooked: boolean }>;
   /** The fonts of the RTL lists that this computer has. */
   fonts: string[];
 }
@@ -63,7 +67,7 @@ const COPY = {
   scopeProject: "This project only. Inherit uses the defaults.",
 };
 
-const ICONS = iconMap(["sun", "moon", "chevronDown", "messages", "folder", "alertTriangle", "search", "pencil", "archive", "restore", "download", "trash", "play", "volume", "check"]);
+const ICONS = iconMap(["chevronDown", "chevronsUp", "messages", "folder", "alertTriangle", "search", "pencil", "archive", "restore", "download", "trash", "play", "volume", "check"]);
 
 function switchRow(key: string, label: string, hint = "", main = false): string {
   return `<label class="srow${main ? " main" : ""}"><span><strong>${label}</strong>${hint ? `<small>${hint}</small>` : ""}</span><input type="checkbox" class="switch" role="switch" data-set="${key}" /></label>`;
@@ -86,6 +90,16 @@ function textRow(key: string, label: string, placeholder: string): string {
   return `<label class="frow">${label}<input class="field" type="text" data-set="${key}" placeholder="${placeholder}" spellcheck="false" autocomplete="off" /></label>`;
 }
 
+/** An agent's switch, with its mark and whether it is on this computer. */
+/** A "Benefits alert only" switch: the agent's own notification and sound off. */
+function ownRow(agent: HookedAgent, label: string, note: string): string {
+  return `<label class="srow agent-row"><span class="agent-copy">${agentMark(agent)}<span><strong>${label}</strong><small>${note}</small></span></span><input type="checkbox" class="switch" role="switch" data-set="agents.${agent}OwnAlertsOff" /></label>`;
+}
+
+function agentRow(agent: HookedAgent, label: string): string {
+  return `<label class="srow agent-row"><span class="agent-copy">${agentMark(agent)}<span><strong>${label}</strong><small id="agent-${agent}-status"></small></span></span><input type="checkbox" class="switch" role="switch" data-set="agents.${agent}" /></label>`;
+}
+
 function hint(text: string, id = ""): string {
   return `<p class="hint"${id ? ` id="${id}"` : ""}>${text}</p>`;
 }
@@ -103,11 +117,12 @@ function swatch(p: PresetColor): string {
   return `<button class="swatch" type="button" role="radio" aria-checked="false" data-hex="${p.hex}" title="${escapeHtml(p.name)} · ${p.hex}" aria-label="${escapeHtml(p.name)}" style="--sw:${p.hex};--sw-text:${foregroundFor(p.hex)}">${icon("check")}</button>`;
 }
 
-const PAGE_CONTENT: Record<PageId, () => string> = {
+const PAGE_CONTENT: Record<PageId, (agent: AgentId) => string> = {
   appearance: () =>
     selectRow("appearance.theme", "Theme", [["auto", "Auto, follow the editor"], ["light", "Light"], ["dark", "Dark"]]) +
     hint("Applies to the sidebar, viewer and desktop popup.") +
-    `<p class="hint" id="hc-note" hidden>High contrast is on in the editor, so its colors are used.</p>`,
+    `<p class="hint" id="hc-note" hidden>High contrast is on in the editor, so its colors are used.</p>` +
+    switchRow("appearance.brandFolded", "Fold the Benefits card", "One line at the foot of the sidebar. The card's own button does the same."),
 
   windowColor: () => `
     <p class="hint" id="color-no-folder" hidden>Open a folder to give it a color.</p>
@@ -132,7 +147,7 @@ const PAGE_CONTENT: Record<PageId, () => string> = {
       <button type="button" id="scope-project" aria-pressed="false">This project</button>
     </div>
     <p class="hint" id="sound-hint"></p>
-    <p class="slot-label">When Claude finishes</p>
+    <p class="slot-label">When an agent finishes</p>
     <div class="picker-row"><button class="picker" type="button" id="pick-stop" data-pick="stop" aria-haspopup="menu" aria-expanded="false" title="Choose a sound"></button><button class="icon-btn framed" type="button" data-play="stop" aria-label="Play" title="Play">${icon("play")}</button></div>
     <p class="slot-label">When Claude needs input</p>
     <div class="picker-row"><button class="picker" type="button" id="pick-notification" data-pick="notification" aria-haspopup="menu" aria-expanded="false" title="Choose a sound"></button><button class="icon-btn framed" type="button" data-play="notification" aria-label="Play" title="Play">${icon("play")}</button></div>
@@ -140,25 +155,33 @@ const PAGE_CONTENT: Record<PageId, () => string> = {
     <div class="btn-row"><button class="btn" type="button" id="test-sounds">${icon("volume")}Test sounds</button></div>
     ${switchRow("sounds.autoAssign", "Give new projects their own sound", "A finished sound no other project uses, the first time a project has a Claude Code conversation. Needs input stays shared.")}`,
 
-  popup: () => `
+  popup: (agent) => `
     <p class="hint" id="popup-unsupported" hidden>The popup works on Windows and macOS. Here, alerts are sound only.</p>
-    ${switchRow("popup.onDone", "When Claude finishes")}
+    ${switchRow("popup.onDone", "When an agent finishes")}
     ${switchRow("popup.onWaiting", "When Claude needs input")}
     ${switchRow("popup.stayUntilClicked", "Stay until clicked", "The popup waits for a click on it or on its x.")}
+    ${selectRow("popup.position", "Position", [["topRight", "Top right"], ["bottomRight", "Bottom right"]])}
+    ${hint("Windows shows its own notifications at the bottom right, macOS at the top right.")}
     <label class="frow" id="popup-seconds">Visible for (seconds)<input class="field" type="number" min="3" max="60" data-set="popup.seconds" /></label>
     <div id="popup-name-row">
       <label class="frow">This project: popup name<input class="field" id="popup-name" maxlength="${DISPLAY_NAME_MAX}" dir="auto" spellcheck="false" autocomplete="off" /></label>
       ${hint("Empty uses the folder name. Stored on this computer.")}
     </div>
     <div class="popup-preview" aria-hidden="true">
-      <span class="ptile" id="pv-tile">${icon("check")}</span>
-      <span class="pcopy"><strong id="pv-title" dir="auto"></strong><small>Claude finished</small></span>
+      <span class="ptile" id="pv-tile">${agentMark(agent)}</span>
+      <span class="pcopy"><strong id="pv-title" dir="auto"></strong><small>${AGENT_NAMES[agent]} finished</small></span>
       <span class="px">${icon("x")}</span>
     </div>
     <div class="btn-row"><button class="btn primary" type="button" id="test-popup">${icon("bell")}Test popup</button></div>
     ${hint("Not shown while this window is focused. Hovering pauses the timer. A click brings this window to the front.")}`,
 
-  chats: () =>
+  chats: (agent) =>
+    `<p class="section-label">New chat</p>` +
+    switchRow("chats.newChatButton", "New chat button", "At the top of the sidebar.") +
+    // Only Cursor and Antigravity have an agent of their own beside Claude Code.
+    `<div${agent === "claude" ? " hidden" : ""}>` +
+    selectRow("chats.newChatOpens", "New chat opens", [["editor", `${AGENT_NAMES[agent]} Agent`], ["claudeCode", "Claude Code"]]) +
+    `</div>` +
     `<p class="section-label">List</p>` +
     selectRow("chats.scope", "Show", [["currentWorkspace", "This project"], ["all", "All projects"]]) +
     selectRow("chats.groupBy", "Group by", [["date", "Date"], ["project", "Project"], ["flat", "None"]]) +
@@ -170,6 +193,23 @@ const PAGE_CONTENT: Record<PageId, () => string> = {
     `<p class="section-label">Viewer</p>` +
     switchRow("chats.codeCopyButtons", "Copy button on code blocks") +
     switchRow("chats.mdHeButton", "md-he button on messages"),
+
+  agents: (agent) =>
+    hint("The agents built into Cursor and Antigravity, next to Claude Code in those editors. Each one on here gets a sound and a popup when it finishes, and its conversations in the list.") +
+    agentRow("cursor", "Cursor Agent") +
+    agentRow("antigravity", "Antigravity Agent") +
+    `<p class="section-label">Their own alerts</p>` +
+    hint("Cursor and Antigravity also alert by themselves when their agent finishes, in the same corner as the popup.") +
+    // Cursor's chime is a Cursor setting: only the toolkit inside Cursor can change it.
+    `<div class="own-row"${agent === "cursor" ? "" : " hidden"}>` +
+    ownRow("cursor", "Cursor: Benefits alert only", "Turns off Cursor's chime. Its system notification is a Cursor setting: General, Notifications.") +
+    `<div class="btn-row"><button class="btn" type="button" id="open-cursor-settings">Open Cursor Settings</button></div></div>` +
+    (agent === "cursor" ? "" : hint("Cursor's own chime is turned off from this page in Cursor.")) +
+    `<div class="own-row">` +
+    ownRow("antigravity", "Antigravity: Benefits alert only", "Turns off Antigravity's notification and sound for its agent. Off puts them back. Restart Antigravity if its notification still shows.") +
+    `</div>` +
+    hint("Their conversations are read-only: open and save, no rename, archive or delete. They have no needs input alert and no RTL.") +
+    hint("Takes effect from the next prompt. Sounds and the popup follow their own pages."),
 
   rtl: () =>
     hint("Applies to the Claude Code chat panel. The viewer has its own direction switch.") +
@@ -208,7 +248,7 @@ function featureRow(p: SettingsPage): string {
     </button>`;
 }
 
-function body(): string {
+function body(agent: AgentId): string {
   return `
 <div class="side">
   <div class="side-head">
@@ -216,7 +256,7 @@ function body(): string {
       <button type="button" role="tab" id="tab-chats" aria-selected="true" aria-controls="screen-chats">Chats</button>
       <button type="button" role="tab" id="tab-settings" aria-selected="false" aria-controls="screen-settings">Settings</button>
     </div>
-    <button class="icon-btn framed" type="button" id="theme-btn"></button>
+    <button class="head-new" type="button" id="new-chat" hidden>${agentMark(agent)}<span>New chat</span></button>
   </div>
   <div class="side-body" id="body">
     <section id="screen-chats" role="tabpanel" aria-labelledby="tab-chats">
@@ -241,13 +281,16 @@ function body(): string {
         <p class="hint" id="no-folder-note" hidden>No folder open. Project settings need one.</p>
         <nav aria-label="Settings pages">${SETTINGS_PAGES.map(featureRow).join("")}</nav>
       </div>
-      ${SETTINGS_PAGES.map((p) => page(p, PAGE_CONTENT[p.id](), p.id === "windowColor" ? COLOR_NOW : "")).join("\n")}
+      ${SETTINGS_PAGES.map((p) => page(p, PAGE_CONTENT[p.id](agent), p.id === "windowColor" ? COLOR_NOW : "")).join("\n")}
     </section>
   </div>
-  <a class="brand" id="brand" href="${BENEFITS_URL}">
-    <span class="top"><span class="logo" aria-hidden="true">${BENEFITS_LOGO_SVG}</span><span class="lock"><strong>Benefits</strong><small>${BENEFITS_SLOGAN}</small></span>${icon("externalLink")}</span>
-    <p>${BENEFITS_TAGLINE_HTML}</p>
-  </a>
+  <div class="brand" id="brand">
+    <a class="brand-link" id="brand-link" href="${BENEFITS_URL}">
+      <span class="top"><span class="logo" aria-hidden="true">${BENEFITS_LOGO_SVG}</span><span class="lock"><strong>Benefits</strong><small>${BENEFITS_SLOGAN_HTML}</small></span></span>
+      <p>${BENEFITS_TAGLINE_HTML}</p>
+    </a>
+    <button class="fold" type="button" id="brand-fold" aria-controls="brand-link" aria-expanded="true" aria-label="Fold the Benefits card" title="Fold"></button>
+  </div>
 </div>
 <div class="menu" id="list-menu" role="menu" aria-label="List options" hidden>
   <p class="menu-label">Group by</p>
@@ -263,17 +306,20 @@ function body(): string {
 <div class="toast" id="toast" role="status" aria-live="polite"></div>`;
 }
 
-function script(): string {
+function script(agent: AgentId): string {
   const pages = SETTINGS_PAGES.map((p) => ({ id: p.id, switchKey: p.switchKey ?? null }));
   const palette = PRESET_PALETTE.map((p) => ({ name: p.name, hex: p.hex }));
   return `
   const PAGES = ${JSON.stringify(pages)};
   const PALETTE = ${JSON.stringify(palette)};
   const ICONS = ${JSON.stringify(ICONS)};
+  const AGENT_NAMES = ${JSON.stringify(AGENT_NAMES)};
+  const EDITOR_AGENT = ${JSON.stringify(agent)};
   const COPY = ${JSON.stringify(COPY)};
 ${SIDEBAR_SCRIPT}`;
 }
 
-export function sidebarHtml(fonts: BrandFonts | null, theme: ResolvedTheme): string {
-  return renderWebviewPage({ fonts, theme, title: "Benefit's Toolkit", css: SIDEBAR_CSS, body: body(), script: script() });
+/** `agent` is the one built into this editor; the popup preview shows its mark. */
+export function sidebarHtml(fonts: BrandFonts | null, theme: ResolvedTheme, agent: AgentId = "claude"): string {
+  return renderWebviewPage({ fonts, theme, title: "Benefit's Toolkit", css: SIDEBAR_CSS + agentMarkCss(), body: body(agent), script: script(agent) });
 }

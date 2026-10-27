@@ -1,4 +1,4 @@
-import type { BenefitConfig } from "../../../core/config-manager";
+import type { BenefitConfig, PopupPosition } from "../../../core/config-manager";
 
 /**
  * ~/.benefits-toolkit/config.json: the settings the dispatcher needs, mirrored
@@ -7,8 +7,11 @@ import type { BenefitConfig } from "../../../core/config-manager";
 export interface AlertConfigFile {
   version: 1;
   sounds: { enabled: boolean; done: string; waiting: string };
-  /** stay: up until clicked. Dispatchers from before it read it as false. */
-  popup: { enabled: boolean; onDone: boolean; onWaiting: boolean; seconds: number; stay: boolean };
+  /**
+   * stay: up until clicked. position: the screen corner. Dispatchers from
+   * before them read them as false and the bottom right.
+   */
+  popup: { enabled: boolean; onDone: boolean; onWaiting: boolean; seconds: number; stay: boolean; position: PopupPosition };
 }
 
 export const POPUP_SECONDS_MIN = 3;
@@ -29,6 +32,7 @@ export function buildAlertConfig(cfg: Pick<BenefitConfig, "sounds" | "popup">): 
       onWaiting: cfg.popup.onWaiting,
       seconds: Math.min(POPUP_SECONDS_MAX, Math.max(POPUP_SECONDS_MIN, Math.round(seconds))),
       stay: cfg.popup.stayUntilClicked === true,
+      position: cfg.popup.position === "bottomRight" ? "bottomRight" : "topRight",
     },
   };
 }

@@ -1,11 +1,14 @@
 // Benefit's Toolkit popup (macOS, JavaScript for Automation + Cocoa).
 // Started detached by dispatch.js (or by the extension's "Test popup") with
 // the path of a JSON job file:
-//   { title, subtitle, kind, color, text, theme, cli, folder, seconds, stay }
+//   { agent, title, subtitle, kind, color, text, theme, cli, folder, seconds, stay, position }
 // A small non-activating panel in the toolkit's theme, top-right under the
-// menu bar, stacked under popups already showing: a tile in the project's
-// color with a check (finished) or "!" (needs input), the project name, and
-// the status, framed in the project's color. It never takes focus by itself;
+// menu bar (or bottom-right with position "bottomRight"), stacked away from
+// the corner past popups already showing: a tile with the mark of the
+// agent that finished (Claude, Cursor or Antigravity, from bin/marks), the
+// project name, and the status, framed in the project's color. A job without
+// a mark gets the older tile: the project's color with a check (finished) or
+// "!" (needs input). It never takes focus by itself;
 // clicking it runs "<cli> <folder>", which brings that project's editor
 // window to the front. The x in the corner just closes it. With "stay" it
 // waits for one of the two.
@@ -45,10 +48,10 @@ const FRAME = 1 / 60;
 // high contrast). Same tokens as the sidebar and popup.ps1. The frame takes
 // the project's color, except in high contrast.
 const THEMES = {
-  'dark': { bg: '#1F2120', line: '#363A38', text: '#F6F4EA', muted: '#A9B3AE', done: '#8FD3B3', waiting: '#FCD34D' },
-  'light': { bg: '#FFFDF6', line: '#E6D9AE', text: '#14231C', muted: '#55635C', done: '#047857', waiting: '#92400E' },
-  'hc-dark': { bg: '#000000', line: '#FFFFFF', text: '#FFFFFF', muted: '#FFFFFF', done: '#FFFFFF', waiting: '#FFFFFF' },
-  'hc-light': { bg: '#FFFFFF', line: '#000000', text: '#000000', muted: '#000000', done: '#000000', waiting: '#000000' },
+  'dark': { bg: '#1F2120', tile: '#2C302E', line: '#363A38', text: '#F6F4EA', muted: '#A9B3AE', done: '#8FD3B3', waiting: '#FCD34D' },
+  'light': { bg: '#FFFDF6', tile: '#F1ECDD', line: '#E6D9AE', text: '#14231C', muted: '#55635C', done: '#047857', waiting: '#92400E' },
+  'hc-dark': { bg: '#000000', tile: '#000000', line: '#FFFFFF', text: '#FFFFFF', muted: '#FFFFFF', done: '#FFFFFF', waiting: '#FFFFFF' },
+  'hc-light': { bg: '#FFFFFF', tile: '#FFFFFF', line: '#000000', text: '#000000', muted: '#000000', done: '#000000', waiting: '#000000' },
 };
 
 function readText(path) {
@@ -142,7 +145,19 @@ function inside(p, r) {
     p.y >= r.origin.y && p.y <= r.origin.y + r.size.height;
 }
 
-function show(job, slotsDir, sh) {
+// The agent's mark (a PNG in bin/marks), or null. Cursor's one-color cube
+// comes in the card's text color, one file per theme.
+function agentMark(job, marksDir) {
+  const agent = String(job.agent || '');
+  if (!/^[a-z]+$/.test(agent)) return null;
+  const name = agent === 'cursor' ? (/light/.test(String(job.theme || '')) ? 'cursor-light' : 'cursor-dark') : agent;
+  const path = marksDir + '/' + name + '.png';
+  if (!$.NSFileManager.defaultManager.fileExistsAtPath(path)) return null;
+  const img = $.NSImage.alloc.initWithContentsOfFile(path);
+  return img.isNil() ? null : img;
+}
+
+function show(job, slotsDir, marksDir, sh) {
   // Stack position: the lowest slot no live popup holds.
   $.NSFileManager.defaultManager.createDirectoryAtPathWithIntermediateDirectoriesAttributesError(slotsDir, true, $(), null);
   let slot = 0;
@@ -168,7 +183,9 @@ function show(job, slotsDir, sh) {
 
     const vf = $.NSScreen.mainScreen.visibleFrame;
     const x = vf.origin.x + vf.size.width - W - EDGE;
-    const y = vf.origin.y + vf.size.height - EDGE - H - slot * (H + GAP);
+    const y = job.position === 'bottomRight'
+      ? vf.origin.y + EDGE + slot * (H + GAP)
+      : vf.origin.y + vf.size.height - EDGE - H - slot * (H + GAP);
     // Borderless (0) | NonactivatingPanel (1 << 7)
     const panel = $.NSPanel.alloc.initWithContentRectStyleMaskBackingDefer($.NSMakeRect(x, y, W, H), 1 << 7, 2, false);
     panel.setLevel(25); // NSStatusWindowLevel
@@ -184,10 +201,22 @@ function show(job, slotsDir, sh) {
     panel.setContentView(card);
     const content = card.contentView;
 
+    // The agent's mark fills the tile, on a quiet surface, so who finished
+    // shows at a glance; the project's color stays in the frame. Sized by the
+    // image itself, so no image-scaling constant is needed.
     const tileY = (H - TILE) / 2;
-    content.addSubview(box($.NSMakeRect(12, tileY, TILE, TILE), nsColor(tileHex), 8, null));
-    const glyph = waiting ? '!' : String.fromCharCode(0x2713);
-    content.addSubview(centered(glyph, waiting ? 18 : 17, 0.6, nsColor(tileText), 12, tileY, TILE, TILE));
+    const mark = agentMark(job, marksDir);
+    if (mark) {
+      content.addSubview(box($.NSMakeRect(12, tileY, TILE, TILE), nsColor(theme.tile), 8, highContrast ? nsColor(theme.line) : null));
+      mark.setSize($.NSMakeSize(20, 20));
+      const view = $.NSImageView.alloc.initWithFrame($.NSMakeRect(12 + (TILE - 20) / 2, tileY + (TILE - 20) / 2, 20, 20));
+      view.setImage(mark);
+      content.addSubview(view);
+    } else {
+      content.addSubview(box($.NSMakeRect(12, tileY, TILE, TILE), nsColor(tileHex), 8, null));
+      const glyph = waiting ? '!' : String.fromCharCode(0x2713);
+      content.addSubview(centered(glyph, waiting ? 18 : 17, 0.6, nsColor(tileText), 12, tileY, TILE, TILE));
+    }
 
     const textX = 12 + TILE + 10;
     const textW = W - textX - 30;
@@ -271,7 +300,7 @@ function run(argv) {
     $.NSFileManager.defaultManager.removeItemAtPathError(jobPath, null);
     const sh = Application.currentApplication();
     sh.includeStandardAdditions = true;
-    show(job, stateDir + '/popup-slots', sh);
+    show(job, stateDir + '/popup-slots', stateDir.replace(/\/state$/, '') + '/bin/marks', sh);
   } catch (e) {
     try {
       const log = stateDir + '/dispatch.log';

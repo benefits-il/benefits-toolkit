@@ -46,6 +46,17 @@ try {
         elseif ($data.workspace_roots) { $folder = [string](@($data.workspace_roots)[0]) }
         elseif ($data.workspacePaths) { $folder = [string](@($data.workspacePaths)[0]) }
     }
+    # Editors may write a Windows folder as a URI path ("/c:/Users/...").
+    if ($folder -match '^/[A-Za-z]:') { $folder = $folder.Substring(1) }
+
+    # Cursor also runs Claude Code's hooks for its own agent (its "third-party
+    # configs" option). Its own hook, "cursor done", reports that turn, so the
+    # copy that arrives as "claude" stays quiet. Only Cursor sets these two.
+    if ($Agent -eq "claude" -and ($env:CURSOR_TRANSCRIPT_PATH -or ($data -and $data.cursor_version))) { exit 0 }
+    # A turn the user stopped needs no alert; Antigravity also reports steps
+    # before its agent is done.
+    if ($Agent -eq "cursor" -and $data -and ($data.status -eq "aborted")) { exit 0 }
+    if ($Agent -eq "antigravity" -and $data -and ($data.fullyIdle -eq $false)) { exit 0 }
 
     $configPath = Join-Path $root "config.json"
     if (-not (Test-Path -LiteralPath $configPath)) { exit 0 }
@@ -93,6 +104,7 @@ try {
         # The record carries the text color and the theme the extension worked
         # out; older records lack them, and popup.ps1 falls back on its own.
         $job = [ordered]@{
+            agent    = $Agent
             title    = $name
             subtitle = if ($Kind -eq "waiting") { "$agentLabel needs input" } else { "$agentLabel finished" }
             kind     = $Kind
@@ -103,6 +115,9 @@ try {
             folder   = if ($project) { [string]$project.folder } else { $folder }
             seconds  = $config.popup.seconds
             stay     = ($config.popup.stay -eq $true)
+            # Top right unless chosen otherwise: the editors' own notifications
+            # take the bottom right.
+            position = if ($config.popup.position -eq "bottomRight") { "bottomRight" } else { "topRight" }
         }
         $jobsDir = Join-Path $stateDir "popups"
         New-Item -ItemType Directory -Force -Path $jobsDir | Out-Null

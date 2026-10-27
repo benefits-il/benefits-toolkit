@@ -8,13 +8,13 @@ import {
 
 const BASE = {
   sounds: { enabled: true, stopSound: "stop-default.wav", notificationSound: "notify-default.wav", cleanupOnDeactivate: false },
-  popup: { enabled: true, onDone: true, onWaiting: false, seconds: 8, stayUntilClicked: false },
+  popup: { enabled: true, onDone: true, onWaiting: false, seconds: 8, stayUntilClicked: false, position: "topRight" },
 };
 
 test("buildAlertConfig maps the slots to done / waiting", () => {
   const c = buildAlertConfig(BASE);
   assert.deepEqual(c.sounds, { enabled: true, done: "stop-default.wav", waiting: "notify-default.wav" });
-  assert.deepEqual(c.popup, { enabled: true, onDone: true, onWaiting: false, seconds: 8, stay: false });
+  assert.deepEqual(c.popup, { enabled: true, onDone: true, onWaiting: false, seconds: 8, stay: false, position: "topRight" });
   assert.equal(buildAlertConfig({ ...BASE, popup: { ...BASE.popup, stayUntilClicked: true } }).popup.stay, true);
   assert.equal(c.version, 1);
 });

@@ -3,6 +3,7 @@ import * as vscode from "vscode";
 import { readConfig } from "../../../core/config-manager";
 import { logger } from "../../../core/logger";
 import { currentTheme } from "../../../core/theme";
+import { AGENT_NAMES, editorAgent } from "../../../shared/agents";
 import { foregroundFor, normalizeHex } from "../../window-color/services/color-utils";
 import { WindowColorService } from "../../window-color/services/window-color-service";
 import { AlertAssets } from "../services/alert-assets";
@@ -89,15 +90,18 @@ export function registerAlertsCommands(
     }),
 
     // The popup this window would get, shown now: same name and color as
-    // the record the dispatcher reads for the (first) project folder.
+    // the record the dispatcher reads for the (first) project folder, and
+    // the mark of this editor's own agent (Claude in VS Code).
     vscode.commands.registerCommand("benefit.popup.test", async () => {
       try {
         const folder = vscode.workspace.workspaceFolders?.find((f) => f.uri.scheme === "file");
         const color = normalizeHex(new WindowColorService(ctx).getCurrentColor() ?? "") ?? DEFAULT_POPUP_COLOR;
+        const agent = editorAgent(vscode.env.uriScheme);
         await showPopup(
           {
+            agent,
             title: folder ? prefs.displayName(folder.uri.fsPath, folder.name) : "Benefit's Toolkit",
-            subtitle: "Claude finished",
+            subtitle: `${AGENT_NAMES[agent]} finished`,
             kind: "done",
             color,
             text: foregroundFor(color),
@@ -106,6 +110,7 @@ export function registerAlertsCommands(
             folder: folder?.uri.fsPath ?? null,
             seconds: readConfig().popup.seconds,
             stay: readConfig().popup.stayUntilClicked,
+            position: readConfig().popup.position,
           },
           platform,
         );
