@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.1 · RTL finds the right Claude Code after an update
+
+**Fixed**
+- RTL could miss the Claude Code chat for a while after Claude Code updated. During an update the old and new versions sit side by side, and the toolkit compared their version numbers as text, so 2.1.99 came out newer than 2.1.100 and the patch went to the old one. Versions are compared as numbers now.
+
 ## 0.8.0 · One sidebar, a new look
 
 **One sidebar, two tabs.** The sidebar is a single page now, with **Chats** and **Settings** tabs at the top and a theme button beside them. The native chats tree and the separate settings view are gone.
