@@ -257,6 +257,19 @@ export const SIDEBAR_CSS = `
   .popup-preview small { display: block; font-size: 11px; color: var(--accent); }
   .popup-preview .px { align-self: flex-start; color: var(--muted); }
   .popup-preview .px .ico { width: 14px; height: 14px; }
+  /* The pill a staying popup shrinks to: mark, name, counter, check. */
+  .pv-cap { display: block; margin: -4px 0 6px; font-size: 11px; color: var(--muted); }
+  .pill-preview {
+    display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 10px 0 7px; margin: 0 0 12px;
+    border-radius: 15px; background: var(--surface); border: 2px solid var(--c); box-shadow: var(--card-shadow);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+  :root[data-theme^="hc"] .pill-preview { border-color: var(--line); }
+  .pill-preview .mark { width: 16px; height: 16px; }
+  .pill-preview strong { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 600; }
+  .pill-preview .pn { min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; display: grid; place-items: center; background: var(--c); color: var(--ct); font-size: 10px; font-weight: 700; }
+  :root[data-theme^="hc"] .pill-preview .pn { background: var(--line); color: var(--bg); }
+  .pill-preview .ico { width: 12px; height: 12px; color: var(--accent); }
 
   .status { display: flex; align-items: center; gap: 8px; margin: 6px 0; padding: 10px 12px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); font-size: 12.5px; }
   .status i { width: 9px; height: 9px; flex: none; border-radius: 50%; background: var(--muted); }
@@ -491,13 +504,21 @@ export const SIDEBAR_SCRIPT = `
     if (pr && document.activeElement !== name) name.value = pr.popupName || '';
     if (pr) name.placeholder = pr.folderName;
     const typed = document.activeElement === name ? name.value.trim() : (pr && pr.popupName) || '';
-    $('pv-title').textContent = typed || (pr ? pr.folderName : "Benefit's Toolkit");
-    // The preview card takes the project's color for its frame and tile, like the real one.
-    const card = $('pv-tile').parentElement;
-    card.style.setProperty('--c', pr && pr.color ? pr.color.hex : '#047857');
-    card.style.setProperty('--ct', pr && pr.color ? pr.color.text : '#ffffff');
-    $('popup-seconds').hidden = !!value('popup.stayUntilClicked');
+    const title = typed || (pr ? pr.folderName : "Benefit's Toolkit");
+    $('pv-title').textContent = title;
+    $('pv-pill-title').textContent = title;
+    // The preview card and pill take the project's color for their frame, like the real ones.
+    for (const el of [$('pv-tile').parentElement, $('pv-pill')]) {
+      el.style.setProperty('--c', pr && pr.color ? pr.color.hex : '#047857');
+      el.style.setProperty('--ct', pr && pr.color ? pr.color.text : '#ffffff');
+    }
+    // Staying popups are full size for the seconds, then a pill.
+    const stay = !!value('popup.stayUntilClicked');
+    $('popup-seconds-label').textContent = stay ? 'Full size for (seconds)' : 'Visible for (seconds)';
+    $('pv-pill-row').hidden = !stay;
+    $('popup-place').hidden = !state.popupPlaced;
   }
+  $('popup-corner').onclick = () => post({ type: 'popupToCorner' });
   $('popup-name').addEventListener('input', renderPopup);
   $('popup-name').addEventListener('change', (e) => post({ type: 'setPopupName', value: e.target.value }));
   $('test-popup').onclick = () => post({ type: 'testPopup' });

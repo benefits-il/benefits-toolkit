@@ -10,6 +10,7 @@ import { AgentHookTarget } from "../alerts/services/agent-hooks";
 import { AlertAssets, SoundSlot } from "../alerts/services/alert-assets";
 import { CURSOR_SETTINGS_COMMAND } from "../alerts/services/native-alerts";
 import { HookInstaller } from "../alerts/services/hook-installer";
+import { clearPopupPlace, hasPopupPlace, watchPopupPlace } from "../alerts/services/popup-place";
 import { onProjectPrefsChanged, ProjectPrefsStore } from "../alerts/services/project-prefs-store";
 import { playPreview } from "../alerts/services/sound-player";
 import { playProjectSounds } from "../alerts/services/sound-test";
@@ -91,6 +92,8 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
         if (e.affectsConfiguration("workbench.colorCustomizations")) void this.postState();
       }),
       chatsHub.onDidChange(() => this.watchController()),
+      // A popup dropped somewhere new (or sent back) shows on the Popup page.
+      watchPopupPlace(() => void this.postState()),
     ];
     this.watchController();
     view.onDidDispose(() => {
@@ -174,6 +177,7 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
       theme: currentTheme(),
       values,
       platform: { alerts: platform !== "unsupported", popup: platform === "win32" || platform === "darwin" },
+      popupPlaced: hasPopupPlace(),
       project: folder
         ? {
             folderName: folder.name,
@@ -249,6 +253,10 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
           return;
         case "testPopup":
           await vscode.commands.executeCommand("benefit.popup.test");
+          return;
+        case "popupToCorner":
+          await clearPopupPlace();
+          await this.postState();
           return;
         case "pickColor": {
           const hex = typeof msg.hex === "string" ? normalizeHex(msg.hex) : undefined;

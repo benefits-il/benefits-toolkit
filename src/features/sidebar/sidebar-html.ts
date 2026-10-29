@@ -18,6 +18,8 @@ export interface SidebarState {
   /** Every setting the page writes (WRITABLE_SETTINGS), by key. */
   values: Record<string, boolean | string | number>;
   platform: { alerts: boolean; popup: boolean };
+  /** The popup was dragged to a spot of its own (Popup page: Back to corner). */
+  popupPlaced: boolean;
   /** The window's (first) project; null with no folder open. */
   project: {
     folderName: string;
@@ -159,10 +161,14 @@ const PAGE_CONTENT: Record<PageId, (agent: AgentId) => string> = {
     <p class="hint" id="popup-unsupported" hidden>The popup works on Windows and macOS. Here, alerts are sound only.</p>
     ${switchRow("popup.onDone", "When an agent finishes")}
     ${switchRow("popup.onWaiting", "When Claude needs input")}
-    ${switchRow("popup.stayUntilClicked", "Stay until clicked", "The popup waits for a click on it or on its x.")}
+    ${switchRow("popup.stayUntilClicked", "Stay until clicked", "After the visible time it shrinks to a small pill that waits for a click.")}
     ${selectRow("popup.position", "Position", [["topRight", "Top right"], ["bottomRight", "Bottom right"]])}
     ${hint("Windows shows its own notifications at the bottom right, macOS at the top right.")}
-    <label class="frow" id="popup-seconds">Visible for (seconds)<input class="field" type="number" min="3" max="60" data-set="popup.seconds" /></label>
+    <div id="popup-place" hidden>
+      ${hint("Placed where you dragged it. New popups show there too.")}
+      <div class="btn-row"><button class="btn" type="button" id="popup-corner">Back to corner</button></div>
+    </div>
+    <label class="frow"><span id="popup-seconds-label">Visible for (seconds)</span><input class="field" type="number" min="3" max="60" data-set="popup.seconds" /></label>
     <div id="popup-name-row">
       <label class="frow">This project: popup name<input class="field" id="popup-name" maxlength="${DISPLAY_NAME_MAX}" dir="auto" spellcheck="false" autocomplete="off" /></label>
       ${hint("Empty uses the folder name. Stored on this computer.")}
@@ -172,8 +178,12 @@ const PAGE_CONTENT: Record<PageId, (agent: AgentId) => string> = {
       <span class="pcopy"><strong id="pv-title" dir="auto"></strong><small>${AGENT_NAMES[agent]} finished</small></span>
       <span class="px">${icon("x")}</span>
     </div>
+    <div id="pv-pill-row" hidden>
+      <span class="pv-cap">Then, until clicked:</span>
+      <div class="pill-preview" id="pv-pill" aria-hidden="true">${agentMark(agent)}<strong id="pv-pill-title" dir="auto"></strong><span class="pn">3</span>${icon("check")}</div>
+    </div>
     <div class="btn-row"><button class="btn primary" type="button" id="test-popup">${icon("bell")}Test popup</button></div>
-    ${hint("Not shown while this window is focused. Hovering pauses the timer. A click brings this window to the front.")}`,
+    ${hint("Not shown while this window is focused. Hovering pauses the timer. A click brings this window to the front; a drag moves the popup. More alerts from one window raise a counter on its popup.")}`,
 
   chats: (agent) =>
     `<p class="section-label">New chat</p>` +

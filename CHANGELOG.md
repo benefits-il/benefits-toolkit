@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.11.0 · A popup you notice, and one per window
+
+**A popup you notice.** The popup springs in from the edge of the screen, runs a little past its spot and settles back, then flashes its frame once in the project's color. With animations turned off in Windows or Reduce motion on in macOS, it fades in and the frame flashes without moving.
+
+**One popup per window.** More alerts from the same window no longer stack up new popups. The popup that is already up takes them: a counter on the agent's mark goes up, the frame flashes again, the second line shows the latest alert and the timer starts over. Popups from different windows still stack, and close up the gap when one goes. The same folder in VS Code and in Cursor is two windows, so two popups.
+
+**Drag it anywhere.** A click still brings the window to the front; a drag only moves the popup. Where you drop it is where later popups show, stacking down from there (or up, in the bottom half of the screen), and they come in from the nearer edge. The Popup page in Settings gets a **Back to corner** button once a popup has been dragged. A spot on a screen that is no longer there falls back to the corner.
+
+**Stay until clicked, as a pill.** With Stay until clicked on, the popup is full size for the usual seconds, then shrinks to a small pill in its place: the project's color, the agent's mark, the name, the counter, and a check (finished) or a bell (needs input). Hovering the pill turns the check into an x that closes it; a click anywhere else brings the window to the front. A new alert from that window opens it back to full size. The seconds field now stays on the Popup page with Stay on, as **Full size for (seconds)**, and the page shows the pill under the card.
+
 ## 0.10.0 · Room for titles, and a sidebar that narrows
 
 **More room for titles.** Each row starts with the project's dot, then the agent's mark and the title. At the far end sit the time and a small ring for how full the context is: green, then yellow from 50% and red from 80%, with the percent on hover. Times are short (now, 5m, 3h, 2d, 3mo, 1y), with the exact date on hover, and line up from row to row. What every row shares is left out: no Claude marks when all the conversations are Claude's, and no project dots when they all belong to one project, as in This project.

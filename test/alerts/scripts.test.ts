@@ -46,6 +46,34 @@ test("the popup's corner travels from config.json to both popups, top right unle
   }
 });
 
+test("one popup process shows every card: the first becomes the host, later ones hand their job over", () => {
+  const ps = readFileSync(join(scripts, "win", "popup.ps1"), "utf8");
+  assert.ok(ps.includes("Local\\BenefitToolkitPopupHost"), "popup.ps1 has no host mutex");
+  assert.ok(/Test-Path -LiteralPath \$JobFile\)\)\s*\{\s*exit 0/.test(ps), "popup.ps1 does not exit once the host took its job");
+  const js = readFileSync(join(scripts, "mac", "popup.js"), "utf8");
+  assert.ok(js.includes("/popup-host'") && js.includes("kill -0"), "popup.js has no host lock with a stale check");
+  assert.ok(js.includes("fileExistsAtPath(jobPath)"), "popup.js does not exit once the host took its job");
+  for (const [f, s] of [["win/popup.ps1", ps], ["mac/popup.js", js]]) {
+    assert.ok(s.includes("popups"), `${f} does not read the job folder`);
+    assert.ok(s.includes("popup-place.json"), `${f} does not keep the dropped spot where Back to corner deletes it`);
+  }
+});
+
+test("the popups merge alerts from one window, shrink staying cards to a pill and only move on a drag", () => {
+  for (const f of ["win/popup.ps1", "mac/popup.js"]) {
+    const s = readFileSync(join(scripts, f), "utf8");
+    // Same window = same folder in the same editor.
+    assert.ok(/folder[\s\S]{0,200}\|[\s\S]{0,80}cli/.test(s), `${f} does not key cards by folder and editor`);
+    assert.ok(/[Pp]ill/.test(s) && /[Ss]tay/.test(s), `${f} has no pill for staying cards`);
+    assert.ok(/[Dd]ropped/.test(s), `${f} has no drop`);
+    // The chosen motion: the spring in from the edge, then one flash.
+    assert.ok(s.includes("-18 * $s") || s.includes("-18 * s"), `${f} lacks the spring's overshoot`);
+    assert.ok(s.includes("820"), `${f} lacks the flash`);
+  }
+  // Clicks on the Mac popup are read on mouse up now, so a drag can be told apart.
+  assert.ok(readFileSync(join(scripts, "mac", "popup.js"), "utf8").includes("LEFT_MOUSE_UP"));
+});
+
 test("every agent has a popup mark", () => {
   for (const f of ["claude.png", "cursor-dark.png", "cursor-light.png", "antigravity.png"]) {
     assert.ok(readFileSync(join(scripts, "marks", f)).subarray(1, 4).toString() === "PNG", `${f} is missing or not a PNG`);

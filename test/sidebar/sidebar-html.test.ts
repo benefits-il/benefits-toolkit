@@ -67,6 +67,15 @@ test("the Popup page picks the screen corner", () => {
   assert.ok(html.includes('data-set-value="popup.position" data-value="bottomRight"'));
 });
 
+test("the Popup page sends a dragged popup back to the corner and shows the pill a staying popup becomes", () => {
+  assert.ok(html.includes('id="popup-corner"') && html.includes(">Back to corner<"));
+  assert.ok(html.includes("type: 'popupToCorner'"));
+  assert.ok(html.includes("state.popupPlaced"));
+  assert.ok(html.includes('id="pv-pill"'));
+  // The seconds stay: with Stay until clicked they are the full-size time.
+  assert.ok(html.includes("Full size for (seconds)"));
+});
+
 test("no em or en dashes in what the page says", () => {
   const text = html.replace(/<svg[\s\S]*?<\/svg>/g, "").replace(/<style>[\s\S]*?<\/style>/, "");
   assert.ok(!/[–—]/.test(text));

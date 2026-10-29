@@ -52,6 +52,16 @@ export function toolkitConfigFile(): string {
   return path.join(toolkitHome(), "config.json");
 }
 
+/** What the dispatcher and the popup keep between alerts: jobs, stamps, the log. */
+export function toolkitStateDir(): string {
+  return path.join(toolkitHome(), "state");
+}
+
+/** Where the user last dropped the popup; the popup writes it, "Back to corner" deletes it. */
+export function popupPlaceFile(): string {
+  return path.join(toolkitStateDir(), "popup-place.json");
+}
+
 /** Cursor's per-user folder: its hooks.json and its agent's transcripts. */
 export function cursorRoot(): string {
   return path.join(homeDir(), ".cursor");
