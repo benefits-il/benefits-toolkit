@@ -1,6 +1,7 @@
 import { AGENT_NAMES, AgentId, agentMark, agentMarkCss } from "../../shared/agents";
 import { BENEFITS_LOGO_SVG, BENEFITS_SLOGAN_HTML, BENEFITS_TAGLINE_HTML, BENEFITS_URL } from "../../shared/brand-bar";
 import { icon, iconMap } from "../../shared/icons";
+import { OPEN_IN_AGENT_NAMES } from "../chats/services/open-in-agent";
 import type { ResolvedTheme } from "../../shared/theme-resolve";
 import { BrandFonts, escapeHtml, renderWebviewPage } from "../../shared/webview-theme";
 import type { HookedAgent } from "../alerts/services/agent-hooks";
@@ -69,7 +70,7 @@ const COPY = {
   scopeProject: "This project only. Inherit uses the defaults.",
 };
 
-const ICONS = iconMap(["chevronDown", "chevronsUp", "messages", "folder", "alertTriangle", "search", "pencil", "archive", "restore", "download", "trash", "play", "volume", "check"]);
+const ICONS = iconMap(["chevronDown", "chevronsUp", "messages", "folder", "alertTriangle", "search", "pencil", "archive", "restore", "download", "trash", "play", "volume", "check", "arrowUpRight"]);
 
 function switchRow(key: string, label: string, hint = "", main = false): string {
   return `<label class="srow${main ? " main" : ""}"><span><strong>${label}</strong>${hint ? `<small>${hint}</small>` : ""}</span><input type="checkbox" class="switch" role="switch" data-set="${key}" /></label>`;
@@ -193,6 +194,7 @@ const PAGE_CONTENT: Record<PageId, (agent: AgentId) => string> = {
     selectRow("chats.newChatOpens", "New chat opens", [["editor", `${AGENT_NAMES[agent]} Agent`], ["claudeCode", "Claude Code"]]) +
     `</div>` +
     `<p class="section-label">List</p>` +
+    switchRow("chats.openInAgentButton", "Open in agent button", "Opens a conversation in its agent's own chat: on a hovered row, in the right-click menu and in the viewer.") +
     selectRow("chats.scope", "Show", [["currentWorkspace", "This project"], ["all", "All projects"]]) +
     selectRow("chats.groupBy", "Group by", [["date", "Date"], ["project", "Project"], ["flat", "None"]]) +
     selectRow("chats.sortOrder", "Sort", [["newest", "Newest first"], ["oldest", "Oldest first"]]) +
@@ -201,6 +203,7 @@ const PAGE_CONTENT: Record<PageId, (agent: AgentId) => string> = {
     switchRow("chats.confirmDelete", "Confirm before deleting") +
     switchRow("chats.showStatusBarRename", "Rename in the status bar", "Renames this project's latest conversation.") +
     `<p class="section-label">Viewer</p>` +
+    selectRow("chats.viewerOpens", "Opens in", [["beside", "A split beside"], ["active", "The group in use"]]) +
     switchRow("chats.codeCopyButtons", "Copy button on code blocks") +
     switchRow("chats.mdHeButton", "md-he button on messages"),
 
@@ -327,6 +330,7 @@ function script(agent: AgentId): string {
   const PALETTE = ${JSON.stringify(palette)};
   const ICONS = ${JSON.stringify(ICONS)};
   const AGENT_NAMES = ${JSON.stringify(AGENT_NAMES)};
+  const OPEN_IN_NAMES = ${JSON.stringify(OPEN_IN_AGENT_NAMES)};
   const EDITOR_AGENT = ${JSON.stringify(agent)};
   const COPY = ${JSON.stringify(COPY)};
 ${SIDEBAR_SCRIPT}`;

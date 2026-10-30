@@ -2,7 +2,7 @@
   "name": "benefits-toolkit",
   "displayName": "Benefit's Toolkit",
   "description": "Quality-of-life tools for Claude Code, and for Cursor's and Antigravity's own agents: RTL chat, sounds and popups, a conversation manager and viewer, window colors and HTML in your browser. Part of Benefits, the course that teaches you to work right with AI (benefits-il.dev).",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "publisher": "benakiva",
   "author": {
     "name": "Ben Akiva"
@@ -547,6 +547,11 @@
           ],
           "description": "What the New chat button opens."
         },
+        "benefit.chats.openInAgentButton": {
+          "type": "boolean",
+          "default": true,
+          "description": "Open a conversation in its agent's own chat, in an editor tab: a button on the hovered row, an item in its right-click menu and a button in the viewer. Works for Claude Code conversations of this window's folder (when Claude Code is installed) and, in Cursor, for Cursor's."
+        },
         "benefit.chats.confirmDelete": {
           "type": "boolean",
           "default": true,
@@ -566,6 +571,19 @@
           "type": "boolean",
           "default": true,
           "description": "Show an \"Open in md-he\" button on every message in the conversation viewer (opens the message at benefits-il.dev/md-he for comfortable reading)."
+        },
+        "benefit.chats.viewerOpens": {
+          "type": "string",
+          "enum": [
+            "beside",
+            "active"
+          ],
+          "default": "beside",
+          "enumDescriptions": [
+            "In a split beside the editor; more conversations open as tabs in that same group.",
+            "In the editor group in use, as a tab over what is open there."
+          ],
+          "description": "Where a conversation opens in the viewer."
         },
         "benefit.windowColor.enabled": {
           "type": "boolean",

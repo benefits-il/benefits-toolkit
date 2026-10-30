@@ -26,6 +26,10 @@ export const VIEWER_CSS = `
   .pdot { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--c, transparent); border: 1.5px solid var(--c, var(--muted)); }
   .heading-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 8px 0 6px; }
   .heading-row h1 { font: 700 22px/1.25 var(--head); letter-spacing: -0.4px; min-width: 0; overflow-wrap: anywhere; }
+  /* Open in the agent's own chat, beside More: the agent's mark, the words, an arrow. */
+  .heading-row .open-in { margin-inline-start: auto; flex: none; }
+  .heading-row .open-in .mark { width: 15px; height: 15px; }
+  .heading-row .open-in .ico { width: 13px; height: 13px; opacity: 0.75; }
   .meta { display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--muted); font-size: 12px; }
   .tools { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 16px; }
   .find {
@@ -205,6 +209,7 @@ export const VIEWER_CSS = `
     .messages { padding: 0; }
     .column { padding: 4px 12px 40px; border: 0; }
     .heading-row h1 { font-size: 19px; }
+    .heading-row .open-in span { display: none; }
     .find { flex-basis: 100%; }
     .meta { gap: 2px 10px; }
     .msg-body { padding: 12px 14px; }
@@ -294,6 +299,8 @@ export const VIEWER_SCRIPT = `
   });
 
   // ---- Collapse: one message from its header, or all of them.
+  // The cards opened or closed by hand keep that state when new messages arrive.
+  const touched = new Set();
   function setCollapsed(article, collapsed) {
     article.classList.toggle('collapsed', collapsed);
     article.querySelector('.msg-toggle').setAttribute('aria-expanded', String(!collapsed));
@@ -306,6 +313,7 @@ export const VIEWER_SCRIPT = `
     const head = e.target.closest('.msg-head');
     if (!head || e.target.closest('.actions')) return;
     const article = head.closest('.msg');
+    touched.add(article.dataset.key);
     setCollapsed(article, !article.classList.contains('collapsed'));
     syncCollapseAll();
   });
@@ -316,12 +324,13 @@ export const VIEWER_SCRIPT = `
     if (!body) return;
     e.preventDefault();
     e.stopPropagation();
+    touched.add(body.closest('.msg').dataset.key);
     setCollapsed(body.closest('.msg'), false);
     syncCollapseAll();
   }, true);
   $('collapse').onclick = () => {
     const anyOpen = $$('.msg').some((m) => !m.classList.contains('collapsed'));
-    $$('.msg').forEach((m) => setCollapsed(m, anyOpen));
+    $$('.msg').forEach((m) => { touched.add(m.dataset.key); setCollapsed(m, anyOpen); });
     syncCollapseAll();
   };
 
@@ -507,8 +516,58 @@ export const VIEWER_SCRIPT = `
     pin();
   }
 
+  // ---- Open in the agent's own chat (Claude Code, or Cursor inside Cursor).
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('#open-in')) post({ type: 'action', action: 'openInAgent' });
+  });
+
+  // ---- New messages while the page is open. Only the exchanges that changed
+  // are replaced, so the rest keep their place and their state. A card opened
+  // or closed by hand stays so; the others take the server's choice (only the
+  // newest answer open). The page follows the bottom only if it was there.
+  function applyUpdate(parts) {
+    const atEnd = list.scrollHeight - list.scrollTop - list.clientHeight < 120;
+    const wasOpen = new Map($$('.msg').map((m) => [m.dataset.key, !m.classList.contains('collapsed')]));
+    const openDetails = new Set($$('details[data-key]').filter((d) => d.open).map((d) => d.dataset.key));
+    const col = $('column');
+    if (!parts.turns.length) {
+      col.innerHTML = '<div class="empty-state">No messages in this conversation.</div>';
+    } else {
+      const empty = col.querySelector('.empty-state');
+      if (empty) empty.remove();
+      const have = $$('.turn', col);
+      parts.turns.forEach((t, i) => {
+        const cur = have[i];
+        if (cur && cur.dataset.h === t.h) return;
+        const tpl = document.createElement('template');
+        tpl.innerHTML = t.html;
+        const el = tpl.content.firstElementChild;
+        $$('.msg', el).forEach((m) => {
+          if (touched.has(m.dataset.key) && wasOpen.has(m.dataset.key)) setCollapsed(m, !wasOpen.get(m.dataset.key));
+        });
+        $$('details[data-key]', el).forEach((d) => { if (openDetails.has(d.dataset.key)) d.open = true; });
+        if (cur) cur.replaceWith(el); else col.append(el);
+      });
+      have.slice(parts.turns.length).forEach((el) => el.remove());
+    }
+    $$('.heading-row h1').forEach((h) => { h.textContent = parts.title; });
+    INITIAL.title = parts.title;
+    $('meta').innerHTML = parts.meta;
+    $('context-slot').innerHTML = parts.context;
+    applyPrefs();
+    syncCollapseAll();
+    if (atEnd) list.scrollTop = list.scrollHeight;
+    syncLatest();
+  }
+
   window.addEventListener('message', (e) => {
     const m = e.data || {};
+    if (m.type === 'update' && m.parts) applyUpdate(m.parts);
+    if (m.type === 'openIn' && typeof m.button === 'string') {
+      const tpl = document.createElement('template');
+      tpl.innerHTML = m.button;
+      $('open-in').replaceWith(tpl.content.firstElementChild);
+    }
     if (m.type === 'prefs') { prefs = m.prefs; applyPrefs(); }
     if (m.type === 'flags') {
       document.body.classList.toggle('no-code-copy', !m.codeCopy);

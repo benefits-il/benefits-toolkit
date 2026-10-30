@@ -11,7 +11,8 @@ import { ConversationMeta } from "../domain/conversation";
 import { ConversationRepository } from "../services/conversation-repository";
 import { isWebLink, parseFileLink, resolveCandidates } from "../services/link-resolver";
 import { openInMdHe } from "../services/md-he-launcher";
-import { buildViewerHtml, cleanViewerPrefs, ViewerFlags, ViewerPrefs } from "./viewer/viewer-html";
+import type { OpenableAgent } from "../services/open-in-agent";
+import { buildViewerHtml, cleanViewerPrefs, openInButton, ViewerFlags, viewerParts, ViewerPrefs } from "./viewer/viewer-html";
 
 const VIEW_TYPE = "benefit.chatViewer";
 /** Reading direction and Display filters, shared by every viewer. */
@@ -26,10 +27,14 @@ export interface ViewerActions {
   delete(meta: ConversationMeta): Promise<void>;
   exportFull(meta: ConversationMeta): Promise<void>;
   revealInList(meta: ConversationMeta): Promise<void>;
+  /** The conversation in its agent's own chat (the header's button). */
+  openInAgent(meta: ConversationMeta): Promise<void>;
+  /** Whose chat can open it from this window; null hides the button. */
+  openInTarget(meta: ConversationMeta): OpenableAgent | null;
   projectColor(meta: ConversationMeta): Promise<string | null>;
 }
 
-type ActionName = "rename" | "archive" | "restore" | "delete" | "exportFull" | "reveal";
+type ActionName = "rename" | "archive" | "restore" | "delete" | "exportFull" | "reveal" | "openInAgent";
 
 interface ViewerMessage {
   type?: string;
@@ -43,6 +48,23 @@ interface OpenViewer {
   panel: vscode.WebviewPanel;
   /** The freshest meta: a rename or a move re-reads it. */
   meta: ConversationMeta;
+  /** The file's size and time when the page was last filled; a different one means new messages. */
+  stamp: string;
+  /** The file changed while the tab was hidden: it updates when shown. */
+  stale: boolean;
+  /** An update is running; `again` asks for one more after it. */
+  busy: boolean;
+  again: boolean;
+}
+
+/** A file's size and time of change, to tell whether it grew; "" once it is gone. */
+async function stampOf(filePath: string): Promise<string> {
+  try {
+    const s = await fs.promises.stat(filePath);
+    return `${s.size}:${s.mtimeMs}`;
+  } catch {
+    return "";
+  }
 }
 
 function readViewerFlags(): ViewerFlags {
@@ -80,19 +102,23 @@ export class ChatViewerService implements vscode.Disposable {
     const existing = this.viewers.get(meta.filePath);
     if (existing) {
       existing.panel.reveal();
+      void this.updateIfChanged(existing);
       return;
     }
 
-    const panel = vscode.window.createWebviewPanel(VIEW_TYPE, tabTitle(meta.title), vscode.ViewColumn.Active, {
+    const panel = vscode.window.createWebviewPanel(VIEW_TYPE, tabTitle(meta.title), this.column(), {
       enableScripts: true,
       retainContextWhenHidden: true,
       localResourceRoots: panelResourceRoots(this.ctx.extensionUri),
     });
     panel.iconPath = new vscode.ThemeIcon("comment-discussion");
-    const entry: OpenViewer = { panel, meta };
+    const entry: OpenViewer = { panel, meta, stamp: "", stale: false, busy: false, again: false };
     this.viewers.set(meta.filePath, entry);
 
-    panel.onDidChangeViewState(() => this.syncActive());
+    panel.onDidChangeViewState(() => {
+      this.syncActive();
+      if (panel.visible && entry.stale) void this.update(entry);
+    });
     panel.onDidDispose(() => {
       for (const [key, value] of this.viewers) if (value === entry) this.viewers.delete(key);
       this.syncActive();
@@ -113,6 +139,59 @@ export class ChatViewerService implements vscode.Disposable {
       entry.meta = meta;
       await this.render(entry);
     })();
+  }
+
+  /**
+   * Conversation files changed on disk (the agent wrote more): every open
+   * viewer whose file grew takes the new messages in place. A hidden tab
+   * waits until it is shown.
+   */
+  refreshChanged(): void {
+    for (const entry of this.viewers.values()) void this.updateIfChanged(entry);
+  }
+
+  /** The setting or Claude Code's presence changed: each header's button follows. */
+  syncOpenIn(): void {
+    for (const entry of this.viewers.values()) {
+      void entry.panel.webview.postMessage({ type: "openIn", button: openInButton(this.actions.openInTarget(entry.meta)) });
+    }
+  }
+
+  private async updateIfChanged(entry: OpenViewer): Promise<void> {
+    const stamp = await stampOf(entry.meta.filePath);
+    if (!stamp || stamp === entry.stamp) return;
+    if (entry.panel.visible) await this.update(entry);
+    else entry.stale = true;
+  }
+
+  /** New messages into an open page, without reloading it: its scroll, open cards and search stay. */
+  private async update(entry: OpenViewer): Promise<void> {
+    if (entry.busy) {
+      entry.again = true;
+      return;
+    }
+    entry.busy = true;
+    try {
+      do {
+        entry.again = false;
+        entry.stale = false;
+        const stamp = await stampOf(entry.meta.filePath);
+        if (!stamp) return;
+        // Claude Code's files carry the title and the usage; the others' list data stays.
+        if (entry.meta.source === "claude") {
+          const meta = await this.repo.readMeta(entry.meta.filePath, entry.meta.projectFolder, entry.meta.archived);
+          if (meta) entry.meta = meta;
+        }
+        const records = await this.repo.records(entry.meta);
+        entry.stamp = stamp;
+        entry.panel.title = tabTitle(entry.meta.title);
+        await entry.panel.webview.postMessage({ type: "update", parts: viewerParts({ meta: entry.meta, records }) });
+      } while (entry.again);
+    } catch (err) {
+      logger.warn("chats", "Updating an open conversation failed", err);
+    } finally {
+      entry.busy = false;
+    }
   }
 
   /** The conversation file moved (archive, restore): keep its viewer on the new file. */
@@ -151,6 +230,18 @@ export class ChatViewerService implements vscode.Disposable {
     this.activeChanged.dispose();
   }
 
+  /**
+   * Where a new viewer tab goes. Beside: the group the viewers already use,
+   * or else a split next to the editor (with nothing open there is nothing
+   * to sit beside, so the group in use). Active: the group in use.
+   */
+  private column(): vscode.ViewColumn {
+    if (readConfig().chats.viewerOpens === "active") return vscode.ViewColumn.Active;
+    for (const { panel } of this.viewers.values()) if (panel.viewColumn !== undefined) return panel.viewColumn;
+    const anyOpen = vscode.window.tabGroups.all.some((g) => g.tabs.length > 0);
+    return anyOpen ? vscode.ViewColumn.Beside : vscode.ViewColumn.Active;
+  }
+
   private prefs(): ViewerPrefs {
     return cleanViewerPrefs(this.ctx.globalState.get(PREFS_KEY));
   }
@@ -171,7 +262,10 @@ export class ChatViewerService implements vscode.Disposable {
 
   private async render(entry: OpenViewer): Promise<void> {
     const { panel, meta } = entry;
+    const stamp = await stampOf(meta.filePath);
     const records = await this.repo.records(meta);
+    entry.stamp = stamp;
+    entry.stale = false;
     panel.title = tabTitle(meta.title);
     panel.webview.html = buildViewerHtml({
       meta,
@@ -181,6 +275,7 @@ export class ChatViewerService implements vscode.Disposable {
       prefs: this.prefs(),
       flags: readViewerFlags(),
       projectColor: await this.actions.projectColor(meta).catch(() => null),
+      openIn: this.actions.openInTarget(meta),
     });
   }
 
@@ -220,6 +315,7 @@ export class ChatViewerService implements vscode.Disposable {
       case "delete": return this.actions.delete(meta);
       case "exportFull": return this.actions.exportFull(meta);
       case "reveal": return this.actions.revealInList(meta);
+      case "openInAgent": return this.actions.openInAgent(meta);
     }
   }
 

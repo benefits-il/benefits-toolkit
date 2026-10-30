@@ -26,7 +26,7 @@ import { SidebarChats, sidebarHtml, SidebarState } from "./sidebar-html";
 
 const SLOTS: readonly SoundSlot[] = ["stop", "notification"];
 const SLOT_CONFIG_KEY: Record<SoundSlot, string> = { stop: "sounds.stopSound", notification: "sounds.notificationSound" };
-const CHAT_ACTIONS = ["open", "rename", "archive", "restore", "delete", "export"] as const;
+const CHAT_ACTIONS = ["open", "openInAgent", "rename", "archive", "restore", "delete", "export"] as const;
 type ChatAction = (typeof CHAT_ACTIONS)[number];
 
 interface SidebarMessage {
@@ -365,6 +365,7 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
     if (!meta) return;
     switch (action as ChatAction) {
       case "open": return controller.open(meta);
+      case "openInAgent": return controller.openInAgent(meta);
       case "rename": return controller.rename(meta);
       case "archive": return controller.archive(meta);
       case "restore": return controller.restore(meta);

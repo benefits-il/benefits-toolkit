@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.12.0 · Open the real chat, and a viewer that keeps up
+
+**Open in the agent's own chat.** Hovering a row shows a small button with the agent's mark and an arrow, in place of the time and the ring. It opens the conversation in that agent's own chat, in an editor tab: Claude Code's for a Claude conversation, Cursor's for a Cursor conversation (inside Cursor). A conversation that is already open there gets focus instead of a second tab. A plain click on the row still opens the toolkit's viewer. The same action is in the row's right-click menu, under Open, and in the viewer's header, beside More.
+
+**Which rows have it.** Only this window's own conversations: Claude Code finds a session only in the open folder's project, and a Cursor chat opened from another folder would work in this one. Claude conversations need Claude Code installed in the editor; archived ones have left their project and have no button. Antigravity has no way to open a conversation by its id, so its rows have none. The switch is **Open in agent button** on the Conversations page (`benefit.chats.openInAgentButton`).
+
+**The viewer keeps up.** An open conversation takes in new messages as the agent writes them, without closing and reopening the tab. Only the exchanges that changed are redrawn: the page keeps its scroll, the cards you opened or closed stay so, and a search stays on. At the bottom, it follows the new answer; scrolled up, it stays where it is and the Go to latest button shows. A tab in the background updates when you come back to it. The title, the message count and the context bar follow too.
+
+**The viewer opens beside your code.** A conversation now opens in a split next to the editor instead of over it, and the next ones open as tabs in that same group. With nothing open in the editor, it opens in the editor's place. **Opens in** on the Conversations page (`benefit.chats.viewerOpens`) switches back to the group in use.
+
 ## 0.11.0 · A popup you notice, and one per window
 
 **A popup you notice.** The popup springs in from the edge of the screen, runs a little past its spot and settles back, then flashes its frame once in the project's color. With animations turned off in Windows or Reduce motion on in macOS, it fades in and the frame flashes without moving.

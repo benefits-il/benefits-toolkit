@@ -130,6 +130,26 @@ export const SIDEBAR_CSS = `
   /* What every row shares tells nothing, so it makes room for the titles: no
      marks when all the conversations are Claude's, no dots when all are one project's. */
   #chat-list.claude-only .row > .mark, #chat-list.one-project .row > .pdot { display: none; }
+  /* Open in the agent's own chat: a small pill (the agent's mark and an arrow)
+     that takes the place of the time and the ring while the row is hovered,
+     so the title keeps its width. */
+  .open-agent {
+    display: none; position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    align-items: center; gap: 3px; height: 20px; padding: 0 5px 0 4px;
+    border: 1px solid var(--line); border-radius: var(--pill); cursor: pointer;
+    background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--muted);
+  }
+  .open-agent .mark { width: 13px; height: 13px; }
+  .open-agent .ico { width: 11px; height: 11px; stroke-width: 2.2; }
+  .open-agent:hover, .open-agent:focus-visible {
+    background: color-mix(in srgb, var(--text) 15%, transparent); color: var(--text);
+    border-color: color-mix(in srgb, var(--text) 22%, transparent);
+  }
+  .open-agent:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+  .row:hover .open-agent { display: inline-flex; }
+  .row:hover:has(.open-agent) .row-end { visibility: hidden; }
+  #row-menu .open-in .mark { width: 15px; height: 15px; }
+  #row-menu .open-in .ico.after { width: 12px; height: 12px; margin-left: auto; opacity: .7; }
   .skeleton { height: 28px; margin: 2px 0; border-radius: var(--row-r); background: var(--surface); animation: pulse 1.4s ease-in-out infinite; }
   @keyframes pulse { 50% { opacity: 0.55; } }
 
@@ -620,7 +640,7 @@ export const SIDEBAR_SCRIPT = `
           '<i class="mark mark-' + esc(r.agent) + '" role="img" aria-label="' + esc(AGENT_NAMES[r.agent]) + '" title="' + esc(AGENT_NAMES[r.agent]) + '"></i>' +
           '<span class="row-title" dir="auto" title="' + esc(r.title) + '">' + esc(r.title) + '</span>' +
           '<span class="row-end"><time datetime="' + esc(r.modified) + '" title="' + esc(new Date(r.modified).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })) + '">' + esc(relTime(r.modified)) + '</time>' +
-          '<span class="row-ctx">' + contextMeter(r.context) + '</span></span></div>';
+          '<span class="row-ctx">' + contextMeter(r.context) + '</span></span>' + openButton(r) + '</div>';
         n++;
       });
     });
@@ -633,6 +653,14 @@ export const SIDEBAR_SCRIPT = `
     if (focusIndex >= n) focusIndex = n - 1;
     syncFocus(false);
     if (pendingReveal) reveal(pendingReveal);
+  }
+
+  // The row's way into the agent's own chat: its mark and an arrow, on hover.
+  function openButton(r) {
+    if (!r.openIn) return '';
+    const label = 'Open in ' + OPEN_IN_NAMES[r.openIn];
+    return '<button type="button" class="open-agent" tabindex="-1" data-open-in="1" title="' + esc(label) + '" aria-label="' + esc(label) + '">' +
+      '<i class="mark mark-' + esc(r.openIn) + '" aria-hidden="true"></i>' + ICONS.arrowUpRight + '</button>';
   }
 
   // How full the conversation's context window is: a small ring, the percent on hover.
@@ -657,7 +685,7 @@ export const SIDEBAR_SCRIPT = `
     if (!row) return;
     focusIndex = visibleRows().indexOf(row);
     syncFocus(false);
-    post({ type: 'chat', action: 'open', id: row.dataset.id });
+    post({ type: 'chat', action: e.target.closest('[data-open-in]') ? 'openInAgent' : 'open', id: row.dataset.id });
   });
   $('chat-list').addEventListener('contextmenu', (e) => {
     const row = e.target.closest('.row');
@@ -771,10 +799,16 @@ export const SIDEBAR_SCRIPT = `
       '<button type="button" role="menuitem"' + (cls ? ' class="' + cls + '"' : '') + ' data-row-action="' + action + '">' + ICONS[icon] + label + '</button>';
     const menu = $('row-menu');
     menu.dataset.id = row.dataset.id;
+    // The row's own button says where it opens: the same item sits under Open.
+    const via = row.querySelector('.open-agent');
+    const openIn = via
+      ? '<button type="button" role="menuitem" class="open-in" data-row-action="openInAgent">' + via.querySelector('.mark').outerHTML + esc(via.title) +
+        ICONS.arrowUpRight.replace('class="ico"', 'class="ico after"') + '</button>'
+      : '';
     // Cursor's and Antigravity's conversations are theirs: open and save only.
     menu.innerHTML = row.dataset.readOnly
-      ? item('open', 'messages', 'Open') + item('export', 'download', 'Save as Markdown')
-      : item('open', 'messages', 'Open') + item('rename', 'pencil', 'Rename') +
+      ? item('open', 'messages', 'Open') + openIn + item('export', 'download', 'Save as Markdown')
+      : item('open', 'messages', 'Open') + openIn + item('rename', 'pencil', 'Rename') +
         (archived ? item('restore', 'restore', 'Restore from archive') : item('archive', 'archive', 'Archive')) +
         item('export', 'download', 'Save as Markdown') + '<hr />' + item('delete', 'trash', 'Delete', 'danger');
     toggleMenu(null, menu, x, y, false);

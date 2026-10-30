@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { ChatsScope, readConfig } from "../../core/config-manager";
 import { logger } from "../../core/logger";
 import { toolkitProjectsDir } from "../../core/paths";
-import { AgentId, AGENT_NAMES } from "../../shared/agents";
+import { AgentId, AGENT_NAMES, editorAgent } from "../../shared/agents";
 import { isWindows } from "../../shared/platform-detector";
 import { findProject } from "../alerts/services/project-registry";
 import { readProjectRecords } from "../alerts/services/project-records-reader";
@@ -12,6 +12,7 @@ import { ArchiveService } from "./services/archive-service";
 import { contextPercent, groupConversations, inWorkspace, sortConversations } from "./services/chat-list";
 import { ConversationRepository } from "./services/conversation-repository";
 import { MarkdownExporter } from "./services/export-markdown";
+import { CLAUDE_CODE_EXTENSION, OpenableAgent, openInAgentCommand, openInAgentTarget, OPEN_IN_AGENT_NAMES } from "./services/open-in-agent";
 import { RenameService } from "./services/rename-service";
 import { ChatViewerService } from "./ui/chat-viewer-webview";
 
@@ -31,6 +32,8 @@ export interface ChatRow {
   /** ISO time of the last change; the page turns it into "42m", "2d". */
   modified: string;
   archived: boolean;
+  /** The agent whose own chat can open this conversation here (the row's button); null for none. */
+  openIn: OpenableAgent | null;
 }
 
 export interface ChatListSnapshot {
@@ -42,6 +45,17 @@ export interface ChatListSnapshot {
 
 function workspaceFolders(): string[] {
   return (vscode.workspace.workspaceFolders ?? []).filter((f) => f.uri.scheme === "file").map((f) => f.uri.fsPath);
+}
+
+/** Where this window can open a conversation's own chat; null for none, or with the setting off. */
+export function openInAgentHere(meta: ConversationMeta): OpenableAgent | null {
+  if (!readConfig().chats.openInAgentButton) return null;
+  return openInAgentTarget(meta, {
+    editor: editorAgent(vscode.env.uriScheme),
+    claudeCode: vscode.extensions.getExtension(CLAUDE_CODE_EXTENSION) !== undefined,
+    folders: workspaceFolders(),
+    caseInsensitive: isWindows(),
+  });
 }
 
 /**
@@ -79,6 +93,8 @@ export class ChatsController implements vscode.Disposable {
       delete: (m) => this.delete(m),
       exportFull: (m) => this.exportFull(m),
       revealInList: (m) => this.revealInList(m),
+      openInAgent: (m) => this.openInAgent(m),
+      openInTarget: (m) => openInAgentHere(m),
       projectColor: async (m) => (await this.colorLookup(workspaceFolders()))(m),
     });
   }
@@ -134,6 +150,7 @@ export class ChatsController implements vscode.Disposable {
         context: contextPercent(m),
         modified: m.lastModifiedAt,
         archived: m.archived,
+        openIn: openInAgentHere(m),
       })),
     }));
     return { status: "ready", scope: cfg.scope, groups, total: sorted.length };
@@ -178,6 +195,22 @@ export class ChatsController implements vscode.Disposable {
 
   async open(meta: ConversationMeta): Promise<void> {
     await this.viewer.open(meta);
+  }
+
+  /** The conversation in its agent's own chat, in an editor tab: Claude Code's, or Cursor's inside Cursor. */
+  async openInAgent(meta: ConversationMeta): Promise<void> {
+    const agent = openInAgentHere(meta);
+    if (!agent) {
+      vscode.window.showInformationMessage(`Benefit: this conversation cannot open in ${AGENT_NAMES[meta.source]}'s chat from this window.`);
+      return;
+    }
+    const [command, ...args] = openInAgentCommand(agent, meta.conversationId);
+    try {
+      await vscode.commands.executeCommand(command, ...args);
+    } catch (err) {
+      logger.error("chats", `Opening in ${OPEN_IN_AGENT_NAMES[agent]} failed`, err);
+      vscode.window.showErrorMessage(`Benefit: could not open the conversation in ${OPEN_IN_AGENT_NAMES[agent]}: ${(err as Error).message}`);
+    }
   }
 
   /** Cursor's and Antigravity's files belong to them: the toolkit only reads them. */

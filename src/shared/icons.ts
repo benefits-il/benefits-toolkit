@@ -38,6 +38,7 @@ const OUTLINE = {
   refresh: '<path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"/><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/>',
   check: '<path d="M5 12l5 5l10 -10"/>',
   x: '<path d="M18 6l-12 12"/><path d="M6 6l12 12"/>',
+  arrowUpRight: '<path d="M17 7l-10 10"/><path d="M8 7l9 0l0 9"/>',
   externalLink: '<path d="M12 6h-6a2 2 0 0 0 -2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-6"/><path d="M11 13l9 -9"/><path d="M15 4h5v5"/>',
   user: '<path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0"/><path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"/>',
   archive:

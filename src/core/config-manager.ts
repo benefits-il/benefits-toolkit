@@ -7,6 +7,8 @@ const ROOT_SECTION = "benefit";
 export type RtlMode = "off" | "active" | "always" | "auto";
 export type ChatsGroupBy = "date" | "project" | "flat";
 export type ChatsSortOrder = "newest" | "oldest";
+/** Where the conversation viewer opens: a split beside the editor, or the editor group in use. */
+export type ViewerOpens = "beside" | "active";
 export type ChatsScope = "currentWorkspace" | "all";
 /** The screen corner the popup shows in; the editors' own notifications use the bottom right. */
 export type PopupPosition = "topRight" | "bottomRight";
@@ -61,6 +63,10 @@ export interface BenefitConfig {
     /** The New chat button at the top of the sidebar, and what it opens. */
     newChatButton: boolean;
     newChatOpens: NewChatOpens;
+    /** Open a conversation in its agent's own chat: a row's button, its menu item, the viewer's button. */
+    openInAgentButton: boolean;
+    /** Where the viewer opens: a split beside the editor, or the group in use. */
+    viewerOpens: ViewerOpens;
   };
   /** The agents built into Cursor and Antigravity: their alerts and their conversations. */
   agents: {
@@ -134,6 +140,8 @@ export function readConfig(): BenefitConfig {
       mdHeButton: readWith("chats.mdHeButton", true),
       newChatButton: readWith("chats.newChatButton", true),
       newChatOpens: readWith<NewChatOpens>("chats.newChatOpens", "editor") === "claudeCode" ? "claudeCode" : "editor",
+      openInAgentButton: readWith("chats.openInAgentButton", true),
+      viewerOpens: readWith<ViewerOpens>("chats.viewerOpens", "beside") === "active" ? "active" : "beside",
     },
     agents: {
       cursor: readWith("agents.cursor", true),

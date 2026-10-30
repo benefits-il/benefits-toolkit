@@ -13,7 +13,7 @@ import { registerChatCommands } from "./ui/chat-commands";
 import { ChatStatusBar } from "./ui/chat-status-bar";
 
 /** Settings that change which conversations the list holds or how it is ordered. */
-const LIST_KEYS = ["chats.scope", "chats.groupBy", "chats.sortOrder", "chats.showArchived", "chats.hideEmpty"];
+const LIST_KEYS = ["chats.scope", "chats.groupBy", "chats.sortOrder", "chats.showArchived", "chats.hideEmpty", "chats.openInAgentButton"];
 
 export function createChatsFeature(ctx: vscode.ExtensionContext): Feature {
   let disposables: vscode.Disposable[] = [];
@@ -34,17 +34,30 @@ export function createChatsFeature(ctx: vscode.ExtensionContext): Feature {
         controller,
         statusBar,
         watcher,
-        watcher.onDidChange(() => controller.refresh()),
+        // The list, and any open viewer whose conversation grew.
+        watcher.onDidChange(() => {
+          controller.refresh();
+          controller.viewer.refreshChanged();
+        }),
         ...registerChatCommands(controller),
         vscode.workspace.onDidChangeConfiguration((e) => {
           if (affects(e, "chats.showStatusBarRename")) statusBar.setVisible(readConfig().chats.showStatusBarRename);
           if (affects(e, "chats.codeCopyButtons") || affects(e, "chats.mdHeButton")) controller.viewer.applyFlags();
           if (LIST_KEYS.some((k) => affects(e, k)) || affects(e, "agents")) controller.refresh();
+          if (affects(e, "chats.openInAgentButton")) controller.viewer.syncOpenIn();
           // Project colors in the list follow the windows' colors.
           if (e.affectsConfiguration("workbench.colorCustomizations")) controller.refresh();
         }),
         // Re-scope the list when the user switches the open folder/workspace.
-        vscode.workspace.onDidChangeWorkspaceFolders(() => controller.refresh()),
+        vscode.workspace.onDidChangeWorkspaceFolders(() => {
+          controller.refresh();
+          controller.viewer.syncOpenIn();
+        }),
+        // Claude Code installed or removed: its Open buttons come or go.
+        vscode.extensions.onDidChange(() => {
+          controller.refresh();
+          controller.viewer.syncOpenIn();
+        }),
       );
       chatsHub.set(controller);
       logger.info("chats", "Feature activated.");

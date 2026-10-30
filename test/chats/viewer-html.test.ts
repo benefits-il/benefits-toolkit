@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { ConversationMeta, MessageRecord } from "../../src/features/chats/domain/conversation";
-import { buildViewerHtml, cleanViewerPrefs, DEFAULT_VIEWER_PREFS, toItems, toTurns } from "../../src/features/chats/ui/viewer/viewer-html";
+import { buildViewerHtml, cleanViewerPrefs, DEFAULT_VIEWER_PREFS, openInButton, toItems, toTurns, viewerParts } from "../../src/features/chats/ui/viewer/viewer-html";
 
 let n = 0;
 function msg(type: "user" | "assistant", content: unknown): MessageRecord {
@@ -63,7 +63,7 @@ test("the page: oldest exchange at the top, cards with icons in their headers, a
     msg("assistant", text("second answer")),
   ];
   const html = buildViewerHtml({ meta, records, theme: "dark", fonts: null, prefs: DEFAULT_VIEWER_PREFS, flags: { codeCopy: true, mdHe: true }, projectColor: "#1f8a8a" });
-  const order = [...html.matchAll(/<article class="msg unit (\w+)( collapsed)?"|<details class="work">/g)].map((m) => (m[1] ? m[1] + (m[2] ? " closed" : " open") : "work"));
+  const order = [...html.matchAll(/<article class="msg unit (\w+)( collapsed)?"|<details class="work"/g)].map((m) => (m[1] ? m[1] + (m[2] ? " closed" : " open") : "work"));
   assert.deepEqual(order, ["you closed", "work", "claude closed", "you closed", "claude open"]);
   assert.ok(html.indexOf("hello there") < html.indexOf("second question"), "the newest exchange comes last");
   assert.ok(html.includes('id="to-latest"') && html.includes("openAtLatest()"), "the page opens at the newest message");
@@ -120,4 +120,25 @@ test("another agent's conversation: its name and mark, no context bar, no rename
   assert.ok(!html.includes('class="context"'), "no context bar: Cursor records no usage");
   for (const action of ["rename", "archive", "delete"]) assert.ok(!html.includes(`data-action="${action}"`), `no ${action}`);
   assert.ok(html.includes('data-action="exportFull"'));
+});
+
+test("the header's Open in button: the agent's mark and name, hidden when this window cannot open it", () => {
+  const records = [msg("user", text("hi")), msg("assistant", text("hello"))];
+  const html = buildViewerHtml({ meta, records, theme: "dark", fonts: null, prefs: DEFAULT_VIEWER_PREFS, flags: { codeCopy: true, mdHe: true }, projectColor: null, openIn: "claude" });
+  assert.ok(html.includes('id="open-in" title="Open in Claude Code">'), "shown, with its name");
+  assert.ok(html.includes('<i class="mark mark-claude" aria-hidden="true"></i><span>Open in Claude Code</span>'));
+  assert.ok(openInButton("cursor").includes("mark-cursor") && openInButton("cursor").includes("Open in Cursor"));
+  assert.ok(openInButton(null).includes('id="open-in" title="" hidden>'), "kept in the page, hidden, so a setting can bring it back");
+});
+
+test("new messages: the earlier exchanges keep their fingerprint, so the open page keeps them as they are", () => {
+  const first = [msg("user", text("one")), msg("assistant", text("answer one")), msg("user", text("two")), msg("assistant", text("answer two"))];
+  const before = viewerParts({ meta, records: first }).turns;
+  const after = viewerParts({ meta, records: [...first, msg("user", text("three")), msg("assistant", text("answer three"))] }).turns;
+  assert.equal(after.length, 3);
+  assert.equal(after[0].h, before[0].h, "an exchange that did not change");
+  assert.notEqual(after[1].h, before[1].h, "the answer that was the latest closes now");
+  assert.ok(after[2].html.startsWith(`<section class="turn" data-h="${after[2].h}">`));
+  assert.deepEqual(viewerParts({ meta, records: first }).turns, before, "the same file renders the same");
+  assert.ok(/<article class="msg unit you collapsed" data-key="u\d+"/.test(after[0].html), "each card carries its message's id");
 });

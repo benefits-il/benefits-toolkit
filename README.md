@@ -11,7 +11,7 @@ Five features in one place:
 - **Alerts** — Know when the agent is done without watching it:
   - **Sounds** when Claude finishes a message or asks for your input, and when Cursor's or Antigravity's agent finishes. Pick any sound from a shared library for each event, hearing each one as you click it, as a default for all projects or just for this one. A new project gets a "finished" sound no other project uses, so each window sounds different.
   - **Popup** (Windows and macOS): a small card framed in the project's window color, with its name (the folder's, or one you type in Settings). It springs in from the screen edge and flashes its frame once. Click it to jump straight back to that window; drag it anywhere and later popups show there too. More alerts from the same window raise a counter on its card instead of stacking new ones. It never shows while you're already in that window, and it can stay until you click it, shrunk to a small pill after the usual seconds.
-- **Chats**: a sidebar list of your past conversations with Claude Code, Cursor's agent and Antigravity's agent, each with its time and a small ring for how full its context is. Rename, archive, restore, search, export to Markdown, and a viewer that reads like a closed thread: every message in a card marked by its speaker, closed to its first lines until you open it, with only the latest answer open, and Claude's tool calls and notes folded into one line. It has find in the conversation, a left-to-right or right-to-left switch for Hebrew, file links that open the file right in the editor, a Copy button on every code block, and an "Open in md-he" button that opens any message at [benefits-il.dev/md-he](https://benefits-il.dev/md-he/) for comfortable reading.
+- **Chats**: a sidebar list of your past conversations with Claude Code, Cursor's agent and Antigravity's agent, each with its time and a small ring for how full its context is. Rename, archive, restore, search, export to Markdown, and a viewer that reads like a closed thread: every message in a card marked by its speaker, closed to its first lines until you open it, with only the latest answer open, and Claude's tool calls and notes folded into one line. It has find in the conversation, a left-to-right or right-to-left switch for Hebrew, file links that open the file right in the editor, a Copy button on every code block, and an "Open in md-he" button that opens any message at [benefits-il.dev/md-he](https://benefits-il.dev/md-he/) for comfortable reading. An open conversation takes in new messages as the agent writes them. A button on a hovered row (and in the viewer) opens the conversation in its agent's own chat, in an editor tab.
 - **Colors**: give each editor window its own color (title, activity and status bars), so five open projects stop looking identical. A new project gets a color no other project uses; pick another of the 38 in Settings, or type a hex.
 - **Open in browser**: a Benefits button on HTML files, in the editor title bar and the Explorer's right-click menu, opens them in your browser. The same button on Markdown files opens them in [md-he](https://benefits-il.dev/md-he/). Uses the system default browser, or set `benefit.htmlOpen.browserPath` to force a specific one (e.g. Chrome).
 
@@ -26,12 +26,14 @@ Every feature works in all three editors. What changes is which agent it serves.
 | Conversation list and viewer | ✓ | ✓ | ✓ | All three agents |
 | Sound and popup when the agent finishes | ✓ | ✓ | ✓ | All three agents |
 | New chat button | ✓ | ✓ | ✓ | The editor's agent, or Claude Code |
+| Open in the agent's own chat | ✓ | ✓ | ✓ | Claude Code; Cursor's agent inside Cursor |
 | Window colors | ✓ | ✓ | ✓ | Any agent |
 | Open in browser and md-he | ✓ | ✓ | ✓ | Any agent |
 | Right-to-left chat | ✓ | ✓ | ✓ | Claude Code |
 | Alert when the agent needs input | ✓ | ✓ | ✓ | Claude Code |
 
 - Cursor and Antigravity conversations open for reading, and you can save them as Markdown.
+- Open in the agent's own chat works for this window's own conversations: Claude Code's wherever Claude Code is installed, and Cursor's inside Cursor. Antigravity's agent cannot open a conversation by its id, so its conversations have no button.
 - Right-to-left works in Claude Code's chat, in each of the editors. Cursor's and Antigravity's agents don't get it in their own chat; their conversations read right to left in the toolkit's viewer.
 - In Cursor and Antigravity you can also turn off the editor's own alerts, so only the Benefits alert remains.
 - Claude Code features need the Claude Code extension in that editor.

@@ -68,6 +68,8 @@ export const WRITABLE_SETTINGS: Readonly<Record<string, SettingSpec>> = {
   "chats.mdHeButton": BOOL,
   "chats.newChatButton": BOOL,
   "chats.newChatOpens": { kind: "enum", values: ["editor", "claudeCode"] },
+  "chats.openInAgentButton": BOOL,
+  "chats.viewerOpens": { kind: "enum", values: ["beside", "active"] },
   "agents.cursor": BOOL,
   "agents.antigravity": BOOL,
   "agents.cursorOwnAlertsOff": BOOL,

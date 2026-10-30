@@ -8,6 +8,7 @@ import { BrandFonts, escapeHtml, renderWebviewPage } from "../../../../shared/we
 import { CONTEXT_WINDOW, ContentBlock, contextTokens, extractBlocks, formatModelName, readLastUsage } from "../../domain/blocks";
 import { ConversationMeta, MessageRecord, RawJsonlRecord } from "../../domain/conversation";
 import { safeDecode } from "../../services/link-resolver";
+import { OpenableAgent, OPEN_IN_AGENT_NAMES } from "../../services/open-in-agent";
 import { VIEWER_CSS, VIEWER_SCRIPT } from "./viewer-assets";
 
 /** Reading direction and Display filters: one set for every open viewer. */
@@ -51,6 +52,40 @@ export interface ViewerInput {
   flags: ViewerFlags;
   /** The project's window color, when one is known: Claude's bubbles take it. */
   projectColor: string | null;
+  /** The agent whose own chat can open this conversation here (the header's button); null hides it. */
+  openIn?: OpenableAgent | null;
+}
+
+/**
+ * What changes as the conversation grows, rendered alone: the open page
+ * swaps these in (message "update") and keeps its scroll, its open cards
+ * and its search.
+ */
+export interface ViewerParts {
+  title: string;
+  /** The line under the title: when it started, how many messages, which agent. */
+  meta: string;
+  /** The context bar; "" for Cursor's and Antigravity's conversations. */
+  context: string;
+  /** One per exchange, oldest first; `h` tells the page whether its copy is still current. */
+  turns: RenderedTurn[];
+}
+
+export interface RenderedTurn {
+  h: string;
+  html: string;
+}
+
+export const EMPTY_CONVERSATION = '<div class="empty-state">No messages in this conversation.</div>';
+
+/** FNV-1a: a short fingerprint of an exchange's markup. */
+function fingerprint(text: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(36);
 }
 
 // `html: false` escapes any raw HTML in the message instead of emitting it, so
@@ -293,7 +328,7 @@ function article({ who, agent, message, body, blocks, open }: Speech): string {
   const modelRaw = (message.message as Record<string, unknown>)?.["model"];
   const model = claude && typeof modelRaw === "string" ? formatModelName(modelRaw) : undefined;
   return `
-    <article class="msg unit ${who}${open ? "" : " collapsed"}" data-who="${name}" data-when="${escapeHtml(dateTime(message.timestamp))}">
+    <article class="msg unit ${who}${open ? "" : " collapsed"}" data-key="${escapeHtml(message.uuid)}" data-who="${name}" data-when="${escapeHtml(dateTime(message.timestamp))}">
       <div class="msg-head">
         <button class="msg-toggle" type="button" aria-expanded="${open}">
           <span class="avatar${claude ? ` avatar-${agent}` : ""}" aria-hidden="true">${claude ? agentMark(agent) : icon("user")}</span>
@@ -341,7 +376,7 @@ function names(list: string[]): string {
  * line: "12 updates, 31 tool calls · Read, Edit, Bash". Open, it shows the
  * running notes and each run of steps, each folded again.
  */
-function renderWork(items: ViewerItem[], extra: ContentBlock[], answerAt: string | undefined, agent: AgentId): string {
+function renderWork(items: ViewerItem[], extra: ContentBlock[], answerAt: string | undefined, agent: AgentId, key: string): string {
   if (items.length === 0 && extra.length === 0) return "";
   const all: ContentBlock[] = [];
   let updates = 0;
@@ -355,7 +390,7 @@ function renderWork(items: ViewerItem[], extra: ContentBlock[], answerAt: string
     const blocks = item.messages.flatMap((m) => extractBlocks(m));
     all.push(...blocks);
     const { label, names: tools } = describeSteps(blocks);
-    return `<details class="step unit" data-who="${escapeHtml(label)}" data-when="${escapeHtml(dateTime(item.messages[0].timestamp))}"><summary>${icon(blocks.some((b) => b.kind === "tool") ? "tool" : "brain")}<span>${escapeHtml(label)}${escapeHtml(names(tools))}</span></summary><div class="step-body">${renderBlocks(blocks)}</div></details>`;
+    return `<details class="step unit" data-key="${escapeHtml(item.messages[0].uuid)}" data-who="${escapeHtml(label)}" data-when="${escapeHtml(dateTime(item.messages[0].timestamp))}"><summary>${icon(blocks.some((b) => b.kind === "tool") ? "tool" : "brain")}<span>${escapeHtml(label)}${escapeHtml(names(tools))}</span></summary><div class="step-body">${renderBlocks(blocks)}</div></details>`;
   });
   if (extra.length) {
     all.push(...extra);
@@ -365,11 +400,11 @@ function renderWork(items: ViewerItem[], extra: ContentBlock[], answerAt: string
   const { names: tools } = describeSteps(all);
   const calls = all.filter((b) => b.kind === "tool" && b.text.startsWith("[Tool: ")).length;
   const summary = [updates ? plural(updates, "update", "updates") : "", calls ? plural(calls, "tool call", "tool calls") : ""].filter(Boolean).join(", ") || "Thinking";
-  return `<details class="work"><summary>${icon("chevronRight")}<span>${escapeHtml(summary + names(tools))}</span></summary><div class="work-body">${parts.join("")}</div></details>`;
+  return `<details class="work" data-key="${escapeHtml(`work:${key}`)}"><summary>${icon("chevronRight")}<span>${escapeHtml(summary + names(tools))}</span></summary><div class="work-body">${parts.join("")}</div></details>`;
 }
 
 /** `open`: which of the exchange's messages starts open, if any. */
-function renderTurn(turn: Turn, agent: AgentId, open: "you" | "claude" | null): string {
+function renderTurn(turn: Turn, agent: AgentId, open: "you" | "claude" | null): RenderedTurn {
   let you = "";
   if (turn.user) {
     const { own, attached } = splitAttachments(extractBlocks(turn.user));
@@ -378,9 +413,12 @@ function renderTurn(turn: Turn, agent: AgentId, open: "you" | "claude" | null): 
   // The answer's bubble holds its text; its thinking or tool calls join the work.
   const answerBlocks = turn.answer ? extractBlocks(turn.answer) : [];
   const text = answerBlocks.filter((b) => b.kind === "text");
-  const work = renderWork(turn.work, answerBlocks.filter((b) => b.kind !== "text"), turn.answer?.timestamp, agent);
+  const key = turn.user?.uuid ?? turn.answer?.uuid ?? "";
+  const work = renderWork(turn.work, answerBlocks.filter((b) => b.kind !== "text"), turn.answer?.timestamp, agent, key);
   const answer = turn.answer ? article({ who: "claude", agent, message: turn.answer, body: renderBlocks(text), blocks: text, open: open === "claude" }) : "";
-  return `<section class="turn">${you}${work}${answer}</section>`;
+  const inner = `${you}${work}${answer}`;
+  const h = fingerprint(inner);
+  return { h, html: `<section class="turn" data-h="${h}">${inner}</section>` };
 }
 
 /** JSON inside a <script>: no "</script>" can close it early. */
@@ -391,8 +429,7 @@ function scriptJson(value: unknown): string {
 /** The agent's stripe takes the project's color; without one, the Benefits green. */
 const DEFAULT_BUBBLE = "#10B981";
 
-export function buildViewerHtml(input: ViewerInput): string {
-  const { meta, records, prefs, flags } = input;
+export function viewerParts({ meta, records }: Pick<ViewerInput, "meta" | "records">): ViewerParts {
   const messages = records.filter(isRealMessage) as MessageRecord[];
   const stats = contextStats(records, messages);
   // Like a messaging app: the oldest exchange at the top, the newest at the
@@ -400,16 +437,41 @@ export function buildViewerHtml(input: ViewerInput): string {
   // bottom: your message, the work, the answer.
   const agent = meta.source;
   const agentName = AGENT_NAMES[agent];
-  // Cursor's and Antigravity's files belong to them: no rename, archive or delete.
-  const readOnly = agent !== "claude";
   // Every message starts closed but the latest answer (or, with no answer
   // yet, the latest message): the conversation reads like a closed thread.
   const turns = toTurns(messages);
   const lastAnswer = turns.map((t) => Boolean(t.answer)).lastIndexOf(true);
   const opened = (i: number): "you" | "claude" | null =>
     lastAnswer >= 0 ? (i === lastAnswer ? "claude" : null) : i === turns.length - 1 ? "you" : null;
-  const turnsHtml = turns.map((t, i) => renderTurn(t, agent, opened(i))).join("\n");
   const started = dateTime(meta.firstMessageAt ?? messages[0]?.timestamp);
+  return {
+    title: meta.title,
+    meta: `${started ? `<span>${escapeHtml(started)}</span>` : ""}
+      <span>${messages.length} ${messages.length === 1 ? "message" : "messages"}</span>
+      <span class="agent">${agentMark(agent)}${escapeHtml(stats.model && agent === "claude" ? `${agentName} ${stats.model}` : agentName)}</span>`,
+    // Cursor's and Antigravity's files carry no usage: no context bar.
+    context: agent !== "claude" ? "" : `<div class="context" title="${escapeHtml(stats.tooltip)}">
+      <span>Context<strong>${Math.round(stats.pct)}%</strong></span>
+      <div class="bar"><i class="tier-${stats.tier}" style="width:${stats.pct.toFixed(1)}%"></i></div>
+      <span>${stats.estimate ? '<span class="est">Estimated</span> · ' : ""}${stats.used} / ${stats.window}</span>
+    </div>`,
+    turns: turns.map((t, i) => renderTurn(t, agent, opened(i))),
+  };
+}
+
+/** The header's button into the agent's own chat; hidden when this window cannot open it. */
+export function openInButton(openIn: OpenableAgent | null): string {
+  const label = openIn ? `Open in ${OPEN_IN_AGENT_NAMES[openIn]}` : "";
+  return `<button class="btn open-in" type="button" id="open-in" title="${label}"${openIn ? "" : " hidden"}>${openIn ? agentMark(openIn) : ""}<span>${label}</span>${icon("arrowUpRight")}</button>`;
+}
+
+export function buildViewerHtml(input: ViewerInput): string {
+  const { meta, prefs, flags } = input;
+  const parts = viewerParts(input);
+  const agent = meta.source;
+  const agentName = AGENT_NAMES[agent];
+  // Cursor's and Antigravity's files belong to them: no rename, archive or delete.
+  const readOnly = agent !== "claude";
   const projectColor = input.projectColor && /^#[0-9a-f]{6}$/i.test(input.projectColor) ? input.projectColor : null;
   const color = projectColor ? ` style="--c:${projectColor}"` : "";
 
@@ -418,13 +480,12 @@ export function buildViewerHtml(input: ViewerInput): string {
   <header class="vhead">
     <div class="eyebrow"><i class="pdot"${color}></i><span>${escapeHtml(meta.projectDisplayName)}</span><span class="kind">Conversation</span></div>
     <div class="heading-row">
-      <h1 dir="auto">${escapeHtml(meta.title)}</h1>
+      <h1 dir="auto">${escapeHtml(parts.title)}</h1>
+      ${openInButton(input.openIn ?? null)}
       <button class="btn" type="button" id="more" aria-haspopup="menu" aria-expanded="false"><span>More</span>${icon("dots")}</button>
     </div>
-    <div class="meta">
-      ${started ? `<span>${escapeHtml(started)}</span>` : ""}
-      <span>${messages.length} ${messages.length === 1 ? "message" : "messages"}</span>
-      <span class="agent">${agentMark(agent)}${escapeHtml(stats.model && !readOnly ? `${agentName} ${stats.model}` : agentName)}</span>
+    <div class="meta" id="meta">
+      ${parts.meta}
     </div>
     <div class="tools">
       <div class="find" role="search">
@@ -441,16 +502,12 @@ export function buildViewerHtml(input: ViewerInput): string {
       <button class="btn" type="button" id="display" aria-haspopup="true" aria-expanded="false">${icon("adjustments")}<span>Display</span></button>
       <button class="btn" type="button" id="collapse">${icon("chevronsUp")}<span>Collapse all</span></button>
     </div>
-    ${readOnly ? "" : `<div class="context" title="${escapeHtml(stats.tooltip)}">
-      <span>Context<strong>${Math.round(stats.pct)}%</strong></span>
-      <div class="bar"><i class="tier-${stats.tier}" style="width:${stats.pct.toFixed(1)}%"></i></div>
-      <span>${stats.estimate ? '<span class="est">Estimated</span> · ' : ""}${stats.used} / ${stats.window}</span>
-    </div>`}
+    <div id="context-slot">${parts.context}</div>
     <div class="hidden-matches" id="hidden-matches" hidden><span id="hidden-count"></span> in hidden parts. <button class="link" type="button" id="show-hidden">Show them</button></div>
   </header>
   <main class="messages" id="messages">
-    <div class="column" dir="${prefs.direction}">
-${turnsHtml || '<div class="empty-state">No messages in this conversation.</div>'}
+    <div class="column" id="column" dir="${prefs.direction}">
+${parts.turns.map((t) => t.html).join("\n") || EMPTY_CONVERSATION}
     </div>
   </main>
   <footer class="vfoot">
