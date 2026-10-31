@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.12.1 · The Mac popup takes clicks again on macOS 26
+
+**Fixed**
+- On macOS 26 the popup showed, but a click or a drag did nothing: no window came to the front, the popup did not move, and the x did not close it. The clicks did reach the popup. macOS 26 hands the script an event type that reads as 1 but is not the number 1 the script compared it with, so no click was ever recognized. The script now turns these values into plain numbers before it compares them. Seen on an Apple Silicon Mac with macOS 26.6; older macOS versions and Intel Macs worked and still do.
+
 ## 0.12.0 · Open the real chat, and a viewer that keeps up
 
 **Open in the agent's own chat.** Hovering a row shows a small button with the agent's mark and an arrow, in place of the time and the ring. It opens the conversation in that agent's own chat, in an editor tab: Claude Code's for a Claude conversation, Cursor's for a Cursor conversation (inside Cursor). A conversation that is already open there gets focus instead of a second tab. A plain click on the row still opens the toolkit's viewer. The same action is in the row's right-click menu, under Open, and in the viewer's header, beside More.

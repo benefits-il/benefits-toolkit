@@ -32,7 +32,10 @@
 // different numbers on each (so labels are placed by measuring, never by
 // alignment), and NSEventMaskAny (2^64-1) does not survive a JS number.
 // Mouse events are therefore read straight off the event queue, and every
-// view is a plain NSBox, NSTextField or NSImageView (no layers).
+// view is a plain NSBox, NSTextField or NSImageView (no layers). On macOS 26
+// (seen on Apple Silicon) an event's type comes back as a value that reads
+// "1" but is not the number 1, so integers from Cocoa go through int()
+// before they are compared.
 // Failures are appended to state/dispatch.log, tagged [popup] as on Windows.
 ObjC.import('Cocoa');
 
@@ -108,6 +111,8 @@ function mtimeSeconds(path) {
   return attrs.objectForKey($.NSFileModificationDate).timeIntervalSince1970;
 }
 function quote(s) { return "'" + String(s).replace(/'/g, "'\\''") + "'"; }
+// An integer from Cocoa (an event's type, a window number) as a plain number.
+function int(v) { return Number(String(v)); }
 function logLine(stateDir, message) {
   try {
     const log = stateDir + '/dispatch.log';
@@ -189,8 +194,8 @@ function box(frame, fill, radius, line, lineWidth) {
 // (or an error) means animate.
 function reduceMotion() {
   try {
-    const v = $.NSWorkspace.sharedWorkspace.accessibilityDisplayShouldReduceMotion;
-    return v === true || v === 1;
+    const v = String($.NSWorkspace.sharedWorkspace.accessibilityDisplayShouldReduceMotion);
+    return v === 'true' || v === '1';
   } catch (e) {
     return false;
   }
@@ -756,10 +761,11 @@ function host(stateDir, marksDir, sh) {
 
   // --- Mouse: a click opens, a drag moves, the x closes. ---
   function onEvent(event) {
-    const type = event.type;
+    const type = int(event.type);
     const m = $.NSEvent.mouseLocation;
     if (type === LEFT_MOUSE_DOWN) {
-      const c = cards.find((k) => k.phase !== 'leave' && k.panel.windowNumber === event.windowNumber);
+      const win = int(event.windowNumber);
+      const c = cards.find((k) => k.phase !== 'leave' && int(k.panel.windowNumber) === win);
       if (c && inside(m, screenRect(c))) press = { c, x: m.x, y: m.y, ax: c.ax, ay: c.ay, dragging: false };
     } else if (type === LEFT_MOUSE_DRAGGED && press) {
       const c = press.c;

@@ -2,7 +2,7 @@
   "name": "benefits-toolkit",
   "displayName": "Benefit's Toolkit",
   "description": "Quality-of-life tools for Claude Code, and for Cursor's and Antigravity's own agents: RTL chat, sounds and popups, a conversation manager and viewer, window colors and HTML in your browser. Part of Benefits, the course that teaches you to work right with AI (benefits-il.dev).",
-  "version": "0.12.0",
+  "version": "0.12.1",
   "publisher": "benakiva",
   "author": {
     "name": "Ben Akiva"
